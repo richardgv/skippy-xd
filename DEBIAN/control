@@ -1,0 +1,10 @@
+Package: skippy-xd
+Version: 0.5-1
+Section: base
+Priority: optional
+Architecture: amd64
+Depends: libxcomposite1 (>= 1:0.4.3-2), libxrender1 (>= 1:0.9.6-2), libxfixes3 (>= 1:5.0-4), libxdamage1 (>= 1:1.1.3-2), libxft2 (>= 2.2.0-3ubuntu1)
+Maintainer: Nick Watts <nick@resplect.com>
+Description: Skippy-XD
+ Provides composited Mac OSX Expose-style task-switching 
+ for non-composited window managers.
