@@ -1,0 +1,11 @@
+Skippy-XD changelog
+
+0.5.0 -- "Damage, Inc."
+ - 'Lazy transparency' mode: let xcompmgr take care of alpha-blending the
+   mini-windows.
+ - Tooltip can have drop-shadow text, and can be translucent
+ - Read config from ~/.skippy-xd.rc since the configuration options have
+   changed
+ - Branched from 'regular' skippy, switched from Imlib2 to XRender
+   rendering, removed the old window snapshot code and replaced it with
+   XComposite / XDamage stuff
