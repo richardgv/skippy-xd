@@ -1,9 +1,6 @@
-# Copy this to ~/.skippy-xd.rc and edit it to your liking
+# Copy this to ~/.config/skippy-xd/skippy-xd.rc and edit it to your liking
 #
 # Notes:
-#
-# - keysym can be anything XStringToKeysym can handle
-#   (like F11, KP_Enter or implementation specific keysyms)
 #
 # - colors can be anything XAllocNamedColor can handle
 #   (like "black" or "#000000")
@@ -28,7 +25,6 @@
 #
 
 [general]
-keysym = F11
 distance = 50
 useNetWMFullscreen = true
 ignoreSkipTaskbar = true
@@ -50,9 +46,9 @@ opacity = 255
 
 [tooltip]
 show = true
-border = #e0e0e0
+border = #ffffff
 background = #404040
 opacity = 128
-text = #e0e0e0
+text = #ffffff
 textShadow = black
 font = fixed-11:weight=bold

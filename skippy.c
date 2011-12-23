@@ -147,9 +147,9 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xi
 	mainwin_update(mw);
 #ifdef XINERAMA
 	if(all_xin)
+	{
 		mw->xin_active = 0;
-#else /* ! XINERAMA */
-	if(all_xin);
+	}
 #endif /* XINERAMA */
 	
 	/* Map the main window and run our event loop */
@@ -302,11 +302,10 @@ main(void)
 	dlist *clients = 0, *config = 0;
 	Display *dpy = XOpenDisplay(NULL);
 	MainWin *mw;
-	KeyCode keycode;
-	KeySym keysym;
 	const char *tmp, *homedir;
 	char cfgpath[8192];
 	Bool invertShift = False;
+	Window leader, focused;
 	
 	if(! dpy) {
 		fprintf(stderr, "FATAL: Couldn't connect to display.\n");
@@ -322,11 +321,13 @@ main(void)
 	
 	homedir = getenv("HOME");
 	if(homedir) {
-		snprintf(cfgpath, 8191, "%s/%s", homedir, ".skippy-xd.rc");
+		snprintf(cfgpath, 8191, "%s/%s", homedir, ".config/skippy-xd/skippy-xd.rc");
 		config = config_load(cfgpath);
 	}
 	else
+	{
 		fprintf(stderr, "WARNING: $HOME not set, not loading config.\n");
+	}
 	
 	wm_use_netwm_fullscreen(strcasecmp("true", config_get(config, "general", "useNETWMFullscreen", "true")) == 0);
 	wm_ignore_skip_taskbar(strcasecmp("true", config_get(config, "general", "ignoreSkipTaskbar", "false")) == 0);
@@ -342,41 +343,10 @@ main(void)
 	
 	invertShift = strcasecmp("true", config_get(config, "xinerama", "showAll", "false")) == 0;
 	
-	tmp = config_get(config, "general", "keysym", "F11");
-	keysym = XStringToKeysym(tmp);
-	if(keysym == NoSymbol)
-	{
-		fprintf(stderr, "FATAL: Couldn't look up keysym for '%s', bailing out.\n", tmp);
-		config_free(config);
-		XCloseDisplay(mw->dpy);
-		return -1;
-	}
-	
 	XSelectInput(mw->dpy, mw->root, PropertyChangeMask);
-	
-	keycode = XKeysymToKeycode(mw->dpy, keysym);
-	XGrabKey(mw->dpy, keycode, AnyModifier, mw->root, False, GrabModeAsync, GrabModeAsync);
-	while(! DIE_NOW)
-	{
-		XEvent ev;
-		XNextEvent(mw->dpy, &ev);
-		if(ev.type == PropertyNotify && (ev.xproperty.atom == ESETROOT_PMAP_ID || ev.xproperty.atom == _XROOTPMAP_ID))
-			mainwin_update_background(mw);
-		else if(ev.type == KeyRelease && ev.xkey.keycode == keycode)
-		{
-			Window leader = None, focused = wm_get_focused(mw->dpy);
-			Bool shifted = (ev.xkey.state & ShiftMask) ? ! invertShift : invertShift;
-			
-			if(ev.xkey.state & Mod1Mask)
-			{
-				if(focused != None)
-					leader = wm_get_group_leader(mw->dpy, focused);
-				if(! leader)
-					continue;
-			}
-			clients = skippy_run(mw, clients, focused, leader, shifted);
-		}
-	}
+
+	leader = None, focused = wm_get_focused(mw->dpy);
+	clients = skippy_run(mw, clients, focused, leader, !invertShift);
 	
 	dlist_free_with_func(clients, (dlist_free_func)clientwin_destroy);
 	
