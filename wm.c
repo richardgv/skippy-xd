@@ -260,14 +260,12 @@ wm_get_stack(Display *dpy)
 	
 	for(i = 0; i < items_read; i++)
 	{
-		if (ENVIRONMENT_64_BIT)
-		{
-			l = dlist_add(l, (void*)((CARD64*)data)[i]);
-		}
-		else if (ENVIRONMENT_32_BIT)
-		{
-			l = dlist_add(l, (void*)((CARD32*)data)[i]);
-		}
+		#ifdef ENVIRONMENT_64_BIT
+		l = dlist_add(l, (void*)((CARD64*)data)[i]);
+		#endif
+		#ifdef ENVIRONMENT_32_BIT
+		l = dlist_add(l, (void*)((CARD32*)data)[i]);
+		#endif
 	}
 	
 	XFree(data);

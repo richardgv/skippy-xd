@@ -39,13 +39,11 @@ filefooter = '''
 
 if long_size == "64":
 	architecture_constants = '''
-const char ENVIRONMENT_64_BIT = 1;
-const char ENVIRONMENT_32_BIT = 0;
+#define ENVIRONMENT_64_BIT 1
 '''
 elif long_size == "32":
 	architecture_constants = '''
-const char ENVIRONMENT_64_BIT = 0;
-const char ENVIRONMENT_32_BIT = 1;
+#define ENVIRONMENT_32_BIT = 1;
 '''
 else:
 	print("Could not determine architecture, \"getconf LONG_BIT\" returned neither \"32\" nor \"64\"")
