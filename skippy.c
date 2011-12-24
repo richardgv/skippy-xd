@@ -292,7 +292,9 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xi
 		DIE_NOW = 1;
 	
 	if(refocus)
+	{
 		XSetInputFocus(mw->dpy, focus, RevertToPointerRoot, CurrentTime);
+	}
 	
 	return clients;
 }
@@ -322,6 +324,16 @@ void activate_window_picker(const char* pipePath)
 void exit_daemon(const char* pipePath)
 {
 	send_command_to_daemon_via_fifo(EXIT_RUNNING_DAEMON, pipePath);
+}
+
+void show_help()
+{
+	printf("Usage: skippy-xd [command]\n\n");
+	printf("The available commands are:\n");
+	printf("\t--start-daemon            - starts the daemon running.\n");
+	printf("\t--stop-daemon             - stops the daemon running.\n");
+	printf("\t--activate-window-picker  - tells the daemon to show the window picker.\n");
+	printf("\t--help                    - show this message.\n\n");
 }
 
 int main(int argc, char *argv[])
@@ -370,6 +382,11 @@ int main(int argc, char *argv[])
 		else if (strcmp(argv[1], "--start-daemon") == 0)
 		{
 			runAsDaemon = True;
+		}
+		else if (strcmp(argv[1], "--help") == 0)
+		{
+			show_help();
+			exit(0);
 		}	
 	}
 	

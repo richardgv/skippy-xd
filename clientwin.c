@@ -336,7 +336,6 @@ clientwin_handle(ClientWin *cw, XEvent *ev)
 		clientwin_render(cw);
 		XFlush(cw->mainwin->dpy);
 	} else if(ev->type == EnterNotify) {
-		XSetInputFocus(cw->mainwin->dpy, cw->mini.window, RevertToNone, CurrentTime);
 		if(cw->mainwin->tooltip)
 		{
 			int win_title_len = 0;
