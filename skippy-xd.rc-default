@@ -30,6 +30,7 @@ useNetWMFullscreen = true
 ignoreSkipTaskbar = true
 updateFreq = 10.0
 lazyTrans = false
+pipePath = /tmp/skippy-xd-fifo
 
 [xinerama]
 showAll = false

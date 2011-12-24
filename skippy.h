@@ -67,4 +67,7 @@
 #include "config.h"
 #include "tooltip.h"
 
+#define ACTIVATE_WINDOW_PICKER 1
+#define EXIT_RUNNING_DAEMON 2
+
 #endif /* SKIPPY_H */

@@ -17,6 +17,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <errno.h>
 #include "skippy.h"
 
 static int DIE_NOW = 0;
@@ -296,16 +297,81 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xi
 	return clients;
 }
 
-int
-main(void)
+void send_command_to_daemon_via_fifo(int command, const char* pipePath)
+{
+	FILE *fp;	
+	if (access(pipePath, W_OK) != 0)
+	{
+		fprintf(stderr, "pipe does not exist, exiting...\n");
+		exit(1);
+	}
+	
+	fp = fopen(pipePath, "w");
+	
+	printf("sending command...\n");
+	fputc(command, fp);
+	
+	fclose(fp);
+}
+
+void activate_window_picker(const char* pipePath)
+{
+	send_command_to_daemon_via_fifo(ACTIVATE_WINDOW_PICKER, pipePath);
+}
+
+void exit_daemon(const char* pipePath)
+{
+	send_command_to_daemon_via_fifo(EXIT_RUNNING_DAEMON, pipePath);
+}
+
+int main(int argc, char *argv[])
 {
 	dlist *clients = 0, *config = 0;
 	Display *dpy = XOpenDisplay(NULL);
 	MainWin *mw;
-	const char *tmp, *homedir;
+	const char *homedir;
 	char cfgpath[8192];
 	Bool invertShift = False;
+	Bool runAsDaemon = False;
 	Window leader, focused;
+	const char* pipePath;
+	int result;
+	int flush_file = 0;
+	FILE *fp;
+	int piped_input;
+	int exitDaemon = 0;
+	
+	homedir = getenv("HOME");
+	if(homedir) {
+		snprintf(cfgpath, 8191, "%s/%s", homedir, ".config/skippy-xd/skippy-xd.rc");
+		config = config_load(cfgpath);
+	}
+	else
+	{
+		fprintf(stderr, "WARNING: $HOME not set, not loading config.\n");
+	}
+	
+	pipePath = config_get(config, "general", "pipePath", "/tmp/skippy-xd-fifo");
+	
+	if (argc > 1)
+	{
+		if (strcmp(argv[1], "--activate-window-picker") == 0)
+		{
+			printf("activating window picker...\n");
+			activate_window_picker(pipePath);
+			exit(0);
+		}
+		else if (strcmp(argv[1], "--stop-daemon") == 0)
+		{
+			printf("exiting daemon...\n");
+			exit_daemon(pipePath);
+			exit(0);
+		}
+		else if (strcmp(argv[1], "--start-daemon") == 0)
+		{
+			runAsDaemon = True;
+		}	
+	}
 	
 	if(! dpy) {
 		fprintf(stderr, "FATAL: Couldn't connect to display.\n");
@@ -317,16 +383,6 @@ main(void)
 	if(! wm_check(dpy)) {
 		fprintf(stderr, "FATAL: WM not NETWM or GNOME WM Spec compliant.\n");
 		return -1;
-	}
-	
-	homedir = getenv("HOME");
-	if(homedir) {
-		snprintf(cfgpath, 8191, "%s/%s", homedir, ".config/skippy-xd/skippy-xd.rc");
-		config = config_load(cfgpath);
-	}
-	else
-	{
-		fprintf(stderr, "WARNING: $HOME not set, not loading config.\n");
 	}
 	
 	wm_use_netwm_fullscreen(strcasecmp("true", config_get(config, "general", "useNETWMFullscreen", "true")) == 0);
@@ -345,8 +401,77 @@ main(void)
 	
 	XSelectInput(mw->dpy, mw->root, PropertyChangeMask);
 
-	leader = None, focused = wm_get_focused(mw->dpy);
-	clients = skippy_run(mw, clients, focused, leader, !invertShift);
+	if (runAsDaemon)
+	{
+		printf("Running as daemon...\n");
+
+		if (access(pipePath, R_OK) == 0)
+		{
+			printf("access() returned 0\n");
+			printf("reading excess data to end...\n");
+			flush_file = 1;
+		}
+		
+		result = mkfifo (pipePath, S_IRUSR| S_IWUSR);
+		if (result < 0  && errno != EEXIST)
+		{
+			fprintf(stderr, "Error creating named pipe.\n");
+			perror("mkfifo");
+			exit(2);
+		}
+		
+		fp = fopen(pipePath, "r");
+		
+		if (flush_file)
+		{
+			while (1)
+			{
+				piped_input = fgetc(fp);
+				if (piped_input == EOF)
+				{
+					break;
+				}
+			}
+			
+			fp = fopen(pipePath, "r");
+		}
+		
+		while (!exitDaemon)
+		{
+			piped_input = fgetc(fp);
+			switch (piped_input)
+			{
+				case ACTIVATE_WINDOW_PICKER:
+					leader = None, focused = wm_get_focused(mw->dpy);
+					clients = skippy_run(mw, clients, focused, leader, !invertShift);
+					break;
+				
+				case EXIT_RUNNING_DAEMON:
+					printf("Exit command received, killing daemon cleanly...\n");
+					remove(pipePath);
+					exitDaemon = 1;
+				
+				case EOF:
+					#ifdef DEBUG
+					printf("EOF reached.\n");
+					#endif
+					fclose(fp);
+					fp = fopen(pipePath, "r");
+					break;
+				
+				default:
+					printf("unknown code received: %d\n", piped_input);
+					printf("Ignoring...\n");
+					break;
+			}
+		}
+	}
+	else
+	{
+		printf("running once then quitting...\n");
+		leader = None, focused = wm_get_focused(mw->dpy);
+		clients = skippy_run(mw, clients, focused, leader, !invertShift);
+	}
 	
 	dlist_free_with_func(clients, (dlist_free_func)clientwin_destroy);
 	
