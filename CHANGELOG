@@ -1,6 +1,24 @@
 Skippy-XD changelog
 
-0.5.0 -- "Damage, Inc."
+0.5.1~hg -- "No codename" (23 Dec 2011)
+ - Correctly auto-detect 32 or 64-bit system and compile appropriately.
+ - Removed X11-based hotkey activation code (skippy now displays once on
+   startup then quits, instead of waiting to be activated).
+ - Updated config loading code (and sample config file) accordingly.
+ - Skippy config is now loaded from ~/.config/skippy-xd/skippy-xd.rc
+ - Did some code cleanup (following the boy-scout rule, and just helping 
+   myself to grok it).
+ - Rework triggering code so that activation can be triggered by command 
+   rather than just a hotkey. Better to use DE's global hotkeys.
+ - Add command-line targets for named-pipe based ipc.
+   Start Daemon: skippy-xd --start-daemon
+   Stop Daemon: skippy-xd --stop-daemon (daemon must be running)
+   Activate Window Picker: skippy-xd --activate-window-picker (daemon must be
+   running)
+ - If skippy-xd is run with no arguments, the window picker is activated once, 
+   then the program closes.
+
+0.5.0 -- "Damage, Inc." (19 May 2004)
  - 'Lazy transparency' mode: let xcompmgr take care of alpha-blending the
    mini-windows.
  - Tooltip can have drop-shadow text, and can be translucent
