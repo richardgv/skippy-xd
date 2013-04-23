@@ -18,6 +18,7 @@
  */
 
 #include "skippy.h"
+#include <string.h>
 
 typedef struct
 {

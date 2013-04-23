@@ -1,0 +1,32 @@
+# Build files
+.deps
+aclocal.m4
+autom4te.cache
+config.h
+config.h.in
+config.log
+config.status
+configure
+depcomp
+install-sh
+missing
+stamp-h1
+skippy-xd
+*.o
+build/
+
+# Vim files
+.*.sw[a-z]
+*~
+
+# Misc files
+/core
+/*.core
+oprofile_data/
+skippy-xd.plist
+callgrind.out.*
+man/*.html
+man/*.1
+doxygen/
+.clang_complete
+/src/backtrace-symbols.[ch]

@@ -18,7 +18,6 @@
  */
 
 #include "skippy.h"
-#include "environment.h"
 
 #define WM_PERSONALITY_NETWM 0
 #define WM_PERSONALITY_GNOME 1
@@ -260,12 +259,7 @@ wm_get_stack(Display *dpy)
 	
 	for(i = 0; i < items_read; i++)
 	{
-		#ifdef ENVIRONMENT_64_BIT
-		l = dlist_add(l, (void*)((CARD64*)data)[i]);
-		#endif
-		#ifdef ENVIRONMENT_32_BIT
-		l = dlist_add(l, (void*)((CARD32*)data)[i]);
-		#endif
+		l = dlist_add(l, (void *)((long *)data)[i]);
 	}
 	
 	XFree(data);

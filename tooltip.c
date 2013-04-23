@@ -157,7 +157,7 @@ tooltip_map(Tooltip *tt, int x, int y, const FcChar8 *text, int len)
 {
 	XUnmapWindow(tt->mainwin->dpy, tt->window);
 	
-	XftTextExtents8(tt->mainwin->dpy, tt->font, text, len, &tt->extents);
+	XftTextExtentsUtf8(tt->mainwin->dpy, tt->font, text, len, &tt->extents);
 	
 	tt->width = tt->extents.width + 8;
 	tt->height = tt->font_height + 5 + (tt->shadow.pixel ? 2 : 0);
@@ -214,7 +214,7 @@ tooltip_handle(Tooltip *tt, XEvent *ev)
 		XftDrawRect(tt->draw, &tt->border, tt->width - 1, 1, 1, tt->height - 2);
 		XftDrawRect(tt->draw, &tt->background, 1, 1, tt->width - 2, tt->height - 2);
 		if(tt->shadow.pixel)
-			XftDrawString8(tt->draw, &tt->shadow, tt->font, 6, 3 + tt->extents.y + (tt->font_height - tt->extents.y) / 2, tt->text, tt->text_len);
-		XftDrawString8(tt->draw, &tt->color, tt->font, 4, 1 + tt->extents.y + (tt->font_height - tt->extents.y) / 2, tt->text, tt->text_len);
+			XftDrawStringUtf8(tt->draw, &tt->shadow, tt->font, 6, 3 + tt->extents.y + (tt->font_height - tt->extents.y) / 2, tt->text, tt->text_len);
+		XftDrawStringUtf8(tt->draw, &tt->color, tt->font, 4, 1 + tt->extents.y + (tt->font_height - tt->extents.y) / 2, tt->text, tt->text_len);
 	}
 }

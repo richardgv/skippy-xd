@@ -18,6 +18,7 @@
  */
 
 #include <errno.h>
+#include <locale.h>
 #include "skippy.h"
 
 static int DIE_NOW = 0;
@@ -326,14 +327,20 @@ void exit_daemon(const char* pipePath)
 	send_command_to_daemon_via_fifo(EXIT_RUNNING_DAEMON, pipePath);
 }
 
+#ifndef SKIPPYXD_VERSION
+#define SKIPPYXD_VERSION "unknown"
+#endif
+
 void show_help()
 {
-	printf("Usage: skippy-xd [command]\n\n");
-	printf("The available commands are:\n");
-	printf("\t--start-daemon            - starts the daemon running.\n");
-	printf("\t--stop-daemon             - stops the daemon running.\n");
-	printf("\t--activate-window-picker  - tells the daemon to show the window picker.\n");
-	printf("\t--help                    - show this message.\n\n");
+	fputs("skippy-xd (" SKIPPYXD_VERSION ")\n"
+			"Usage: skippy-xd [command]\n\n"
+			"The available commands are:\n"
+			"\t--start-daemon            - starts the daemon running.\n"
+			"\t--stop-daemon             - stops the daemon running.\n"
+			"\t--activate-window-picker  - tells the daemon to show the window picker.\n"
+			"\t--help                    - show this message.\n"
+			, stdout);
 }
 
 int main(int argc, char *argv[])
@@ -353,6 +360,9 @@ int main(int argc, char *argv[])
 	int piped_input;
 	int exitDaemon = 0;
 	
+	/* Set program locale */
+	setlocale (LC_ALL, "");
+
 	homedir = getenv("HOME");
 	if(homedir) {
 		snprintf(cfgpath, 8191, "%s/%s", homedir, ".config/skippy-xd/skippy-xd.rc");

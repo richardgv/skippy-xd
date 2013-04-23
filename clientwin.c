@@ -68,7 +68,6 @@ clientwin_create(MainWin *mw, Window client)
 	ClientWin *cw = (ClientWin *)malloc(sizeof(ClientWin));
 	XSetWindowAttributes sattr;
 	XWindowAttributes attr;
-	XRenderPictureAttributes pa;
 	
 	cw->mainwin = mw;
 	cw->pixmap = None;
@@ -107,8 +106,11 @@ clientwin_create(MainWin *mw, Window client)
 	XGetWindowAttributes(mw->dpy, client, &attr);
 	cw->client.format = XRenderFindVisualFormat(mw->dpy, attr.visual);
 	
-	pa.subwindow_mode = IncludeInferiors;
-	cw->origin = XRenderCreatePicture (cw->mainwin->dpy, cw->client.window, cw->client.format, CPSubwindowMode, &pa);
+	{
+		XRenderPictureAttributes pa = { .subwindow_mode = IncludeInferiors };
+		cw->origin = XRenderCreatePicture (cw->mainwin->dpy,
+				cw->client.window, cw->client.format, CPSubwindowMode, &pa);
+	}
 	
 	XRenderSetPictureFilter(cw->mainwin->dpy, cw->origin, FilterBest, 0, 0);
 	

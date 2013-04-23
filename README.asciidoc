@@ -1,0 +1,1 @@
+A fork of link:https://code.google.com/p/skippy-xd/[skippy-xd], a full-screen task-switcher for X11, with only very few changes.

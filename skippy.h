@@ -20,6 +20,10 @@
 #ifndef SKIPPY_H
 #define SKIPPY_H
 
+#define _GNU_SOURCE
+
+#include <strings.h>
+
 #include <X11/Xlib.h>
 #include <X11/Xmd.h>
 #include <X11/Xatom.h>
