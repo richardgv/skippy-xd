@@ -1,30 +1,24 @@
-PREFIX = /usr/local
-BINDIR = ${PREFIX}/bin
-
-X11PREFIX = /usr/X11R6
+PREFIX ?= /usr/local
+BINDIR ?= ${PREFIX}/bin
 
 CC ?= gcc
-PYTHON = python
 
 PACKAGES = x11 xft xrender xcomposite xdamage xfixes
 
-# Disable post-processing effects
-# CFLAGS += -DNOEFFECTS
-
-# Comment these out to disable Xinerama support
+# === Options ===
 ifeq "${CFG_NO_XINERAMA}" ""
 	CPPFLAGS += -DXINERAMA
 	PACKAGES += xext xinerama
 endif
 
-# Uncomment this for Xinerama debugging
 ifeq "$(CFG_DEV)" ""
 	CFLAGS ?= -DNDEBUG -O2 -D_FORTIFY_SOURCE=2
 else
 	CC = clang
 	CFLAGS += -ggdb
 	export LD_ALTEXEC = /usr/bin/ld.gold
-	#CPPFLAGS += -DDEBUG
+	# Xinerama debuggin
+	# CPPFLAGS += -DDEBUG
 endif
 
 CFLAGS += -std=c99 -Wall
@@ -38,24 +32,25 @@ CPPFLAGS += -DSKIPPYXD_VERSION="\"${SKIPPYXD_VERSION}\""
 
 # === Recipes ===
 EXESUFFIX =
-
-SOURCES = skippy.c wm.c dlist.c mainwin.c clientwin.c layout.c focus.c config.c tooltip.c
-HEADERS = skippy.h wm.h dlist.h mainwin.h clientwin.h layout.h focus.h config.h tooltip.h
+BINS = skippy-xd${EXESUFFIX}
+SRCS_RAW = skippy wm dlist mainwin clientwin layout focus config tooltip
+SRCS = $(foreach name,$(SRCS_RAW),src/$(name).c)
+HDRS = $(foreach name,$(SRCS_RAW),src/$(name).h)
 
 all: skippy-xd${EXESUFFIX}
 
-skippy-xd${EXESUFFIX}: ${SOURCES} ${HEADERS}
-	${CC} ${INCS} ${CFLAGS} ${CPPFLAGS} ${LIBS} ${LDFLAGS} -o skippy-xd${EXESUFFIX} ${SOURCES}
-
-environment.h: configure_environment_header.py
-	${PYTHON} configure_environment_header.py
+skippy-xd${EXESUFFIX}: ${SRCS} ${HDRS}
+	${CC} ${INCS} ${CFLAGS} ${CPPFLAGS} ${LIBS} ${LDFLAGS} -o skippy-xd${EXESUFFIX} ${SRCS}
 
 clean:
-	rm -f skippy-xd${EXESUFFIX} environment.h
+	rm -f ${BINS}
 
-install:
-	install -d ${DESTDIR}${BINDIR}
-	install -m 755 skippy-xd$(EXESUFFIX) ${DESTDIR}${BINDIR}/skippy-xd${EXESUFFIX}
+install: ${BINS}
+	install -d "${DESTDIR}${BINDIR}"
+	install -m 755 ${BINS} "${DESTDIR}${BINDIR}/"
+
+uninstall:
+	rm -f $(foreach bin,$(BINS),"${DESTDIR}${BINDIR}/$(bin)")
 
 version:
 	@echo "${COMPTON_VERSION}"

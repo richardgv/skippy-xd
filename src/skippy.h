@@ -22,6 +22,7 @@
 
 #define _GNU_SOURCE
 
+#include <stdbool.h>
 #include <strings.h>
 
 #include <X11/Xlib.h>
@@ -70,6 +71,8 @@
 #include "focus.h"
 #include "config.h"
 #include "tooltip.h"
+
+extern dlist *config;
 
 #define ACTIVATE_WINDOW_PICKER 1
 #define EXIT_RUNNING_DAEMON 2

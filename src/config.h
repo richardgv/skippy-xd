@@ -20,9 +20,29 @@
 #ifndef SKIPPY_CONFIG_H
 #define SKIPPY_CONFIG_H
 
+#include "skippy.h"
+
 dlist *config_load(const char *);
 void config_free(dlist *);
+
 const char *config_get(dlist *, const char *, const char *, const char *);
+
+/**
+ * @brief Get a boolean value from configuration.
+ */
+static inline bool
+config_get_bool(dlist *config, const char *section, const char *key,
+		bool def) {
+	const char *strdef = (def ? "true": "false");
+	const char *result = config_get(config, section, key, strdef);
+	if (!strcasecmp("true", result))
+		return true;
+	if (!strcasecmp("false", result))
+		return false;
+	printf("%s(%s, %s, %d): Unrecogized boolean value \"%s\".\n", __func__,
+			section, key, def, result);
+	return def;
+}
 
 #endif /* SKIPPY_CONFIG_H */
 

@@ -67,9 +67,7 @@ mainwin_create(Display *dpy, dlist *config)
 	XRenderPictureAttributes pa;
 	XRenderColor clear;
 	int error_base;
-#ifdef XINERAMA
 	int event_base;
-#endif /* XINERAMA */
 	
 	MainWin *mw = (MainWin *)malloc(sizeof(MainWin));
 	

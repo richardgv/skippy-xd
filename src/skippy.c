@@ -21,6 +21,8 @@
 #include <locale.h>
 #include "skippy.h"
 
+dlist *config = NULL;
+
 static int DIE_NOW = 0;
 
 static int
@@ -132,7 +134,9 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader)
 	/* Map the client windows */
 	for(iter = mw->cod; iter; iter = iter->next)
 		clientwin_map((ClientWin*)iter->data);
-	XWarpPointer(mw->dpy, None, mw->focus->mini.window, 0, 0, 0, 0, mw->focus->mini.width / 2, mw->focus->mini.height / 2);
+	if (config_get_bool(config, "general", "movePointerOnStart", true))
+		XWarpPointer(mw->dpy, None, mw->focus->mini.window, 0, 0, 0, 0,
+				mw->focus->mini.width / 2, mw->focus->mini.height / 2);
 	
 	return clients;
 }
@@ -345,7 +349,7 @@ void show_help()
 
 int main(int argc, char *argv[])
 {
-	dlist *clients = 0, *config = 0;
+	dlist *clients = NULL;
 	Display *dpy = XOpenDisplay(NULL);
 	MainWin *mw;
 	const char *homedir;
@@ -420,6 +424,7 @@ int main(int argc, char *argv[])
 	{
 		fprintf(stderr, "FATAL: Couldn't create main window.\n");
 		config_free(config);
+		config = NULL;
 		XCloseDisplay(mw->dpy);
 		return -1;
 	}
@@ -509,6 +514,7 @@ int main(int argc, char *argv[])
 	XSync(dpy, True);
 	XCloseDisplay(dpy);
 	config_free(config);
+	config = NULL;
 	
 	return 0;
 }
