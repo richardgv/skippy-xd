@@ -175,114 +175,112 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xi
 	
 	last_rendered = time_in_millis();
 	while(! die) {
-	    int i, j, now, timeout;
-	    int move_x = -1, move_y = -1;
-	    struct pollfd r_fd;
-	    
-	    XFlush(mw->dpy);
-	    
-	    r_fd.fd = ConnectionNumber(mw->dpy);
-	    r_fd.events = POLLIN;
-	    if(mw->poll_time > 0)
-	    	timeout = MAX(0, mw->poll_time + last_rendered - time_in_millis());
-	    else
-	    	timeout = -1;
-	    i = poll(&r_fd, 1, timeout);
-	    
-	    now = time_in_millis();
-	    if(now >= last_rendered + mw->poll_time)
-	    {
-	    	REDUCE(if( ((ClientWin*)iter->data)->damaged ) clientwin_repair(iter->data), mw->cod);
-	    	last_rendered = now;
-	    }
-	    
-	    i = XPending(mw->dpy);
-	    for(j = 0; j < i; ++j)
-	    {
-		XNextEvent(mw->dpy, &ev);
-		
-		if (ev.type == MotionNotify)
-		{
-			move_x = ev.xmotion.x_root;
-			move_y = ev.xmotion.y_root;
-		}
-		else if(ev.type == DestroyNotify || ev.type == UnmapNotify) {
-			dlist *iter = dlist_find(clients, clientwin_cmp_func, (void *)ev.xany.window);
-			if(iter)
-			{
-				ClientWin *cw = (ClientWin *)iter->data;
-				clients = dlist_first(dlist_remove(iter));
-				iter = dlist_find(mw->cod, clientwin_cmp_func, (void *)ev.xany.window);
-				if(iter)
-					mw->cod = dlist_first(dlist_remove(iter));
-				clientwin_destroy(cw, True);
-				if(! mw->cod)
-				{
-					die = 1;
-					break;
-				}
-			}
-		}
-		else if (mw->poll_time >= 0 && ev.type == mw->damage_event_base + XDamageNotify)
-		{
-			XDamageNotifyEvent *d_ev = (XDamageNotifyEvent *)&ev;
-			dlist *iter = dlist_find(mw->cod, clientwin_cmp_func, (void *)d_ev->drawable);
-			if(iter)
-			{
-				if(mw->poll_time == 0)
-					clientwin_repair((ClientWin *)iter->data);
-				else
-					((ClientWin *)iter->data)->damaged = True;
-			}
-				
-		}
-		else if(ev.type == KeyRelease && ev.xkey.keycode == mw->key_q)
-		{
-			DIE_NOW = 1;
-			die = 1;
-			break;
-		}
-		else if(ev.type == KeyRelease && ev.xkey.keycode == mw->key_escape)
-		{
-			refocus = True;
-			die = 1;
-			break;
-		}
-		else if(ev.xany.window == mw->window)
-			die = mainwin_handle(mw, &ev);
-		else if(ev.type == PropertyNotify)
-		{
-			if(ev.xproperty.atom == ESETROOT_PMAP_ID || ev.xproperty.atom == _XROOTPMAP_ID)
-			{
-				mainwin_update_background(mw);
-				REDUCE(clientwin_render((ClientWin *)iter->data), mw->cod);
-			}
+		int i, j, now, timeout;
+		int move_x = -1, move_y = -1;
+		struct pollfd r_fd;
 
-		}
-		else if(mw->tooltip && ev.xany.window == mw->tooltip->window)
-			tooltip_handle(mw->tooltip, &ev);
+		XFlush(mw->dpy);
+
+		r_fd.fd = ConnectionNumber(mw->dpy);
+		r_fd.events = POLLIN;
+		if(mw->poll_time > 0)
+			timeout = MAX(0, mw->poll_time + last_rendered - time_in_millis());
 		else
+			timeout = -1;
+		i = poll(&r_fd, 1, timeout);
+
+		now = time_in_millis();
+		if(now >= last_rendered + mw->poll_time)
 		{
-			dlist *iter;
-			for(iter = mw->cod; iter; iter = iter->next)
+			REDUCE(if( ((ClientWin*)iter->data)->damaged ) clientwin_repair(iter->data), mw->cod);
+			last_rendered = now;
+		}
+
+		i = XPending(mw->dpy);
+		for(j = 0; j < i; ++j)
+		{
+			XNextEvent(mw->dpy, &ev);
+
+			if (ev.type == MotionNotify)
 			{
-				ClientWin *cw = (ClientWin *)iter->data;
-				if(cw->mini.window == ev.xany.window)
+				move_x = ev.xmotion.x_root;
+				move_y = ev.xmotion.y_root;
+			}
+			else if(ev.type == DestroyNotify || ev.type == UnmapNotify) {
+				dlist *iter = dlist_find(clients, clientwin_cmp_func, (void *)ev.xany.window);
+				if(iter)
 				{
-					die = clientwin_handle(cw, &ev);
-					if(die)
+					ClientWin *cw = (ClientWin *)iter->data;
+					clients = dlist_first(dlist_remove(iter));
+					iter = dlist_find(mw->cod, clientwin_cmp_func, (void *)ev.xany.window);
+					if(iter)
+						mw->cod = dlist_first(dlist_remove(iter));
+					clientwin_destroy(cw, True);
+					if(! mw->cod)
+					{
+						die = 1;
 						break;
+					}
 				}
 			}
-			if(die)
+			else if (mw->poll_time >= 0 && ev.type == mw->damage_event_base + XDamageNotify)
+			{
+				XDamageNotifyEvent *d_ev = (XDamageNotifyEvent *)&ev;
+				dlist *iter = dlist_find(mw->cod, clientwin_cmp_func, (void *)d_ev->drawable);
+				if(iter)
+				{
+					if(mw->poll_time == 0)
+						clientwin_repair((ClientWin *)iter->data);
+					else
+						((ClientWin *)iter->data)->damaged = True;
+				}
+
+			}
+			else if(ev.type == KeyRelease && ev.xkey.keycode == mw->key_q)
+			{
+				DIE_NOW = 1;
+				die = 1;
 				break;
+			}
+			else if(ev.type == KeyRelease && ev.xkey.keycode == mw->key_escape)
+			{
+				refocus = True;
+				die = 1;
+				break;
+			}
+			else if(ev.xany.window == mw->window)
+				die = mainwin_handle(mw, &ev);
+			else if(ev.type == PropertyNotify)
+			{
+				if(ev.xproperty.atom == ESETROOT_PMAP_ID || ev.xproperty.atom == _XROOTPMAP_ID)
+				{
+					mainwin_update_background(mw);
+					REDUCE(clientwin_render((ClientWin *)iter->data), mw->cod);
+				}
+
+			}
+			else if(mw->tooltip && ev.xany.window == mw->tooltip->window)
+				tooltip_handle(mw->tooltip, &ev);
+			else
+			{
+				dlist *iter;
+				for(iter = mw->cod; iter; iter = iter->next)
+				{
+					ClientWin *cw = (ClientWin *)iter->data;
+					if(cw->mini.window == ev.xany.window)
+					{
+						die = clientwin_handle(cw, &ev);
+						if(die)
+							break;
+					}
+				}
+				if(die)
+					break;
+			}
 		}
-	    
-	    }
-	    	
-	    if(mw->tooltip && move_x != -1)
-	    	tooltip_move(mw->tooltip, move_x + 20, move_y + 20);
-	    
+
+		if(mw->tooltip && move_x != -1)
+			tooltip_move(mw->tooltip, move_x + 20, move_y + 20);
 	}
 	
 	/* Unmap the main window and clean up */

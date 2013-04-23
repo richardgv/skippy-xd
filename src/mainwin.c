@@ -118,8 +118,8 @@ mainwin_create(Display *dpy, dlist *config)
 	
 	wattr.colormap = mw->colormap;
 	wattr.background_pixel = wattr.border_pixel = 0;
-	wattr.event_mask = VisibilityChangeMask |
-	                   ButtonReleaseMask;
+	wattr.event_mask = VisibilityChangeMask | ButtonReleaseMask
+		| KeyReleaseMask;
 	
 	mw->window = XCreateWindow(dpy, mw->root, 0, 0, mw->width, mw->height, 0,
 	                           mw->depth, InputOutput, mw->visual,
