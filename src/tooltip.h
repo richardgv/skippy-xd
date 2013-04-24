@@ -37,7 +37,7 @@ struct _Tooltip {
 };
 typedef struct _Tooltip Tooltip;
 
-Tooltip *tooltip_create(MainWin *, dlist *);
+Tooltip *tooltip_create(MainWin *mw);
 void tooltip_destroy(Tooltip *);
 void tooltip_map(Tooltip *, int, int, const FcChar8 *, int);
 void tooltip_unmap(Tooltip *);

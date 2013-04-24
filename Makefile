@@ -7,7 +7,7 @@ PACKAGES = x11 xft xrender xcomposite xdamage xfixes
 
 # === Options ===
 ifeq "${CFG_NO_XINERAMA}" ""
-	CPPFLAGS += -DXINERAMA
+	CPPFLAGS += -DCFG_XINERAMA
 	PACKAGES += xext xinerama
 endif
 
@@ -15,10 +15,10 @@ ifeq "$(CFG_DEV)" ""
 	CFLAGS ?= -DNDEBUG -O2 -D_FORTIFY_SOURCE=2
 else
 	CC = clang
-	CFLAGS += -ggdb
+	CFLAGS += -ggdb # -Weverything -Wno-gnu -Wno-disabled-macro-expansion -Wno-padded
 	export LD_ALTEXEC = /usr/bin/ld.gold
-	# Xinerama debuggin
-	# CPPFLAGS += -DDEBUG
+	# Xinerama debugging
+	CPPFLAGS += -DDEBUG_XINERAMA
 endif
 
 CFLAGS += -std=c99 -Wall
@@ -45,9 +45,10 @@ skippy-xd${EXESUFFIX}: ${SRCS} ${HDRS}
 clean:
 	rm -f ${BINS}
 
-install: ${BINS}
-	install -d "${DESTDIR}${BINDIR}"
+install: ${BINS} skippy-xd.rc-default
+	install -d "${DESTDIR}${BINDIR}" "${DESTDIR}/etc/xdg/"
 	install -m 755 ${BINS} "${DESTDIR}${BINDIR}/"
+	install -m 644 skippy-xd.rc-default "${DESTDIR}/etc/xdg/skippy-xd.rc"
 
 uninstall:
 	rm -f $(foreach bin,$(BINS),"${DESTDIR}${BINDIR}/$(bin)")

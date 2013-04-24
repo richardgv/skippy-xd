@@ -32,6 +32,7 @@ updateFreq = 10.0
 lazyTrans = false
 pipePath = /tmp/skippy-xd-fifo
 movePointerOnStart = true
+useNameWindowPixmap = false
 
 [xinerama]
 showAll = false

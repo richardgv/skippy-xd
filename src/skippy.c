@@ -17,22 +17,16 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include "skippy.h"
 #include <errno.h>
 #include <locale.h>
-#include "skippy.h"
+#include <getopt.h>
+#include <strings.h>
+#include <limits.h>
 
-dlist *config = NULL;
+session_t *ps_g = NULL;
 
 static int DIE_NOW = 0;
-
-static int
-time_in_millis (void)
-{
-    struct timeval  tp;
-
-    gettimeofday (&tp, 0);
-    return(tp.tv_sec * 1000) + (tp.tv_usec / 1000);
-}
 
 static dlist *
 update_clients(MainWin *mw, dlist *clients, Bool *touched)
@@ -70,8 +64,7 @@ update_clients(MainWin *mw, dlist *clients, Bool *touched)
 		if(! cw && (Window)iter->data != mw->window)
 		{
 			cw = clientwin_create(mw, (Window)iter->data);
-			if(! cw)
-				continue;
+			if (!cw) continue;
 			clients = dlist_add(clients, cw);
 			clientwin_update(cw);
 			if(touched)
@@ -87,6 +80,8 @@ update_clients(MainWin *mw, dlist *clients, Bool *touched)
 static dlist *
 do_layout(MainWin *mw, dlist *clients, Window focus, Window leader)
 {
+	session_t * const ps = mw->ps;
+
 	CARD32 desktop = wm_get_current_desktop(mw->dpy);
 	unsigned int width, height;
 	float factor;
@@ -134,7 +129,7 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader)
 	/* Map the client windows */
 	for(iter = mw->cod; iter; iter = iter->next)
 		clientwin_map((ClientWin*)iter->data);
-	if (config_get_bool(config, "general", "movePointerOnStart", true))
+	if (ps->o.movePointerOnStart)
 		XWarpPointer(mw->dpy, None, mw->focus->mini.window, 0, 0, 0, 0,
 				mw->focus->mini.width / 2, mw->focus->mini.height / 2);
 	
@@ -144,6 +139,7 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader)
 static dlist *
 skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xin)
 {
+	session_t * const ps = mw->ps;
 	XEvent ev;
 	int die = 0;
 	Bool refocus = False;
@@ -151,12 +147,12 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xi
 	
 	/* Update the main window's geometry (and Xinerama info if applicable) */
 	mainwin_update(mw);
-#ifdef XINERAMA
+#ifdef CFG_XINERAMA
 	if(all_xin)
 	{
 		mw->xin_active = 0;
 	}
-#endif /* XINERAMA */
+#endif /* CFG_XINERAMA */
 	
 	/* Map the main window and run our event loop */
 	if(mw->lazy_trans)
@@ -206,7 +202,7 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xi
 				move_x = ev.xmotion.x_root;
 				move_y = ev.xmotion.y_root;
 			}
-			else if(ev.type == DestroyNotify || ev.type == UnmapNotify) {
+			else if (ev.type == DestroyNotify || ev.type == UnmapNotify) {
 				dlist *iter = dlist_find(clients, clientwin_cmp_func, (void *)ev.xany.window);
 				if(iter)
 				{
@@ -223,7 +219,7 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xi
 					}
 				}
 			}
-			else if (mw->poll_time >= 0 && ev.type == mw->damage_event_base + XDamageNotify)
+			else if (mw->poll_time >= 0 && ev.type == ps->xinfo.damage_ev_base + XDamageNotify)
 			{
 				XDamageNotifyEvent *d_ev = (XDamageNotifyEvent *)&ev;
 				dlist *iter = dlist_find(mw->cod, clientwin_cmp_func, (void *)d_ev->drawable);
@@ -232,7 +228,7 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xi
 					if(mw->poll_time == 0)
 						clientwin_repair((ClientWin *)iter->data);
 					else
-						((ClientWin *)iter->data)->damaged = True;
+						((ClientWin *)iter->data)->damaged = true;
 				}
 
 			}
@@ -304,7 +300,7 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xi
 
 void send_command_to_daemon_via_fifo(int command, const char* pipePath)
 {
-	FILE *fp;	
+	FILE *fp;
 	if (access(pipePath, W_OK) != 0)
 	{
 		fprintf(stderr, "pipe does not exist, exiting...\n");
@@ -329,6 +325,71 @@ void exit_daemon(const char* pipePath)
 	send_command_to_daemon_via_fifo(EXIT_RUNNING_DAEMON, pipePath);
 }
 
+/**
+ * Xlib error handler function.
+ */
+static int
+xerror(Display *dpy, XErrorEvent *ev) {
+	session_t * const ps = ps_g;
+
+	int o;
+	const char *name = "Unknown";
+
+#define CASESTRRET2(s)	 case s: name = #s; break
+
+	o = ev->error_code - ps->xinfo.fixes_err_base;
+	switch (o) {
+		CASESTRRET2(BadRegion);
+	}
+
+	o = ev->error_code - ps->xinfo.damage_err_base;
+	switch (o) {
+		CASESTRRET2(BadDamage);
+	}
+
+	o = ev->error_code - ps->xinfo.render_err_base;
+	switch (o) {
+		CASESTRRET2(BadPictFormat);
+		CASESTRRET2(BadPicture);
+		CASESTRRET2(BadPictOp);
+		CASESTRRET2(BadGlyphSet);
+		CASESTRRET2(BadGlyph);
+	}
+
+	switch (ev->error_code) {
+		CASESTRRET2(BadAccess);
+		CASESTRRET2(BadAlloc);
+		CASESTRRET2(BadAtom);
+		CASESTRRET2(BadColor);
+		CASESTRRET2(BadCursor);
+		CASESTRRET2(BadDrawable);
+		CASESTRRET2(BadFont);
+		CASESTRRET2(BadGC);
+		CASESTRRET2(BadIDChoice);
+		CASESTRRET2(BadImplementation);
+		CASESTRRET2(BadLength);
+		CASESTRRET2(BadMatch);
+		CASESTRRET2(BadName);
+		CASESTRRET2(BadPixmap);
+		CASESTRRET2(BadRequest);
+		CASESTRRET2(BadValue);
+		CASESTRRET2(BadWindow);
+	}
+
+#undef CASESTRRET2
+
+	print_timestamp(ps);
+	{
+		char buf[BUF_LEN] = "";
+		XGetErrorText(ps->dpy, ev->error_code, buf, BUF_LEN);
+		printf("error %d (%s) request %d minor %d serial %lu (\"%s\")\n",
+				ev->error_code, name, ev->request_code,
+				ev->minor_code, ev->serial, buf);
+	}
+
+	return 0;
+}
+
 #ifndef SKIPPYXD_VERSION
 #define SKIPPYXD_VERSION "unknown"
 #endif
@@ -342,92 +403,272 @@ void show_help()
 			"\t--stop-daemon             - stops the daemon running.\n"
 			"\t--activate-window-picker  - tells the daemon to show the window picker.\n"
 			"\t--help                    - show this message.\n"
+			"\t-S                        - Synchronize X operation (debugging).\n"
 			, stdout);
+}
+
+static inline bool
+init_xexts(session_t *ps) {
+	Display * const dpy = ps->dpy;
+#ifdef CFG_XINERAMA
+	ps->xinfo.xinerama_exist = XineramaQueryExtension(dpy,
+			&ps->xinfo.xinerama_ev_base, &ps->xinfo.xinerama_err_base);
+# ifdef DEBUG_XINERAMA
+	printfef("(): Xinerama extension: %s",
+			(ps->xinfo.xinerama_exist ? "yes": "no"));
+# endif /* DEBUG_XINERAMA */
+#endif /* CFG_XINERAMA */
+
+	if(!XDamageQueryExtension(dpy,
+				&ps->xinfo.damage_ev_base, &ps->xinfo.damage_err_base)) {
+		printfef("(): FATAL: XDamage extension not found.");
+		return false;
+	}
+
+	if(!XCompositeQueryExtension(dpy, &ps->xinfo.composite_ev_base,
+				&ps->xinfo.composite_err_base)) {
+		printfef("(): FATAL: XComposite extension not found.");
+		return false;
+	}
+
+	if(!XRenderQueryExtension(dpy,
+				&ps->xinfo.render_ev_base, &ps->xinfo.render_err_base)) {
+		printfef("(): FATAL: XRender extension not found.");
+		return false;
+	}
+
+	if(!XFixesQueryExtension(dpy,
+				&ps->xinfo.fixes_ev_base, &ps->xinfo.fixes_err_base)) {
+		printfef("(): FATAL: XFixes extension not found.");
+		return false;
+	}
+
+	return true;
+}
+
+/**
+ * @brief Check if a file exists.
+ *
+ * access() may not actually be reliable as according to glibc manual it uses
+ * real user ID instead of effective user ID, but stat() is just too costly
+ * for this purpose.
+ */
+static inline bool
+fexists(const char *path) {
+	return !access(path, F_OK);
+}
+
+/**
+ * @brief Find path to configuration file.
+ */
+static inline char *
+get_cfg_path(void) {
+	static const char *PATH_CONFIG_HOME_SUFFIX = "/skippy-xd/skippy-xd.rc";
+	static const char *PATH_CONFIG_HOME = "/.config";
+	static const char *PATH_CONFIG_SYS_SUFFIX = "/skippy-xd.rc";
+	static const char *PATH_CONFIG_SYS = "/etc/xdg";
+
+	char *path = NULL;
+	const char *dir = NULL;
+
+	// Check $XDG_CONFIG_HOME
+	if ((dir = getenv("XDG_CONFIG_HOME")) && strlen(dir)) {
+		path = mstrjoin(dir, PATH_CONFIG_HOME_SUFFIX);
+		if (fexists(path))
+			goto get_cfg_path_found;
+		free(path);
+		path = NULL;
+	}
+	// Check ~/.config
+	if ((dir = getenv("HOME")) && strlen(dir)) {
+		path = mstrjoin3(dir, PATH_CONFIG_HOME, PATH_CONFIG_HOME_SUFFIX);
+		if (fexists(path))
+			goto get_cfg_path_found;
+		free(path);
+		path = NULL;
+	}
+	// Check $XDG_CONFIG_DIRS
+	if (!((dir = getenv("XDG_CONFIG_DIRS")) && strlen(dir)))
+		dir = PATH_CONFIG_SYS;
+	{
+		char *dir_free = allocchk(strdup(dir));
+		char *part = strtok(dir_free, ":");
+		while (part) {
+			path = mstrjoin(part, PATH_CONFIG_SYS_SUFFIX);
+			if (fexists(path)) {
+				free(dir_free);
+				goto get_cfg_path_found;
+			}
+			free(path);
+			path = NULL;
+			part = strtok(NULL, ":");
+		}
+		free(dir_free);
+	}
+
+	return NULL;
+
+get_cfg_path_found:
+	return path;
 }
 
 int main(int argc, char *argv[])
 {
+	session_t *ps = NULL;
+	int ret = 0;
+
 	dlist *clients = NULL;
-	Display *dpy = XOpenDisplay(NULL);
-	MainWin *mw;
-	const char *homedir;
-	char cfgpath[8192];
+	Display *dpy = NULL;
+	MainWin *mw = NULL;
 	Bool invertShift = False;
 	Bool runAsDaemon = False;
 	Window leader, focused;
-	const char* pipePath;
 	int result;
 	int flush_file = 0;
 	FILE *fp;
 	int piped_input;
 	int exitDaemon = 0;
+	bool synchronize = false;
 	
 	/* Set program locale */
 	setlocale (LC_ALL, "");
 
-	homedir = getenv("HOME");
-	if(homedir) {
-		snprintf(cfgpath, 8191, "%s/%s", homedir, ".config/skippy-xd/skippy-xd.rc");
-		config = config_load(cfgpath);
-	}
-	else
+	// Initialize session structure
 	{
-		fprintf(stderr, "WARNING: $HOME not set, not loading config.\n");
+		static const session_t SESSIONT_DEF = SESSIONT_INIT;
+		ps_g = ps = malloc(sizeof(session_t));
+		if (!ps) {
+			printfef("(): Failed to allocate session structure.");
+			ret = 1;
+			goto main_end;
+		}
+		memcpy(ps, &SESSIONT_DEF, sizeof(session_t));
+		gettimeofday(&ps->time_start, NULL);
 	}
-	
-	pipePath = config_get(config, "general", "pipePath", "/tmp/skippy-xd-fifo");
-	
-	if (argc > 1)
+
+	// Load configuration file
 	{
-		if (strcmp(argv[1], "--activate-window-picker") == 0)
+		dlist *config = NULL;
 		{
-			printf("activating window picker...\n");
-			activate_window_picker(pipePath);
-			exit(0);
+			char *path = get_cfg_path();
+			if (path) {
+				config = config_load(path);
+				free(path);
+			}
+			else
+				printfef("(): WARNING: No configuration file found.");
 		}
-		else if (strcmp(argv[1], "--stop-daemon") == 0)
-		{
-			printf("exiting daemon...\n");
-			exit_daemon(pipePath);
-			exit(0);
+
+		// Read configuration into ps->o, because searching all the time is much
+		// less efficient, may introduce inconsistent default value, and
+		// occupies a lot more memory for non-string types.
+		ps->o.pipePath = allocchk(strdup(config_get(config, "general", "pipePath", "/tmp/skippy-xd-fifo")));
+		ps->o.normal_tint = allocchk(strdup(config_get(config, "normal", "tint", "black")));
+		ps->o.highlight_tint = allocchk(strdup(config_get(config, "highlight", "tint", "#101020")));
+		ps->o.tooltip_border = allocchk(strdup(config_get(config, "tooltip", "border", "#e0e0e0")));
+		ps->o.tooltip_background = allocchk(strdup(config_get(config, "tooltip", "background", "#404040")));
+		ps->o.tooltip_text = allocchk(strdup(config_get(config, "tooltip", "text", "#e0e0e0")));
+		ps->o.tooltip_textShadow = allocchk(strdup(config_get(config, "tooltip", "textShadow", "black")));
+		ps->o.tooltip_font = allocchk(strdup(config_get(config, "tooltip", "font", "fixed-11:weight=bold")));
+		if (config) {
+			config_get_int_wrap(config, "general", "distance", &ps->o.distance, 1, INT_MAX);
+			config_get_bool_wrap(config, "general", "useNetWMFullscreen", &ps->o.useNetWMFullscreen);
+			config_get_bool_wrap(config, "general", "ignoreSkipTaskbar", &ps->o.ignoreSkipTaskbar);
+			config_get_double_wrap(config, "general", "updateFreq", &ps->o.updateFreq, -1000.0, 1000.0);
+			config_get_bool_wrap(config, "general", "lazyTrans", &ps->o.lazyTrans);
+			config_get_bool_wrap(config, "general", "useNameWindowPixmap", &ps->o.useNameWindowPixmap);
+			config_get_bool_wrap(config, "general", "movePointerOnStart", &ps->o.movePointerOnStart);
+			config_get_bool_wrap(config, "xinerama", "showAll", &ps->o.xinerama_showAll);
+			config_get_int_wrap(config, "normal", "tintOpacity", &ps->o.normal_tintOpacity, 0, 256);
+			config_get_int_wrap(config, "normal", "opacity", &ps->o.normal_opacity, 0, 256);
+			config_get_int_wrap(config, "highlight", "tintOpacity", &ps->o.highlight_tintOpacity, 0, 256);
+			config_get_int_wrap(config, "highlight", "opacity", &ps->o.highlight_opacity, 0, 256);
+			config_get_bool_wrap(config, "tooltip", "show", &ps->o.tooltip_show);
+			config_get_int_wrap(config, "tooltip", "tintOpacity", &ps->o.highlight_tintOpacity, 0, 256);
+			config_get_int_wrap(config, "tooltip", "opacity", &ps->o.tooltip_opacity, 0, 256);
+
+			config_free(config);
 		}
-		else if (strcmp(argv[1], "--start-daemon") == 0)
-		{
-			runAsDaemon = True;
-		}
-		else if (strcmp(argv[1], "--help") == 0)
-		{
-			show_help();
-			exit(0);
-		}	
 	}
 	
-	if(! dpy) {
+	const char* pipePath = ps->o.pipePath;
+	
+	// Parse commandline arguments
+	{
+		enum options {
+			OPT_ACTV_PICKER = 256,
+			OPT_DM_START,
+			OPT_DM_STOP,
+		};
+		static const char * opts_short = "hS";
+		static const struct option opts_long[] = {
+			{ "help",					no_argument,	NULL, 'h' },
+			{ "activate-window-picker", no_argument,	NULL, OPT_ACTV_PICKER },
+			{ "start-daemon",			no_argument,	NULL, OPT_DM_START },
+			{ "end-daemon",				no_argument,	NULL, OPT_DM_STOP },
+			{ NULL, no_argument, NULL, 0 }
+		};
+		int o = 0;
+		while ((o = getopt_long(argc, argv, opts_short, opts_long, NULL)) >= 0) {
+			switch (o) {
+				case 'S': synchronize = true; break;
+				case OPT_ACTV_PICKER:
+					printf("activating window picker...\n");
+					activate_window_picker(pipePath);
+					goto main_end;
+				case OPT_DM_START:
+					runAsDaemon = True;
+					break;
+				case OPT_DM_STOP:
+					printf("exiting daemon...\n");
+					exit_daemon(pipePath);
+					goto main_end;
+				case 'h':
+				default:
+					show_help();
+					// Return a non-zero value on unrecognized option
+					if ('h' != o)
+						ret = 1;
+					goto main_end;
+			}
+		}
+	}
+	
+	// Open connection to X
+	ps->dpy = dpy = XOpenDisplay(NULL);
+	if(!dpy) {
 		fprintf(stderr, "FATAL: Couldn't connect to display.\n");
-		return -1;
+		ret = 1;
+		goto main_end;
 	}
+	if (!init_xexts(ps)) {
+		ret = 1;
+		goto main_end;
+	}
+	if (synchronize)
+		XSynchronize(ps->dpy, True);
+	XSetErrorHandler(xerror);
 	
 	wm_get_atoms(dpy);
 	
 	if(! wm_check(dpy)) {
 		fprintf(stderr, "FATAL: WM not NETWM or GNOME WM Spec compliant.\n");
-		return -1;
+		ret = 1;
+		goto main_end;
 	}
 	
-	wm_use_netwm_fullscreen(strcasecmp("true", config_get(config, "general", "useNETWMFullscreen", "true")) == 0);
-	wm_ignore_skip_taskbar(strcasecmp("true", config_get(config, "general", "ignoreSkipTaskbar", "false")) == 0);
+	wm_use_netwm_fullscreen(ps->o.useNetWMFullscreen);
+	wm_ignore_skip_taskbar(ps->o.ignoreSkipTaskbar);
 	
-	mw = mainwin_create(dpy, config);
+	mw = mainwin_create(ps);
 	if(! mw)
 	{
 		fprintf(stderr, "FATAL: Couldn't create main window.\n");
-		config_free(config);
-		config = NULL;
-		XCloseDisplay(mw->dpy);
-		return -1;
+		ret = 1;
+		goto main_end;
 	}
 	
-	invertShift = strcasecmp("true", config_get(config, "xinerama", "showAll", "false")) == 0;
+	invertShift = ps->o.xinerama_showAll;
 	
 	XSelectInput(mw->dpy, mw->root, PropertyChangeMask);
 
@@ -482,7 +723,7 @@ int main(int argc, char *argv[])
 					exitDaemon = 1;
 				
 				case EOF:
-					#ifdef DEBUG
+					#ifdef DEBUG_XINERAMA
 					printf("EOF reached.\n");
 					#endif
 					fclose(fp);
@@ -505,14 +746,28 @@ int main(int argc, char *argv[])
 	
 	dlist_free_with_func(clients, (dlist_free_func)clientwin_destroy);
 	
-	XFlush(mw->dpy);
+main_end:
+	if (mw)
+		mainwin_destroy(mw);
 	
-	mainwin_destroy(mw);
-	
-	XSync(dpy, True);
-	XCloseDisplay(dpy);
-	config_free(config);
-	config = NULL;
-	
-	return 0;
+	// Free session data
+	if (ps) {
+		// Free configuration strings
+		{
+			free(ps->o.pipePath);
+			free(ps->o.normal_tint);
+			free(ps->o.highlight_tint);
+			free(ps->o.tooltip_border);
+			free(ps->o.tooltip_background);
+			free(ps->o.tooltip_text);
+			free(ps->o.tooltip_textShadow);
+			free(ps->o.tooltip_font);
+		}
+
+		if (ps->dpy)
+			XCloseDisplay(dpy);
+		free(ps);
+	}
+
+	return ret;
 }

@@ -36,7 +36,7 @@ clientwin_validate_func(dlist *l, void *data)
 	CARD32 desktop = (*(CARD32*)data),
 		w_desktop = wm_get_window_desktop(cw->mainwin->dpy, cw->client.window);
 	
-#ifdef XINERAMA
+#ifdef CFG_XINERAMA
 	if(cw->mainwin->xin_active && ! INTERSECTS(cw->client.x, cw->client.y, cw->client.width, cw->client.height,
 	                                           cw->mainwin->xin_active->x_org, cw->mainwin->xin_active->y_org,
 	                                           cw->mainwin->xin_active->width, cw->mainwin->xin_active->height))
@@ -66,6 +66,13 @@ ClientWin *
 clientwin_create(MainWin *mw, Window client)
 {
 	ClientWin *cw = (ClientWin *)malloc(sizeof(ClientWin));
+	if (!cw)
+		return NULL;
+	{
+		static const ClientWin CLIENTWT_DEF = CLIENTWT_INIT;
+		memcpy(cw, &CLIENTWT_DEF, sizeof(ClientWin));
+	}
+
 	XSetWindowAttributes sattr;
 	XWindowAttributes attr;
 	
@@ -74,7 +81,7 @@ clientwin_create(MainWin *mw, Window client)
 	cw->focused = 0;
 	cw->origin = cw->destination = None;
 	cw->damage = None;
-	cw->damaged = False;
+	cw->damaged = false;
 	/* cw->repair = None; */
 	
 	sattr.border_pixel = sattr.background_pixel = 0;
@@ -97,26 +104,44 @@ clientwin_create(MainWin *mw, Window client)
 	                                mw->depth, InputOutput, mw->visual,
 	                                CWColormap | CWBackPixel | CWBorderPixel | CWEventMask | CWOverrideRedirect, &sattr);
 	
-	if(cw->mini.window == None)
-	{
-		free(cw);
-		return 0;
-	}
+	if (!cw->mini.window)
+		goto clientwin_create_err;
 	
+	// Listen to events on the window. We don't want to miss any changes so
+	// this is to be done as early as possible
+	XSelectInput(cw->mainwin->dpy, cw->client.window, SubstructureNotifyMask | StructureNotifyMask);
+
 	XGetWindowAttributes(mw->dpy, client, &attr);
 	cw->client.format = XRenderFindVisualFormat(mw->dpy, attr.visual);
 	
+	// Get window pixmap
+	// Seemingly we could only redirect IsViewable windows
+	if (mw->ps->o.useNameWindowPixmap && IsViewable == attr.map_state) {
+		XCompositeRedirectWindow(mw->dpy, cw->client.window, CompositeRedirectAutomatic);
+		cw->redirected = true;
+		cw->cpixmap = XCompositeNameWindowPixmap(mw->dpy, cw->client.window);
+	}
+	// Create window picture
 	{
+		Drawable draw = cw->cpixmap;
+		if (!draw) draw = cw->client.window;
 		XRenderPictureAttributes pa = { .subwindow_mode = IncludeInferiors };
 		cw->origin = XRenderCreatePicture (cw->mainwin->dpy,
-				cw->client.window, cw->client.format, CPSubwindowMode, &pa);
+				draw, cw->client.format, CPSubwindowMode, &pa);
 	}
+	if (!cw->origin)
+		goto clientwin_create_err;
 	
 	XRenderSetPictureFilter(cw->mainwin->dpy, cw->origin, FilterBest, 0, 0);
 	
-	XSelectInput(cw->mainwin->dpy, cw->client.window, SubstructureNotifyMask | StructureNotifyMask);
 	
 	return cw;
+
+clientwin_create_err:
+	if (cw)
+		clientwin_destroy(cw, False);
+
+	return NULL;
 }
 
 void
@@ -143,19 +168,27 @@ clientwin_update(ClientWin *cw)
 void
 clientwin_destroy(ClientWin *cw, Bool parentDestroyed)
 {
-	if(! parentDestroyed)
+	MainWin *mw = cw->mainwin;
+	if (!parentDestroyed)
 	{
-		if(cw->origin != None)
-			XRenderFreePicture(cw->mainwin->dpy, cw->origin);
-		if(cw->damage != None)
-			XDamageDestroy(cw->mainwin->dpy, cw->damage);
+		free_picture(mw->ps, &cw->origin);
+		free_damage(mw->ps, &cw->damage);
+
+		if (cw->client.window) {
+			// Stop listening to events, this should be safe because we don't
+			// monitor window re-map anyway
+			XSelectInput(mw->dpy, cw->client.window, 0);
+
+			if (cw->redirected)
+				XCompositeUnredirectWindow(mw->dpy, cw->client.window, CompositeRedirectAutomatic);
+		}
 	}
-	if(cw->destination != None)
-		XRenderFreePicture(cw->mainwin->dpy, cw->destination);
-	if(cw->pixmap != None)
-		XFreePixmap(cw->mainwin->dpy, cw->pixmap);
+	free_picture(mw->ps, &cw->destination);
+	free_pixmap(mw->ps, &cw->pixmap);
+	free_pixmap(mw->ps, &cw->cpixmap);
 	
-	XDestroyWindow(cw->mainwin->dpy, cw->mini.window);
+	if (cw->mini.window)
+		XDestroyWindow(mw->dpy, cw->mini.window);
 	
 	free(cw);
 }
@@ -217,13 +250,13 @@ clientwin_repair(ClientWin *cw)
 	if(rects)
 		XFree(rects);
 	
-	cw->damaged = False;
+	cw->damaged = false;
 }
 
 void
 clientwin_schedule_repair(ClientWin *cw, XRectangle *area)
 {
-	cw->damaged = True;
+	cw->damaged = true;
 }
 
 void

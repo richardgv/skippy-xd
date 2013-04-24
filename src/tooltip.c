@@ -55,16 +55,13 @@ tooltip_destroy(Tooltip *tt)
 }
 
 Tooltip *
-tooltip_create(MainWin *mw, dlist *config)
+tooltip_create(MainWin *mw)
 {
-	Tooltip *tt;
-	XSetWindowAttributes attr;
+	session_t * const ps = mw->ps;
 	const char *tmp;
 	long int tmp_l;
 	
-	tt = (Tooltip *)malloc(sizeof(Tooltip));
-	if(! tt)
-		return 0;
+	Tooltip *tt = allocchk(malloc(sizeof(Tooltip)));
 	
 	tt->mainwin = mw;
 	tt->window = None;
@@ -73,25 +70,29 @@ tooltip_create(MainWin *mw, dlist *config)
 	tt->text = 0;
 	tt->color.pixel = tt->background.pixel = tt->border.pixel = tt->shadow.pixel = None;
 	
-	attr.override_redirect = True;
-	attr.border_pixel = None;
-	attr.background_pixel = None;
-	attr.event_mask = ExposureMask;
-	attr.colormap = mw->colormap;
-	
-	tt->window = XCreateWindow(mw->dpy, mw->root,
-	                           0, 0, 1, 1, 0,
-	                           mw->depth, InputOutput, mw->visual,
-	                           CWBorderPixel|CWBackPixel|CWOverrideRedirect|CWEventMask|CWColormap,
-	                           &attr);
-	if(tt->window == None)
 	{
-		fprintf(stderr, "WARNING: Couldn't create tooltip window.\n");
+		XSetWindowAttributes attr = {
+			.override_redirect = True,
+			.border_pixel = None,
+			.background_pixel = None,
+			.event_mask = ExposureMask,
+			.colormap = mw->colormap,
+		};
+		
+		tt->window = XCreateWindow(mw->dpy, mw->root,
+		                           0, 0, 1, 1, 0,
+		                           mw->depth, InputOutput, mw->visual,
+		                           CWBorderPixel|CWBackPixel|CWOverrideRedirect|CWEventMask|CWColormap,
+		                           &attr);
+	}
+
+	if (!tt->window) {
+		printfef("(): WARNING: Couldn't create tooltip window.");
 		tooltip_destroy(tt);
 		return 0;
 	}
 	
-	tmp = config_get(config, "tooltip", "border", "#e0e0e0");
+	tmp = ps->o.tooltip_border;
 	if(! XftColorAllocName(mw->dpy, mw->visual, mw->colormap, tmp, &tt->border))
 	{
 		fprintf(stderr, "WARNING: Invalid color '%s'.\n", tmp);
@@ -99,7 +100,7 @@ tooltip_create(MainWin *mw, dlist *config)
 		return 0;
 	}
 	
-	tmp = config_get(config, "tooltip", "background", "#404040");
+	tmp = ps->o.tooltip_background;
 	if(! XftColorAllocName(mw->dpy, mw->visual, mw->colormap, tmp, &tt->background))
 	{
 		fprintf(stderr, "WARNING: Invalid color '%s'.\n", tmp);
@@ -107,12 +108,11 @@ tooltip_create(MainWin *mw, dlist *config)
 		return 0;
 	}
 	
-	tmp = config_get(config, "tooltip", "opacity", "128");
-	tmp_l = MIN(MAX(0, strtol(tmp, 0, 0) * 256), 65535);
+	tmp_l = alphaconv(ps->o.tooltip_opacity);
 	tt->background.color.alpha = tmp_l;
 	tt->border.color.alpha = tmp_l;
 	
-	tmp = config_get(config, "tooltip", "text", "#e0e0e0");
+	tmp = ps->o.tooltip_text;
 	if(! XftColorAllocName(mw->dpy, mw->visual, mw->colormap, tmp, &tt->color))
 	{
 		fprintf(stderr, "WARNING: Couldn't allocate color '%s'.\n", tmp);
@@ -120,7 +120,7 @@ tooltip_create(MainWin *mw, dlist *config)
 		return 0;
 	}
 	
-	tmp = config_get(config, "tooltip", "textShadow", "black");
+	tmp = ps->o.tooltip_textShadow;
 	if(strcasecmp(tmp, "none") != 0)
 	{
 		if(! XftColorAllocName(mw->dpy, mw->visual, mw->colormap, tmp, &tt->shadow))
@@ -139,7 +139,7 @@ tooltip_create(MainWin *mw, dlist *config)
 		return 0;
 	}
 	
-	tt->font = XftFontOpenName(mw->dpy, mw->screen, config_get(config, "tooltip", "font", "fixed-11:weight=bold"));
+	tt->font = XftFontOpenName(mw->dpy, mw->screen, ps->o.tooltip_font);
 	if(! tt->font)
 	{
 		fprintf(stderr, "WARNING: Couldn't open Xft font.\n");

@@ -20,20 +20,22 @@
 #ifndef SKIPPY_CLIENT_H
 #define SKIPPY_CLIENT_H
 
-struct _SkippyWindow {
+typedef struct {
 	Window window;
 	int x, y;
 	unsigned int width, height;
 	XRenderPictFormat *format;
-};
+} SkippyWindow;
 
-typedef struct _SkippyWindow SkippyWindow;
+#define SKIPPYWINT_INIT { .window = None }
 
 struct _MainWin;
-struct _ClientWin{
+typedef struct {
 	struct _MainWin *mainwin;
 	
 	SkippyWindow client;
+	bool redirected;
+	Pixmap cpixmap;
 	SkippyWindow mini;
 	
 	Pixmap pixmap;
@@ -43,13 +45,18 @@ struct _ClientWin{
 	
 	int focused;
 	
-	Bool damaged;
+	bool damaged;
 	/* XserverRegion repair; */
 	
 	/* These are virtual positions set by the layout routine */
 	int x, y;
-};
-typedef struct _ClientWin ClientWin;
+} ClientWin;
+
+#define CLIENTWT_INIT { \
+	.client = SKIPPYWINT_INIT, \
+	.mini = SKIPPYWINT_INIT, \
+	.mainwin = NULL \
+}
 
 int clientwin_validate_func(dlist *, void *);
 int clientwin_sort_func(dlist *, dlist *, void *);

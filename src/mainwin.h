@@ -24,13 +24,13 @@ struct _Tooltip;
 
 struct _MainWin
 {
+	session_t *ps;
 	Display *dpy;
 	int screen;
 	Visual *visual;
 	Colormap colormap;
 	int depth;
 	Window root;
-	int damage_event_base;
 	
 	int poll_time;
 	Bool lazy_trans;
@@ -53,14 +53,14 @@ struct _MainWin
 	
 	KeyCode key_act, key_up, key_down, key_left, key_right, key_enter, key_space, key_q, key_escape;
 	
-#ifdef XINERAMA
+#ifdef CFG_XINERAMA
 	int xin_screens;
 	XineramaScreenInfo *xin_info, *xin_active;
-#endif /* XINERAMA */
+#endif /* CFG_XINERAMA */
 };
 typedef struct _MainWin MainWin;
 
-MainWin *mainwin_create(Display *, dlist *config);
+MainWin *mainwin_create(session_t *ps);
 void mainwin_destroy(MainWin *);
 void mainwin_map(MainWin *);
 void mainwin_unmap(MainWin *);

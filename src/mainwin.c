@@ -57,8 +57,10 @@ find_argb_visual (Display *dpy, int scr)
 }
 
 MainWin *
-mainwin_create(Display *dpy, dlist *config)
+mainwin_create(session_t *ps)
 {
+	Display * const dpy = ps->dpy;
+
 	const char *tmp;
 	double tmp_d;
 	XColor exact_color;
@@ -66,15 +68,14 @@ mainwin_create(Display *dpy, dlist *config)
 	XWindowAttributes rootattr;
 	XRenderPictureAttributes pa;
 	XRenderColor clear;
-	int error_base;
-	int event_base;
 	
 	MainWin *mw = (MainWin *)malloc(sizeof(MainWin));
 	
+	mw->ps = ps;
 	mw->dpy = dpy;
 	mw->screen = DefaultScreen(dpy);
 	mw->root = RootWindow(dpy, mw->screen);
-	mw->lazy_trans = (strcasecmp(config_get(config, "general", "lazyTrans", "false"), "true") == 0) ? True : False;
+	mw->lazy_trans = ps->o.lazyTrans;
 	if(mw->lazy_trans)
 	{
 		mw->depth  = 32;
@@ -94,10 +95,10 @@ mainwin_create(Display *dpy, dlist *config)
 	mw->bg_pixmap = None;
 	mw->background = None;
 	mw->format = XRenderFindVisualFormat(dpy, mw->visual);
-#ifdef XINERAMA
+#ifdef CFG_XINERAMA
 	mw->xin_info = mw->xin_active = 0;
 	mw->xin_screens = 0;
-#endif /* XINERAMA */
+#endif /* CFG_XINERAMA */
 	
 	mw->pressed = mw->focus = 0;
 	mw->tooltip = 0;
@@ -128,73 +129,26 @@ mainwin_create(Display *dpy, dlist *config)
 		free(mw);
 		return 0;
 	}
-	
-#ifdef XINERAMA
-# ifdef DEBUG
-	fprintf(stderr, "--> checking for Xinerama extension... ");
-# endif /* DEBUG */
-	if(XineramaQueryExtension(dpy, &event_base, &error_base))
-	{
-# ifdef DEBUG
-	    fprintf(stderr, "yes\n--> checking if Xinerama is enabled... ");
-# endif /* DEBUG */
-	    if(XineramaIsActive(dpy))
-	    {
-# ifdef DEBUG
-	        fprintf(stderr, "yes\n--> fetching Xinerama info... ");
-# endif /* DEBUG */
-	        mw->xin_info = XineramaQueryScreens(mw->dpy, &mw->xin_screens);
-# ifdef DEBUG	        
-		fprintf(stderr, "done (%i screens)\n", mw->xin_screens);
-# endif /* DEBUG */
-	    }
-# ifdef DEBUG
-	    else
-	        fprintf(stderr, "no\n");
-# endif /* DEBUG */
+
+#ifdef CFG_XINERAMA
+	if (ps->xinfo.xinerama_exist && XineramaIsActive(dpy)) {
+		mw->xin_info = XineramaQueryScreens(mw->dpy, &mw->xin_screens);
+# ifdef DEBUG_XINERAMA
+		printfef("(): Xinerama is enabled (%d screens).", mw->xin_screens);
+# endif /* DEBUG_XINERAMA */
 	}
-# ifdef DEBUG
-	else
-	    fprintf(stderr, "no\n");
-# endif /* DEBUG */
-#endif /* XINERAMA */
-	
-	if(! XDamageQueryExtension (dpy, &mw->damage_event_base, &error_base))
-	{
-		fprintf(stderr, "FATAL: XDamage extension not found.\n");
-		exit(1);
-	}
-	
-	if(! XCompositeQueryExtension(dpy, &event_base, &error_base))
-	{
-		fprintf(stderr, "FATAL: XComposite extension not found.\n");
-		exit(1);
-	}
-	
-	if(! XRenderQueryExtension(dpy, &event_base, &error_base))
-	{
-		fprintf(stderr, "FATAL: XRender extension not found.\n");
-		exit(1);
-	}
-	
-	if(! XFixesQueryExtension(dpy, &event_base, &error_base))
-	{
-		fprintf(stderr, "FATAL: XFixes extension not found.\n");
-		exit(1);
-	}
-	
+#endif /* CFG_XINERAMA */
+
 	XCompositeRedirectSubwindows (mw->dpy, mw->root, CompositeRedirectAutomatic);
 	
-	tmp_d = strtod(config_get(config, "general", "updateFreq", "10.0"), 0);
+	tmp_d = ps->o.updateFreq;
 	if(tmp_d != 0.0)
 		mw->poll_time = (1.0 / tmp_d) * 1000.0;
 	else
 		mw->poll_time = 0;
 	
-	tmp = config_get(config, "normal", "tint", "black");
-	if(! XParseColor(mw->dpy, mw->colormap, tmp, &exact_color))
-	{
-		fprintf(stderr, "Couldn't look up color '%s', reverting to black", tmp);
+	if(!XParseColor(mw->dpy, mw->colormap, ps->o.normal_tint, &exact_color)) {
+		printfef("(): Couldn't look up color '%s', reverting to black.", ps->o.normal_tint);
 		mw->normalTint.red = mw->normalTint.green = mw->normalTint.blue = 0;
 	}
 	else
@@ -203,9 +157,9 @@ mainwin_create(Display *dpy, dlist *config)
 		mw->normalTint.green = exact_color.green;
 		mw->normalTint.blue = exact_color.blue;
 	}
-	mw->normalTint.alpha = MAX(0, MIN(strtol(config_get(config, "normal", "tintOpacity", "0"), 0, 0) * 256, 65535));
+	mw->normalTint.alpha = alphaconv(ps->o.normal_tintOpacity);
 	
-	tmp = config_get(config, "highlight", "tint", "#101020");
+	tmp = ps->o.highlight_tint;
 	if(! XParseColor(mw->dpy, mw->colormap, tmp, &exact_color))
 	{
 		fprintf(stderr, "Couldn't look up color '%s', reverting to #101020", tmp);
@@ -218,24 +172,23 @@ mainwin_create(Display *dpy, dlist *config)
 		mw->highlightTint.green = exact_color.green;
 		mw->highlightTint.blue = exact_color.blue;
 	}
-	mw->highlightTint.alpha = MAX(0, MIN(strtol(config_get(config, "highlight", "tintOpacity", "64"), 0, 0) * 256, 65535));
+	mw->highlightTint.alpha = alphaconv(ps->o.highlight_tintOpacity);
 	
 	pa.repeat = True;
-	clear.alpha = MAX(0, MIN(strtol(config_get(config, "normal", "opacity", "200"), 0, 10) * 256, 65535));
+	clear.alpha = alphaconv(ps->o.normal_opacity);
 	mw->normalPixmap = XCreatePixmap(mw->dpy, mw->window, 1, 1, 8);
 	mw->normalPicture = XRenderCreatePicture(mw->dpy, mw->normalPixmap, XRenderFindStandardFormat(mw->dpy, PictStandardA8), CPRepeat, &pa);
 	XRenderFillRectangle(mw->dpy, PictOpSrc, mw->normalPicture, &clear, 0, 0, 1, 1);
 	
-	clear.alpha = MAX(0, MIN(strtol(config_get(config, "highlight", "opacity", "255"), 0, 10) * 256, 65535));
+	clear.alpha = alphaconv(ps->o.highlight_opacity);
 	mw->highlightPixmap = XCreatePixmap(mw->dpy, mw->window, 1, 1, 8);
 	mw->highlightPicture = XRenderCreatePicture(mw->dpy, mw->highlightPixmap, XRenderFindStandardFormat(mw->dpy, PictStandardA8), CPRepeat, &pa);
 	XRenderFillRectangle(mw->dpy, PictOpSrc, mw->highlightPicture, &clear, 0, 0, 1, 1);
 	
-	tmp = config_get(config, "general", "distance", "50");
-	mw->distance = MAX(1, strtol(tmp, 0, 10));
+	mw->distance = mw->ps->o.distance;
 	
-	if(! strcasecmp(config_get(config, "tooltip", "show", "true"), "true"))
-		mw->tooltip = tooltip_create(mw, config);
+	if (ps->o.tooltip_show)
+		mw->tooltip = tooltip_create(mw);
 	
 	return mw;
 }
@@ -272,7 +225,7 @@ mainwin_update_background(MainWin *mw)
 void
 mainwin_update(MainWin *mw)
 {
-#ifdef XINERAMA
+#ifdef CFG_XINERAMA
 	XineramaScreenInfo *iter;
 	int i;
 	Window dummy_w;
@@ -320,7 +273,7 @@ mainwin_update(MainWin *mw)
 	mw->height = iter->height;
 	XMoveResizeWindow(mw->dpy, mw->window, iter->x_org, iter->y_org, mw->width, mw->height);
 	mw->xin_active = iter;
-#endif /* XINERAMA */
+#endif /* CFG_XINERAMA */
 	mainwin_update_background(mw);
 }
 
@@ -372,10 +325,10 @@ mainwin_destroy(MainWin *mw)
 	
 	XDestroyWindow(mw->dpy, mw->window);
 	
-#ifdef XINERAMA
+#ifdef CFG_XINERAMA
 	if(mw->xin_info)
 		XFree(mw->xin_info);
-#endif /* XINERAMA */
+#endif /* CFG_XINERAMA */
 	
 	free(mw);
 }
