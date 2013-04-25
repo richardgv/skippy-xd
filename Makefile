@@ -53,6 +53,9 @@ install: ${BINS} skippy-xd.rc-default
 uninstall:
 	rm -f $(foreach bin,$(BINS),"${DESTDIR}${BINDIR}/$(bin)")
 
+src/.clang_complete: Makefile
+	@(for i in $(filter-out -O% -DNDEBUG, $(CPPFLAGS) $(CFLAGS) $(INCS)); do echo "$$i"; done) > $@
+
 version:
 	@echo "${COMPTON_VERSION}"
 

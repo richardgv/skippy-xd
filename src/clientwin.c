@@ -103,10 +103,10 @@ clientwin_create(MainWin *mw, Window client)
 	cw->mini.window = XCreateWindow(mw->dpy, mw->lazy_trans ? mw->root : mw->window, 0, 0, 1, 1, 0,
 	                                mw->depth, InputOutput, mw->visual,
 	                                CWColormap | CWBackPixel | CWBorderPixel | CWEventMask | CWOverrideRedirect, &sattr);
-	
 	if (!cw->mini.window)
 		goto clientwin_create_err;
 	
+	wm_wid_set_info(cw->mainwin->ps, cw->mini.window, "mini window", None);
 	// Listen to events on the window. We don't want to miss any changes so
 	// this is to be done as early as possible
 	XSelectInput(cw->mainwin->dpy, cw->client.window, SubstructureNotifyMask | StructureNotifyMask);

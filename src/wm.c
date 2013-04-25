@@ -22,7 +22,13 @@
 Atom
 	/* Root pixmap / wallpaper atoms */
 	_XROOTPMAP_ID,
-	ESETROOT_PMAP_ID;
+	ESETROOT_PMAP_ID,
+
+	// Window type atoms
+	_NET_WM_WINDOW_TYPE_DESKTOP,
+	_NET_WM_WINDOW_TYPE_DOCK,
+	_NET_WM_WINDOW_TYPE_NORMAL,
+	_NET_WM_WINDOW_TYPE_TOOLTIP;
 	
 static Atom
 	/* Generic atoms */
@@ -47,8 +53,6 @@ static Atom
 	_NET_WM_STATE_ABOVE,
 	_NET_WM_STATE_STICKY,
 	_NET_WM_WINDOW_TYPE,
-	_NET_WM_WINDOW_TYPE_DESKTOP,
-	_NET_WM_WINDOW_TYPE_DOCK,
 	_NET_WM_VISIBLE_NAME,
 	_NET_WM_NAME,
 	
@@ -90,44 +94,58 @@ static int WM_PERSONALITY = WM_PERSONALITY_NETWM,
            NETWM_HAS_FULLSCREEN = 0,
            IGNORE_SKIP_TASKBAR = 0;
 
+/**
+ * @brief Wrapper of XInternAtom().
+ */
+static inline Atom
+get_atom(session_t *ps, const char *name) {
+	return XInternAtom(ps->dpy, name, False);
+}
+
+/**
+ * @brief Initialize X atoms.
+ */
 void
-wm_get_atoms(Display *dpy)
-{
-	XA_WM_STATE = XInternAtom(dpy, "WM_STATE", 0);
-	WM_CLIENT_LEADER = XInternAtom(dpy, "WM_CLIENT_LEADER", 0);
-	XA_UTF8_STRING = XInternAtom(dpy, "UTF8_STRING", 0);
+wm_get_atoms(session_t *ps) {
+#define T_GETATOM(name) name = get_atom(ps, # name)
+	XA_WM_STATE = get_atom(ps, "WM_STATE");
+	T_GETATOM(WM_CLIENT_LEADER);
+	XA_UTF8_STRING = get_atom(ps, "UTF8_STRING");
 	
-	_XROOTPMAP_ID = XInternAtom(dpy, "_XROOTPMAP_ID", 0);
-	ESETROOT_PMAP_ID = XInternAtom(dpy, "ESETROOT_PMAP_ID", 0);
+	T_GETATOM(_XROOTPMAP_ID);
+	T_GETATOM(ESETROOT_PMAP_ID);
 	
-	_NET_SUPPORTING_WM_CHECK = XInternAtom(dpy, "_NET_SUPPORTING_WM_CHECK", 0);
-	_NET_SUPPORTED = XInternAtom(dpy, "_NET_SUPPORTED", 0);
-	_NET_NUMBER_OF_DESKTOPS = XInternAtom(dpy, "_NET_NUMBER_OF_DESKTOPS", 0);
-	_NET_CLIENT_LIST = XInternAtom(dpy, "_NET_CLIENT_LIST", 0);
-	_NET_CLIENT_LIST_STACKING = XInternAtom(dpy, "_NET_CLIENT_LIST_STACKING", 0);
-	_NET_CURRENT_DESKTOP = XInternAtom(dpy, "_NET_CURRENT_DESKTOP", 0);
-	_NET_WM_DESKTOP = XInternAtom(dpy, "_NET_WM_DESKTOP", 0);
-	_NET_WM_STATE = XInternAtom(dpy, "_NET_WM_STATE", 0);
-	_NET_WM_STATE_HIDDEN = XInternAtom(dpy, "_NET_WM_STATE_HIDDEN", 0);
-	_NET_WM_STATE_SKIP_TASKBAR = XInternAtom(dpy, "_NET_WM_STATE_SKIP_TASKBAR", 0);
-	_NET_WM_STATE_SKIP_PAGER = XInternAtom(dpy, "_NET_WM_STATE_SKIP_PAGER", 0);
-	_NET_WM_STATE_FULLSCREEN = XInternAtom(dpy, "_NET_WM_STATE_FULLSCREEN", 0);
-	_NET_WM_STATE_SHADED = XInternAtom(dpy, "_NET_WM_STATE_SHADED", 0);
-	_NET_WM_STATE_ABOVE = XInternAtom(dpy, "_NET_WM_STATE_ABOVE", 0);
-	_NET_WM_STATE_STICKY = XInternAtom(dpy, "_NET_WM_STATE_STICKY", 0);
-	_NET_WM_WINDOW_TYPE = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE", 0);
-	_NET_WM_WINDOW_TYPE_DESKTOP = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DESKTOP", 0);
-	_NET_WM_WINDOW_TYPE_DOCK = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DOCK", 0);
-	_NET_WM_VISIBLE_NAME = XInternAtom(dpy, "_NET_WM_VISIBLE_NAME", 0);
-	_NET_WM_NAME = XInternAtom(dpy, "_NET_WM_VISIBLE_NAME", 0);
+	T_GETATOM(_NET_SUPPORTING_WM_CHECK);
+	T_GETATOM(_NET_SUPPORTED);
+	T_GETATOM(_NET_NUMBER_OF_DESKTOPS);
+	T_GETATOM(_NET_CLIENT_LIST);
+	T_GETATOM(_NET_CLIENT_LIST_STACKING);
+	T_GETATOM(_NET_CURRENT_DESKTOP);
+	T_GETATOM(_NET_WM_DESKTOP);
+	T_GETATOM(_NET_WM_STATE);
+	T_GETATOM(_NET_WM_STATE_HIDDEN);
+	T_GETATOM(_NET_WM_STATE_SKIP_TASKBAR);
+	T_GETATOM(_NET_WM_STATE_SKIP_PAGER);
+	T_GETATOM(_NET_WM_STATE_FULLSCREEN);
+	T_GETATOM(_NET_WM_STATE_SHADED);
+	T_GETATOM(_NET_WM_STATE_ABOVE);
+	T_GETATOM(_NET_WM_STATE_STICKY);
+	T_GETATOM(_NET_WM_WINDOW_TYPE);
+	T_GETATOM(_NET_WM_WINDOW_TYPE_DESKTOP);
+	T_GETATOM(_NET_WM_WINDOW_TYPE_DOCK);
+	T_GETATOM(_NET_WM_WINDOW_TYPE_NORMAL);
+	T_GETATOM(_NET_WM_WINDOW_TYPE_TOOLTIP);
+	T_GETATOM(_NET_WM_VISIBLE_NAME);
+	T_GETATOM(_NET_WM_NAME);
 	
-	_WIN_SUPPORTING_WM_CHECK = XInternAtom(dpy, "_WIN_SUPPORTING_WM_CHECK", 0);
-	_WIN_WORKSPACE = XInternAtom(dpy, "_WIN_WORKSPACE", 0);
-	_WIN_WORKSPACE_COUNT = XInternAtom(dpy, "_WIN_WORKSPACE_COUNT", 0);
-	_WIN_PROTOCOLS = XInternAtom(dpy, "_WIN_PROTOCOLS", 0);
-	_WIN_CLIENT_LIST = XInternAtom(dpy, "_WIN_CLIENT_LIST", 0);
-	_WIN_STATE = XInternAtom(dpy, "_WIN_STATE", 0);
-	_WIN_HINTS = XInternAtom(dpy, "_WIN_HINTS", 0);
+	T_GETATOM(_WIN_SUPPORTING_WM_CHECK);
+	T_GETATOM(_WIN_WORKSPACE);
+	T_GETATOM(_WIN_WORKSPACE_COUNT);
+	T_GETATOM(_WIN_PROTOCOLS);
+	T_GETATOM(_WIN_CLIENT_LIST);
+	T_GETATOM(_WIN_STATE);
+	T_GETATOM(_WIN_HINTS);
+#undef T_GETATOM
 }
 
 char
@@ -641,4 +659,57 @@ wm_get_focused(Display *dpy)
 	}
 	
 	return focused;
+}
+
+/**
+ * @brief Set a UTF-8 string property on a window.
+ */
+bool
+wm_wid_set_prop_utf8(session_t *ps, Window wid, Atom prop, char *text) {
+	XTextProperty text_prop = { };
+	bool success = (Success == XmbTextListToTextProperty(ps->dpy, &text, 1,
+				XUTF8StringStyle, &text_prop));
+	if (success)
+		XSetTextProperty(ps->dpy, wid, &text_prop, prop);
+	sxfree(text_prop.value);
+	return success;
+}
+
+/**
+ * @brief Set basic properties on a window.
+ */
+void
+wm_wid_set_info(session_t *ps, Window wid, const char *name,
+		Atom window_type) {
+	// Set window name
+	{
+		char *textcpy = mstrjoin("skippy-xd ", name);
+		{
+			XTextProperty text_prop = { };
+			if (Success == XmbTextListToTextProperty(ps->dpy, &textcpy, 1,
+						XStdICCTextStyle, &text_prop))
+				XSetWMName(ps->dpy, wid, &text_prop);
+			sxfree(text_prop.value);
+		}
+		wm_wid_set_prop_utf8(ps, wid, _NET_WM_NAME, textcpy);
+		free(textcpy);
+	}
+
+	// Set window class
+	{
+		XClassHint *classh = allocchk(XAllocClassHint());
+		classh->res_name = "skippy-xd";
+		classh->res_class = "skippy-xd";
+		XSetClassHint(ps->dpy, wid, classh);
+		XFree(classh);
+	}
+
+	// Set window type
+	{
+		if (!window_type)
+			window_type = _NET_WM_WINDOW_TYPE_NORMAL;
+		long val = window_type;
+		XChangeProperty(ps->dpy, wid, _NET_WM_WINDOW_TYPE, XA_ATOM, 32,
+				PropModeReplace, (unsigned char *) &val, 1);
+	}
 }

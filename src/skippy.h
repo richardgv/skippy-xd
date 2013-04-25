@@ -66,7 +66,10 @@
 /// @brief Possible return values.
 enum {
 	RET_SUCCESS = 0,
-	RET_BADALLOC = 5,
+	RET_UNKNOWN,
+	RET_BADARG,
+	RET_XFAIL,
+	RET_BADALLOC,
 };
 
 /// @brief Option structure.
@@ -284,12 +287,20 @@ mstrjoin3(const char *src1, const char *src2, const char *src3) {
 }
 
 /**
+ * @brief Wrapper of strdup().
+ */
+static inline char *
+mstrdup(const char *src) {
+	return allocchk(strdup(src));
+}
+
+/**
  * @brief Copy and place a string to somewhere.
  */
 static inline void
 strplace(char **dst, const char *src) {
 	free(*dst);
-	*dst = allocchk(strdup(src));
+	*dst = mstrdup(src);
 }
 
 /**
@@ -340,6 +351,17 @@ free_region(session_t *ps, XserverRegion *p) {
 static inline unsigned short
 alphaconv(int alpha) {
 	return MIN(alpha * 256, 65535);
+}
+
+/**
+ * Wrapper of XFree() for convenience.
+ *
+ * Because a NULL pointer cannot be passed to XFree(), its man page says.
+ */
+static inline void
+sxfree(void *data) {
+  if (data)
+    XFree(data);
 }
 
 #include "wm.h"

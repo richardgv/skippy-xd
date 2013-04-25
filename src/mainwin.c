@@ -23,37 +23,27 @@
 static Visual *
 find_argb_visual (Display *dpy, int scr)
 {
-    XVisualInfo		*xvi;
-    XVisualInfo		template;
-    int			nvi;
-    int			i;
-    XRenderPictFormat	*format;
-    Visual		*visual;
-    
-    template.screen = scr;
-    template.depth = 32;
-    template.class = TrueColor;
-    xvi = XGetVisualInfo (dpy, 
-			  VisualScreenMask |
-			  VisualDepthMask |
-			  VisualClassMask,
-			  &template,
-			  &nvi);
-    if (!xvi)
-	return 0;
-    visual = 0;
-    for (i = 0; i < nvi; i++)
-    {
-	format = XRenderFindVisualFormat (dpy, xvi[i].visual);
-	if (format->type == PictTypeDirect && format->direct.alphaMask)
-	{
-	    visual = xvi[i].visual;
-	    break;
-	}
-    }
+	XVisualInfo template = {
+		.screen = scr, .depth = 32, .class = TrueColor,
+	};
+	int	nvi = 0;
+	XVisualInfo *xvi = XGetVisualInfo (dpy,
+			VisualScreenMask | VisualDepthMask | VisualClassMask,
+			&template, &nvi);
+	if (!xvi) return NULL;
 
-    XFree (xvi);
-    return visual;
+	Visual *visual = NULL;;
+	for (int i = 0; i < nvi; ++i) {
+		XRenderPictFormat *format =
+			XRenderFindVisualFormat (dpy, xvi[i].visual);
+		if (format->type == PictTypeDirect && format->direct.alphaMask) {
+			visual = xvi[i].visual;
+			break;
+		}
+	}
+
+	XFree (xvi);
+	return visual;
 }
 
 MainWin *
@@ -129,6 +119,7 @@ mainwin_create(session_t *ps)
 		free(mw);
 		return 0;
 	}
+	wm_wid_set_info(ps, mw->window, "main window", None);
 
 #ifdef CFG_XINERAMA
 	if (ps->xinfo.xinerama_exist && XineramaIsActive(dpy)) {

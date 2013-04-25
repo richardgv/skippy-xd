@@ -23,9 +23,15 @@
 extern Atom
 	/* Root pixmap / wallpaper atoms */
 	_XROOTPMAP_ID,
-	ESETROOT_PMAP_ID;
+	ESETROOT_PMAP_ID,
 
-void wm_get_atoms(Display *dpy);
+	// Window type atoms
+	_NET_WM_WINDOW_TYPE_DESKTOP,
+	_NET_WM_WINDOW_TYPE_DOCK,
+	_NET_WM_WINDOW_TYPE_NORMAL,
+	_NET_WM_WINDOW_TYPE_TOOLTIP;
+
+void wm_get_atoms(session_t *ps);
 char wm_check(Display *dpy);
 void wm_use_netwm_fullscreen(Bool b);
 dlist *wm_get_stack(Display *dpy);
@@ -38,5 +44,8 @@ int wm_validate_window(Display *dpy, Window win);
 CARD32 wm_get_window_desktop(Display *dpy, Window win);
 Window wm_get_focused(Display *dpy);
 void wm_ignore_skip_taskbar(Bool b);
+
+void wm_wid_set_info(session_t *ps, Window wid, const char *name,
+		Atom window_type);
 
 #endif /* SKIPPY_WM_H */

@@ -491,7 +491,7 @@ get_cfg_path(void) {
 	if (!((dir = getenv("XDG_CONFIG_DIRS")) && strlen(dir)))
 		dir = PATH_CONFIG_SYS;
 	{
-		char *dir_free = allocchk(strdup(dir));
+		char *dir_free = mstrdup(dir);
 		char *part = strtok(dir_free, ":");
 		while (part) {
 			path = mstrjoin(part, PATH_CONFIG_SYS_SUFFIX);
@@ -515,7 +515,7 @@ get_cfg_path_found:
 int main(int argc, char *argv[])
 {
 	session_t *ps = NULL;
-	int ret = 0;
+	int ret = RET_SUCCESS;
 
 	dlist *clients = NULL;
 	Display *dpy = NULL;
@@ -536,12 +536,7 @@ int main(int argc, char *argv[])
 	// Initialize session structure
 	{
 		static const session_t SESSIONT_DEF = SESSIONT_INIT;
-		ps_g = ps = malloc(sizeof(session_t));
-		if (!ps) {
-			printfef("(): Failed to allocate session structure.");
-			ret = 1;
-			goto main_end;
-		}
+		ps_g = ps = allocchk(malloc(sizeof(session_t)));
 		memcpy(ps, &SESSIONT_DEF, sizeof(session_t));
 		gettimeofday(&ps->time_start, NULL);
 	}
@@ -562,14 +557,14 @@ int main(int argc, char *argv[])
 		// Read configuration into ps->o, because searching all the time is much
 		// less efficient, may introduce inconsistent default value, and
 		// occupies a lot more memory for non-string types.
-		ps->o.pipePath = allocchk(strdup(config_get(config, "general", "pipePath", "/tmp/skippy-xd-fifo")));
-		ps->o.normal_tint = allocchk(strdup(config_get(config, "normal", "tint", "black")));
-		ps->o.highlight_tint = allocchk(strdup(config_get(config, "highlight", "tint", "#101020")));
-		ps->o.tooltip_border = allocchk(strdup(config_get(config, "tooltip", "border", "#e0e0e0")));
-		ps->o.tooltip_background = allocchk(strdup(config_get(config, "tooltip", "background", "#404040")));
-		ps->o.tooltip_text = allocchk(strdup(config_get(config, "tooltip", "text", "#e0e0e0")));
-		ps->o.tooltip_textShadow = allocchk(strdup(config_get(config, "tooltip", "textShadow", "black")));
-		ps->o.tooltip_font = allocchk(strdup(config_get(config, "tooltip", "font", "fixed-11:weight=bold")));
+		ps->o.pipePath = mstrdup(config_get(config, "general", "pipePath", "/tmp/skippy-xd-fifo"));
+		ps->o.normal_tint = mstrdup(config_get(config, "normal", "tint", "black"));
+		ps->o.highlight_tint = mstrdup(config_get(config, "highlight", "tint", "#101020"));
+		ps->o.tooltip_border = mstrdup(config_get(config, "tooltip", "border", "#e0e0e0"));
+		ps->o.tooltip_background = mstrdup(config_get(config, "tooltip", "background", "#404040"));
+		ps->o.tooltip_text = mstrdup(config_get(config, "tooltip", "text", "#e0e0e0"));
+		ps->o.tooltip_textShadow = mstrdup(config_get(config, "tooltip", "textShadow", "black"));
+		ps->o.tooltip_font = mstrdup(config_get(config, "tooltip", "font", "fixed-11:weight=bold"));
 		if (config) {
 			config_get_int_wrap(config, "general", "distance", &ps->o.distance, 1, INT_MAX);
 			config_get_bool_wrap(config, "general", "useNetWMFullscreen", &ps->o.useNetWMFullscreen);
@@ -628,7 +623,7 @@ int main(int argc, char *argv[])
 					show_help();
 					// Return a non-zero value on unrecognized option
 					if ('h' != o)
-						ret = 1;
+						ret = RET_BADARG;
 					goto main_end;
 			}
 		}
@@ -637,19 +632,19 @@ int main(int argc, char *argv[])
 	// Open connection to X
 	ps->dpy = dpy = XOpenDisplay(NULL);
 	if(!dpy) {
-		fprintf(stderr, "FATAL: Couldn't connect to display.\n");
-		ret = 1;
+		printfef("(): FATAL: Couldn't connect to display.");
+		ret = RET_XFAIL;
 		goto main_end;
 	}
 	if (!init_xexts(ps)) {
-		ret = 1;
+		ret = RET_XFAIL;
 		goto main_end;
 	}
 	if (synchronize)
 		XSynchronize(ps->dpy, True);
 	XSetErrorHandler(xerror);
 	
-	wm_get_atoms(dpy);
+	wm_get_atoms(ps);
 	
 	if(! wm_check(dpy)) {
 		fprintf(stderr, "FATAL: WM not NETWM or GNOME WM Spec compliant.\n");
