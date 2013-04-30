@@ -26,7 +26,7 @@
 #ifndef SKIPPY_H
 #define SKIPPY_H
 
-#define BUF_LEN 80
+#define BUF_LEN 128
 
 #define _GNU_SOURCE
 
@@ -37,8 +37,6 @@
 #include <X11/Xlib.h>
 #include <X11/Xmd.h>
 #include <X11/Xatom.h>
-#include <X11/Xmu/WinUtil.h>
-#include <X11/keysym.h>
 #include <X11/Xft/Xft.h>
 
 #include <X11/extensions/Xrender.h>
@@ -165,6 +163,10 @@ typedef struct {
 	.time_start = { .tv_sec = 0, .tv_usec = 0 }, \
 }
 
+/// @brief Print out a debug message.
+#define printfd(format, ...) \
+  (fprintf(stdout, format "\n", ## __VA_ARGS__), fflush(stdout))
+
 /// @brief Print out an error message.
 #define printfe(format, ...) \
   fprintf(stderr, format "\n", ## __VA_ARGS__)
@@ -188,6 +190,10 @@ allocchk_(void *ptr, const char *func_name) {
 
 /// @brief Wrapper of allocchk_().
 #define allocchk(ptr) allocchk_(ptr, __func__)
+
+/// @brief Return the case string.
+/// Use #s here to prevent macro expansion
+#define CASESTRRET(s)   case s: return #s
 
 #define MAX(a,b) (((a) > (b)) ? (a) : (b))
 #define MIN(a,b) (((a) > (b)) ? (b) : (a))

@@ -377,48 +377,26 @@ wm_get_current_desktop(Display *dpy)
 	return desktop;
 }
 
+/**
+ * @brief Retrieve the title of a window.
+ *
+ * Must be a UTF-8 string.
+ */
 FcChar8 *
-wm_get_window_title(Display *dpy, Window window, int *length_return)
-{
-	unsigned char *data;
-	FcChar8 *ret = 0;
-	int status, real_format;
-	Atom real_type;
-	unsigned long items_read, items_left;
-	
-	*length_return = 0;
-	
-	status = XGetWindowProperty(dpy, window, _NET_WM_VISIBLE_NAME,
-	                  0, 8192, False, XA_UTF8_STRING, &real_type, &real_format,
-	                  &items_read, &items_left, &data);
-	if(status != Success || items_read == 0)
-	{
-		if(status == Success)
-			XFree(data);
-		status = XGetWindowProperty(dpy, window, _NET_WM_NAME,
-		                  0, 8192, False, XA_UTF8_STRING, &real_type, &real_format,
-		                  &items_read, &items_left, &data);
-	}
-	if(status != Success || items_read == 0)
-	{
-		if(status == Success)
-			XFree(data);
-		status = XGetWindowProperty(dpy, window, XA_WM_NAME,
-		                  0, 8192, False, XA_STRING, &real_type, &real_format,
-		                  &items_read, &items_left, &data);
-	}
-	if(status != Success)
-		return 0;
-	
-	if(items_read)
-	{
-		ret = (FcChar8 *)malloc(items_read);
-		memcpy(ret, data, items_read);
-		*length_return = items_read;
-	}
-	
-	XFree(data);
-	
+wm_get_window_title(session_t *ps, Window wid, int *length_return) {
+	char *ret = NULL;
+
+	// wm_wid_get_prop_utf8() is certainly more appropriate, yet
+	// I found Xlib failing to interpret CJK characters in WM_NAME with
+	// type STRING, so we have to keep using the old way here.
+	ret = wm_wid_get_prop_rstr(ps, wid, _NET_WM_VISIBLE_NAME);
+	if (!ret)
+		ret = wm_wid_get_prop_rstr(ps, wid, _NET_WM_NAME);
+	if (!ret)
+		ret = wm_wid_get_prop_rstr(ps, wid, XA_WM_NAME);
+	if (ret && length_return)
+		*length_return = strlen(ret);
+
 	return ret;
 }
 
@@ -659,6 +637,43 @@ wm_get_focused(Display *dpy)
 	}
 	
 	return focused;
+}
+
+/**
+ * @brief Get the raw string from a string property.
+ */
+char *
+wm_wid_get_prop_rstr(session_t *ps, Window wid, Atom prop) {
+	Atom type_ret = None;
+	int fmt_ret = 0;
+	unsigned long nitems = 0;
+	unsigned long bytes_after_ret = 0;
+	unsigned char *data = NULL;
+	char *ret = NULL;
+	if (Success == XGetWindowProperty(ps->dpy, wid, prop, 0, BUF_LEN,
+				False, AnyPropertyType, &type_ret, &fmt_ret, &nitems,
+				&bytes_after_ret, &data) && nitems && 8 == fmt_ret)
+		ret = mstrdup(data);
+	sxfree(data);
+	return ret;
+}
+
+/**
+ * @brief Get the first string in a UTF-8 string property on a window.
+ */
+char *
+wm_wid_get_prop_utf8(session_t *ps, Window wid, Atom prop) {
+	XTextProperty text_prop = { };
+	char *ret = NULL;
+	if (XGetTextProperty(ps->dpy, wid, &text_prop, prop)) {
+		char **strlst = NULL;
+		int cstr = 0;
+		Xutf8TextPropertyToTextList(ps->dpy, &text_prop, &strlst, &cstr);
+		if (cstr) ret = mstrdup(strlst[0]);
+		if (strlst) XFreeStringList(strlst);
+	}
+	sxfree(text_prop.value);
+	return ret;
 }
 
 /**

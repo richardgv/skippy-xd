@@ -36,11 +36,15 @@ BINS = skippy-xd${EXESUFFIX}
 SRCS_RAW = skippy wm dlist mainwin clientwin layout focus config tooltip
 SRCS = $(foreach name,$(SRCS_RAW),src/$(name).c)
 HDRS = $(foreach name,$(SRCS_RAW),src/$(name).h)
+OBJS = $(foreach name,$(SRCS_RAW),$(name).o)
 
-all: skippy-xd${EXESUFFIX}
+.DEFAULT_GOAL := skippy-xd${EXESUFFIX}
 
-skippy-xd${EXESUFFIX}: ${SRCS} ${HDRS}
-	${CC} ${INCS} ${CFLAGS} ${CPPFLAGS} ${LIBS} ${LDFLAGS} -o skippy-xd${EXESUFFIX} ${SRCS}
+%.o: src/%.c ${HDRS}
+	${CC} ${INCS} ${CFLAGS} ${CPPFLAGS} -c src/$*.c
+
+skippy-xd${EXESUFFIX}: ${OBJS}
+	${CC} ${LDFLAGS} -o skippy-xd${EXESUFFIX} ${OBJS} ${LIBS}
 
 clean:
 	rm -f ${BINS}

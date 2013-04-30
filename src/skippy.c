@@ -136,6 +136,62 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader)
 	return clients;
 }
 
+static inline const char *
+ev_dumpstr_type(const XEvent *ev) {
+	switch (ev->type) {
+		CASESTRRET(KeyPress);
+		CASESTRRET(KeyRelease);
+		CASESTRRET(ButtonPress);
+		CASESTRRET(ButtonRelease);
+		CASESTRRET(MotionNotify);
+		CASESTRRET(EnterNotify);
+		CASESTRRET(LeaveNotify);
+		CASESTRRET(FocusIn);
+		CASESTRRET(FocusOut);
+		CASESTRRET(KeymapNotify);
+		CASESTRRET(Expose);
+		CASESTRRET(GraphicsExpose);
+		CASESTRRET(NoExpose);
+		CASESTRRET(CirculateRequest);
+		CASESTRRET(ConfigureRequest);
+		CASESTRRET(MapRequest);
+		CASESTRRET(ResizeRequest);
+		CASESTRRET(CirculateNotify);
+		CASESTRRET(ConfigureNotify);
+		CASESTRRET(CreateNotify);
+		CASESTRRET(DestroyNotify);
+		CASESTRRET(GravityNotify);
+		CASESTRRET(MapNotify);
+		CASESTRRET(MappingNotify);
+		CASESTRRET(ReparentNotify);
+		CASESTRRET(UnmapNotify);
+		CASESTRRET(VisibilityNotify);
+		CASESTRRET(ColormapNotify);
+		CASESTRRET(ClientMessage);
+		CASESTRRET(PropertyNotify);
+		CASESTRRET(SelectionClear);
+		CASESTRRET(SelectionNotify);
+		CASESTRRET(SelectionRequest);
+	}
+
+	return "Unknown";
+}
+
+static inline void
+ev_dump(session_t *ps, const MainWin *mw, const XEvent *ev) {
+	if (!ev || (ps->xinfo.damage_ev_base + XDamageNotify) == ev->type) return;
+
+	const char *name = ev_dumpstr_type(ev);
+	Window wid = ev->xany.window;
+
+	const char *wextra = "";
+	if (mw && mw->root == wid) wextra = "(Root)";
+	if (mw && mw->window == wid) wextra = "(Main)";
+
+	print_timestamp(ps);
+	printfd("Event %-13.13s wid %#010lx %s", name, wid, wextra);
+}
+
 static dlist *
 skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xin)
 {
@@ -196,6 +252,9 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xi
 		for(j = 0; j < i; ++j)
 		{
 			XNextEvent(mw->dpy, &ev);
+#ifdef DEBUG_EVENTS
+			ev_dump(ps, mw, &ev);
+#endif
 
 			if (ev.type == MotionNotify)
 			{
@@ -326,7 +385,7 @@ void exit_daemon(const char* pipePath)
 }
 
 /**
- * Xlib error handler function.
+ * @brief Xlib error handler function.
  */
 static int
 xerror(Display *dpy, XErrorEvent *ev) {
@@ -663,7 +722,7 @@ int main(int argc, char *argv[])
 		goto main_end;
 	}
 	
-	invertShift = ps->o.xinerama_showAll;
+	invertShift = !ps->o.xinerama_showAll;
 	
 	XSelectInput(mw->dpy, mw->root, PropertyChangeMask);
 

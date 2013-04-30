@@ -109,8 +109,10 @@ mainwin_create(session_t *ps)
 	
 	wattr.colormap = mw->colormap;
 	wattr.background_pixel = wattr.border_pixel = 0;
-	wattr.event_mask = VisibilityChangeMask | ButtonReleaseMask
-		| KeyReleaseMask;
+	// I have no idea why, but seemingly without ButtonPressMask, we can't
+	// receive ButtonRelease events in some cases
+	wattr.event_mask = VisibilityChangeMask | ButtonPressMask
+		| ButtonReleaseMask | KeyReleaseMask;
 	
 	mw->window = XCreateWindow(dpy, mw->root, 0, 0, mw->width, mw->height, 0,
 	                           mw->depth, InputOutput, mw->visual,

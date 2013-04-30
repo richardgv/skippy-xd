@@ -374,7 +374,7 @@ clientwin_handle(ClientWin *cw, XEvent *ev)
 		if(cw->mainwin->tooltip)
 		{
 			int win_title_len = 0;
-			FcChar8 *win_title = wm_get_window_title(cw->mainwin->dpy, cw->client.window, &win_title_len);
+			FcChar8 *win_title = wm_get_window_title(cw->mainwin->ps, cw->client.window, &win_title_len);
 			if(win_title)
 			{
 				tooltip_map(cw->mainwin->tooltip,
