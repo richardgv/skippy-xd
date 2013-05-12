@@ -47,8 +47,7 @@ find_argb_visual (Display *dpy, int scr)
 }
 
 MainWin *
-mainwin_create(session_t *ps)
-{
+mainwin_create(session_t *ps) {
 	Display * const dpy = ps->dpy;
 
 	const char *tmp;
@@ -59,29 +58,22 @@ mainwin_create(session_t *ps)
 	XRenderPictureAttributes pa;
 	XRenderColor clear;
 	
-	MainWin *mw = (MainWin *)malloc(sizeof(MainWin));
+	MainWin *mw = allocchk(malloc(sizeof(MainWin)));
 	
 	mw->ps = ps;
-	mw->dpy = dpy;
-	mw->screen = DefaultScreen(dpy);
-	mw->root = RootWindow(dpy, mw->screen);
-	mw->lazy_trans = ps->o.lazyTrans;
-	if(mw->lazy_trans)
-	{
+	if (ps->o.lazyTrans) {
 		mw->depth  = 32;
 		mw->visual = find_argb_visual(dpy, DefaultScreen(dpy));
-		if(! mw->visual)
-		{
-			fprintf(stderr, "WARNING: Couldn't find argb visual, disabling lazy transparency.\n");
-			mw->lazy_trans = False;
+		if (!mw->visual) {
+			printfef("(): Couldn't find ARGB visual, lazy transparency can't work.");
+			goto mainwin_create_err;
 		}
 	}
-	if(! mw->lazy_trans)
-	{
-		mw->depth = DefaultDepth(dpy, mw->screen);
-		mw->visual = DefaultVisual(dpy, mw->screen);
+	if (!ps->o.lazyTrans) {
+		mw->depth = DefaultDepth(dpy, ps->screen);
+		mw->visual = DefaultVisual(dpy, ps->screen);
 	}
-	mw->colormap = XCreateColormap(dpy, mw->root, mw->visual, AllocNone);
+	mw->colormap = XCreateColormap(dpy, ps->root, mw->visual, AllocNone);
 	mw->bg_pixmap = None;
 	mw->background = None;
 	mw->format = XRenderFindVisualFormat(dpy, mw->visual);
@@ -102,7 +94,7 @@ mainwin_create(session_t *ps)
 	mw->key_escape = XKeysymToKeycode(dpy, XK_Escape);
 	mw->key_q = XKeysymToKeycode(dpy, XK_q);
 	
-	XGetWindowAttributes(dpy, mw->root, &rootattr);
+	XGetWindowAttributes(dpy, ps->root, &rootattr);
 	mw->x = mw->y = 0;
 	mw->width = rootattr.width;
 	mw->height = rootattr.height;
@@ -114,7 +106,7 @@ mainwin_create(session_t *ps)
 	wattr.event_mask = VisibilityChangeMask | ButtonPressMask
 		| ButtonReleaseMask | KeyReleaseMask;
 	
-	mw->window = XCreateWindow(dpy, mw->root, 0, 0, mw->width, mw->height, 0,
+	mw->window = XCreateWindow(dpy, ps->root, 0, 0, mw->width, mw->height, 0,
 	                           mw->depth, InputOutput, mw->visual,
 	                           CWBackPixel|CWBorderPixel|CWColormap|CWEventMask, &wattr);
 	if(mw->window == None) {
@@ -125,14 +117,14 @@ mainwin_create(session_t *ps)
 
 #ifdef CFG_XINERAMA
 	if (ps->xinfo.xinerama_exist && XineramaIsActive(dpy)) {
-		mw->xin_info = XineramaQueryScreens(mw->dpy, &mw->xin_screens);
+		mw->xin_info = XineramaQueryScreens(ps->dpy, &mw->xin_screens);
 # ifdef DEBUG_XINERAMA
 		printfef("(): Xinerama is enabled (%d screens).", mw->xin_screens);
 # endif /* DEBUG_XINERAMA */
 	}
 #endif /* CFG_XINERAMA */
 
-	XCompositeRedirectSubwindows (mw->dpy, mw->root, CompositeRedirectAutomatic);
+	XCompositeRedirectSubwindows (ps->dpy, ps->root, CompositeRedirectAutomatic);
 	
 	tmp_d = ps->o.updateFreq;
 	if(tmp_d != 0.0)
@@ -140,7 +132,7 @@ mainwin_create(session_t *ps)
 	else
 		mw->poll_time = 0;
 	
-	if(!XParseColor(mw->dpy, mw->colormap, ps->o.normal_tint, &exact_color)) {
+	if(!XParseColor(ps->dpy, mw->colormap, ps->o.normal_tint, &exact_color)) {
 		printfef("(): Couldn't look up color '%s', reverting to black.", ps->o.normal_tint);
 		mw->normalTint.red = mw->normalTint.green = mw->normalTint.blue = 0;
 	}
@@ -153,7 +145,7 @@ mainwin_create(session_t *ps)
 	mw->normalTint.alpha = alphaconv(ps->o.normal_tintOpacity);
 	
 	tmp = ps->o.highlight_tint;
-	if(! XParseColor(mw->dpy, mw->colormap, tmp, &exact_color))
+	if(! XParseColor(ps->dpy, mw->colormap, tmp, &exact_color))
 	{
 		fprintf(stderr, "Couldn't look up color '%s', reverting to #101020", tmp);
 		mw->highlightTint.red = mw->highlightTint.green = 0x10;
@@ -169,55 +161,63 @@ mainwin_create(session_t *ps)
 	
 	pa.repeat = True;
 	clear.alpha = alphaconv(ps->o.normal_opacity);
-	mw->normalPixmap = XCreatePixmap(mw->dpy, mw->window, 1, 1, 8);
-	mw->normalPicture = XRenderCreatePicture(mw->dpy, mw->normalPixmap, XRenderFindStandardFormat(mw->dpy, PictStandardA8), CPRepeat, &pa);
-	XRenderFillRectangle(mw->dpy, PictOpSrc, mw->normalPicture, &clear, 0, 0, 1, 1);
+	mw->normalPixmap = XCreatePixmap(ps->dpy, mw->window, 1, 1, 8);
+	mw->normalPicture = XRenderCreatePicture(ps->dpy, mw->normalPixmap, XRenderFindStandardFormat(ps->dpy, PictStandardA8), CPRepeat, &pa);
+	XRenderFillRectangle(ps->dpy, PictOpSrc, mw->normalPicture, &clear, 0, 0, 1, 1);
 	
 	clear.alpha = alphaconv(ps->o.highlight_opacity);
-	mw->highlightPixmap = XCreatePixmap(mw->dpy, mw->window, 1, 1, 8);
-	mw->highlightPicture = XRenderCreatePicture(mw->dpy, mw->highlightPixmap, XRenderFindStandardFormat(mw->dpy, PictStandardA8), CPRepeat, &pa);
-	XRenderFillRectangle(mw->dpy, PictOpSrc, mw->highlightPicture, &clear, 0, 0, 1, 1);
+	mw->highlightPixmap = XCreatePixmap(ps->dpy, mw->window, 1, 1, 8);
+	mw->highlightPicture = XRenderCreatePicture(ps->dpy, mw->highlightPixmap, XRenderFindStandardFormat(ps->dpy, PictStandardA8), CPRepeat, &pa);
+	XRenderFillRectangle(ps->dpy, PictOpSrc, mw->highlightPicture, &clear, 0, 0, 1, 1);
 	
-	mw->distance = mw->ps->o.distance;
+	mw->distance = ps->o.distance;
 	
 	if (ps->o.tooltip_show)
 		mw->tooltip = tooltip_create(mw);
 	
 	return mw;
+
+mainwin_create_err:
+	if (mw)
+		free(mw);
+	return NULL;
 }
 
 void
-mainwin_update_background(MainWin *mw)
-{
-	Pixmap root = wm_get_root_pmap(mw->dpy);
+mainwin_update_background(MainWin *mw) {
+	session_t *ps = mw->ps;
+
+	Pixmap root = wm_get_root_pmap(ps->dpy);
 	XRenderColor black = { 0, 0, 0, 65535};
 	XRenderPictureAttributes pa;
 	
 	if(mw->bg_pixmap)
-		XFreePixmap(mw->dpy, mw->bg_pixmap);
+		XFreePixmap(ps->dpy, mw->bg_pixmap);
 	if(mw->background)
-		XRenderFreePicture(mw->dpy, mw->background);
+		XRenderFreePicture(ps->dpy, mw->background);
 	
-	mw->bg_pixmap = XCreatePixmap(mw->dpy, mw->window, mw->width, mw->height, mw->depth);
+	mw->bg_pixmap = XCreatePixmap(ps->dpy, mw->window, mw->width, mw->height, mw->depth);
 	pa.repeat = True;
-	mw->background = XRenderCreatePicture(mw->dpy, mw->bg_pixmap, mw->format, CPRepeat, &pa);
+	mw->background = XRenderCreatePicture(ps->dpy, mw->bg_pixmap, mw->format, CPRepeat, &pa);
 	
 	if(root == None)
-		XRenderFillRectangle(mw->dpy, PictOpSrc, mw->background, &black, 0, 0, mw->width, mw->height);
+		XRenderFillRectangle(ps->dpy, PictOpSrc, mw->background, &black, 0, 0, mw->width, mw->height);
 	else
 	{
-		Picture from = XRenderCreatePicture(mw->dpy, root, XRenderFindVisualFormat(mw->dpy, DefaultVisual(mw->dpy, mw->screen)), 0, 0);
-		XRenderComposite(mw->dpy, PictOpSrc, from, None, mw->background, mw->x, mw->y, 0, 0, 0, 0, mw->width, mw->height);
-		XRenderFreePicture(mw->dpy, from);
+		Picture from = XRenderCreatePicture(ps->dpy, root, XRenderFindVisualFormat(ps->dpy, DefaultVisual(ps->dpy, ps->screen)), 0, 0);
+		XRenderComposite(ps->dpy, PictOpSrc, from, None, mw->background, mw->x, mw->y, 0, 0, 0, 0, mw->width, mw->height);
+		XRenderFreePicture(ps->dpy, from);
 	}
 	
-	XSetWindowBackgroundPixmap(mw->dpy, mw->window, mw->bg_pixmap);
-	XClearWindow(mw->dpy, mw->window);
+	XSetWindowBackgroundPixmap(ps->dpy, mw->window, mw->bg_pixmap);
+	XClearWindow(ps->dpy, mw->window);
 }
 
 void
 mainwin_update(MainWin *mw)
 {
+	session_t * const ps = mw->ps;
+
 #ifdef CFG_XINERAMA
 	XineramaScreenInfo *iter;
 	int i;
@@ -234,7 +234,7 @@ mainwin_update(MainWin *mw)
 # ifdef DEBUG
 	fprintf(stderr, "--> querying pointer... ");
 # endif /* DEBUG */
-	XQueryPointer(mw->dpy, mw->root, &dummy_w, &dummy_w, &root_x, &root_y, &dummy_i, &dummy_i, &dummy_u);
+	XQueryPointer(ps->dpy, ps->root, &dummy_w, &dummy_w, &root_x, &root_y, &dummy_i, &dummy_i, &dummy_u);
 # ifdef DEBUG	
 	fprintf(stderr, "+%i+%i\n", root_x, root_y);
 	
@@ -264,7 +264,7 @@ mainwin_update(MainWin *mw)
 	mw->y = iter->y_org;
 	mw->width = iter->width;
 	mw->height = iter->height;
-	XMoveResizeWindow(mw->dpy, mw->window, iter->x_org, iter->y_org, mw->width, mw->height);
+	XMoveResizeWindow(ps->dpy, mw->window, iter->x_org, iter->y_org, mw->width, mw->height);
 	mw->xin_active = iter;
 #endif /* CFG_XINERAMA */
 	mainwin_update_background(mw);
@@ -273,10 +273,10 @@ mainwin_update(MainWin *mw)
 void
 mainwin_map(MainWin *mw)
 {
-	wm_set_fullscreen(mw->dpy, mw->window, mw->x, mw->y, mw->width, mw->height);
+	wm_set_fullscreen(mw->ps->dpy, mw->window, mw->x, mw->y, mw->width, mw->height);
 	mw->pressed = 0;
-	XMapWindow(mw->dpy, mw->window);
-	XRaiseWindow(mw->dpy, mw->window);
+	XMapWindow(mw->ps->dpy, mw->window);
+	XRaiseWindow(mw->ps->dpy, mw->window);
 }
 
 void
@@ -286,37 +286,38 @@ mainwin_unmap(MainWin *mw)
 		tooltip_unmap(mw->tooltip);
 	if(mw->bg_pixmap)
 	{
-		XFreePixmap(mw->dpy, mw->bg_pixmap);
+		XFreePixmap(mw->ps->dpy, mw->bg_pixmap);
 		mw->bg_pixmap = None;
 	}
-	XUnmapWindow(mw->dpy, mw->window);
+	XUnmapWindow(mw->ps->dpy, mw->window);
 }
 
 void
-mainwin_destroy(MainWin *mw)
-{
+mainwin_destroy(MainWin *mw) {
+	session_t *ps = mw->ps; 
+
 	if(mw->tooltip)
 		tooltip_destroy(mw->tooltip);
 	
 	if(mw->background != None)
-		XRenderFreePicture(mw->dpy, mw->background);
+		XRenderFreePicture(ps->dpy, mw->background);
 	
 	if(mw->bg_pixmap != None)
-		XFreePixmap(mw->dpy, mw->bg_pixmap);
+		XFreePixmap(ps->dpy, mw->bg_pixmap);
 	
 	if(mw->normalPicture != None)
-		XRenderFreePicture(mw->dpy, mw->normalPicture);
+		XRenderFreePicture(ps->dpy, mw->normalPicture);
 	
 	if(mw->highlightPicture != None)
-		XRenderFreePicture(mw->dpy, mw->highlightPicture);
+		XRenderFreePicture(ps->dpy, mw->highlightPicture);
 	
 	if(mw->normalPixmap != None)
-		XFreePixmap(mw->dpy, mw->normalPixmap);
+		XFreePixmap(ps->dpy, mw->normalPixmap);
 	
 	if(mw->highlightPixmap != None)
-		XFreePixmap(mw->dpy, mw->highlightPixmap);
+		XFreePixmap(ps->dpy, mw->highlightPixmap);
 	
-	XDestroyWindow(mw->dpy, mw->window);
+	XDestroyWindow(ps->dpy, mw->window);
 	
 #ifdef CFG_XINERAMA
 	if(mw->xin_info)
@@ -346,16 +347,16 @@ mainwin_handle(MainWin *mw, XEvent *ev)
 	switch(ev->type)
 	{
 	case KeyPress:
-		if(ev->xkey.keycode == XKeysymToKeycode(mw->dpy, XK_q))
+		if(ev->xkey.keycode == XKeysymToKeycode(mw->ps->dpy, XK_q))
 			return 2;
 		break;
 	case ButtonRelease:
+		printfef("(): Detected mouse button release on main window, exiting.");
 		return 1;
-		break;
 	case VisibilityNotify:
 		if(ev->xvisibility.state && mw->focus)
 		{
-			XSetInputFocus(mw->dpy, mw->focus->mini.window, RevertToParent, CurrentTime);
+			XSetInputFocus(mw->ps->dpy, mw->focus->mini.window, RevertToParent, CurrentTime);
 			mw->focus = 0;
 		}
 		break;

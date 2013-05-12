@@ -23,17 +23,43 @@
 #include <getopt.h>
 #include <strings.h>
 #include <limits.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 session_t *ps_g = NULL;
 
 static int DIE_NOW = 0;
+
+/**
+ * @brief Parse a string representation of enum cliop.
+ */
+static bool
+parse_cliop(session_t *ps, const char *str, enum cliop *dest) {
+	static const char * const STRS_CLIENTOP[] = {
+		[	CLIENTOP_NO						] = "no",
+		[	CLIENTOP_FOCUS				] = "focus",
+		[	CLIENTOP_ICONIFY			] = "iconify",
+		[	CLIENTOP_SHADE_EWMH		] = "shade-ewmh",
+		[	CLIENTOP_CLOSE_ICCWM	] = "close-iccwm",
+		[	CLIENTOP_CLOSE_EWMH		] = "close-ewmh",
+		[	CLIENTOP_DESTROY			] = "destroy",
+	};
+	for (int i = 0; i < sizeof(STRS_CLIENTOP) / sizeof(STRS_CLIENTOP[0]); ++i)
+		if (!strcmp(STRS_CLIENTOP[i], str)) {
+			*dest = i;
+			return true;
+		}
+
+	printfef("(\"%s\"): Unrecognized operation.", str);
+	return false;
+}
 
 static dlist *
 update_clients(MainWin *mw, dlist *clients, Bool *touched)
 {
 	dlist *stack, *iter;
 	
-	stack = dlist_first(wm_get_stack(mw->dpy));
+	stack = dlist_first(wm_get_stack(mw->ps->dpy));
 	iter = clients = dlist_first(clients);
 	
 	if(touched)
@@ -82,7 +108,7 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader)
 {
 	session_t * const ps = mw->ps;
 
-	CARD32 desktop = wm_get_current_desktop(mw->dpy);
+	CARD32 desktop = wm_get_current_desktop(ps->dpy);
 	unsigned int width, height;
 	float factor;
 	int xoff, yoff;
@@ -130,7 +156,7 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader)
 	for(iter = mw->cod; iter; iter = iter->next)
 		clientwin_map((ClientWin*)iter->data);
 	if (ps->o.movePointerOnStart)
-		XWarpPointer(mw->dpy, None, mw->focus->mini.window, 0, 0, 0, 0,
+		XWarpPointer(mw->ps->dpy, None, mw->focus->mini.window, 0, 0, 0, 0,
 				mw->focus->mini.width / 2, mw->focus->mini.height / 2);
 	
 	return clients;
@@ -185,7 +211,7 @@ ev_dump(session_t *ps, const MainWin *mw, const XEvent *ev) {
 	Window wid = ev->xany.window;
 
 	const char *wextra = "";
-	if (mw && mw->root == wid) wextra = "(Root)";
+	if (ps->root == wid) wextra = "(Root)";
 	if (mw && mw->window == wid) wextra = "(Main)";
 
 	print_timestamp(ps);
@@ -211,10 +237,9 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xi
 #endif /* CFG_XINERAMA */
 	
 	/* Map the main window and run our event loop */
-	if(mw->lazy_trans)
-	{
+	if (ps->o.lazyTrans) {
 		mainwin_map(mw);
-		XFlush(mw->dpy);
+		XFlush(ps->dpy);
 	}
 	
 	clients = do_layout(mw, clients, focus, leader);
@@ -222,7 +247,7 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xi
 		return clients;
 	
 	/* Map the main window and run our event loop */
-	if(! mw->lazy_trans)
+	if (!ps->o.lazyTrans)
 		mainwin_map(mw);
 	
 	last_rendered = time_in_millis();
@@ -231,9 +256,9 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xi
 		int move_x = -1, move_y = -1;
 		struct pollfd r_fd;
 
-		XFlush(mw->dpy);
+		XFlush(ps->dpy);
 
-		r_fd.fd = ConnectionNumber(mw->dpy);
+		r_fd.fd = ConnectionNumber(ps->dpy);
 		r_fd.events = POLLIN;
 		if(mw->poll_time > 0)
 			timeout = MAX(0, mw->poll_time + last_rendered - time_in_millis());
@@ -248,10 +273,10 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xi
 			last_rendered = now;
 		}
 
-		i = XPending(mw->dpy);
+		i = XPending(ps->dpy);
 		for(j = 0; j < i; ++j)
 		{
-			XNextEvent(mw->dpy, &ev);
+			XNextEvent(ps->dpy, &ev);
 #ifdef DEBUG_EVENTS
 			ev_dump(ps, mw, &ev);
 #endif
@@ -270,9 +295,9 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xi
 					iter = dlist_find(mw->cod, clientwin_cmp_func, (void *)ev.xany.window);
 					if(iter)
 						mw->cod = dlist_first(dlist_remove(iter));
-					clientwin_destroy(cw, True);
-					if(! mw->cod)
-					{
+					clientwin_destroy(cw, true);
+					if (!mw->cod) {
+						printfef("(): Last client window destroyed/unmapped, exiting.");
 						die = 1;
 						break;
 					}
@@ -340,7 +365,7 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xi
 	
 	/* Unmap the main window and clean up */
 	mainwin_unmap(mw);
-	XFlush(mw->dpy);
+	XFlush(ps->dpy);
 	
 	REDUCE(clientwin_unmap((ClientWin*)iter->data), mw->cod);
 	dlist_free(mw->cod);
@@ -351,7 +376,7 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xi
 	
 	if(refocus)
 	{
-		XSetInputFocus(mw->dpy, focus, RevertToPointerRoot, CurrentTime);
+		XSetInputFocus(ps->dpy, focus, RevertToPointerRoot, CurrentTime);
 	}
 	
 	return clients;
@@ -374,13 +399,13 @@ void send_command_to_daemon_via_fifo(int command, const char* pipePath)
 	fclose(fp);
 }
 
-void activate_window_picker(const char* pipePath)
-{
+void activate_window_picker(const char* pipePath) {
+	printf("activating window picker...\n");
 	send_command_to_daemon_via_fifo(ACTIVATE_WINDOW_PICKER, pipePath);
 }
 
-void exit_daemon(const char* pipePath)
-{
+void exit_daemon(const char* pipePath) {
+	printf("exiting daemon...\n");
 	send_command_to_daemon_via_fifo(EXIT_RUNNING_DAEMON, pipePath);
 }
 
@@ -458,6 +483,7 @@ void show_help()
 	fputs("skippy-xd (" SKIPPYXD_VERSION ")\n"
 			"Usage: skippy-xd [command]\n\n"
 			"The available commands are:\n"
+			"\t--config                  - Read the specified configuration file.\n"
 			"\t--start-daemon            - starts the daemon running.\n"
 			"\t--stop-daemon             - stops the daemon running.\n"
 			"\t--activate-window-picker  - tells the daemon to show the window picker.\n"
@@ -571,8 +597,67 @@ get_cfg_path_found:
 	return path;
 }
 
-int main(int argc, char *argv[])
-{
+static void
+parse_args(session_t *ps, int argc, char **argv, bool first_pass) {
+	enum options {
+		OPT_CONFIG = 256,
+		OPT_ACTV_PICKER,
+		OPT_DM_START,
+		OPT_DM_STOP,
+	};
+	static const char * opts_short = "hS";
+	static const struct option opts_long[] = {
+		{ "help",					no_argument,	NULL, 'h' },
+		{ "config",					required_argument, NULL, OPT_CONFIG },
+		{ "activate-window-picker", no_argument,	NULL, OPT_ACTV_PICKER },
+		{ "start-daemon",			no_argument,	NULL, OPT_DM_START },
+		{ "stop-daemon",			no_argument,	NULL, OPT_DM_STOP },
+		{ NULL, no_argument, NULL, 0 }
+	};
+
+	int o = 0;
+	optind = 1;
+
+	// Only parse --config in first pass
+	if (first_pass) {
+		while ((o = getopt_long(argc, argv, opts_short, opts_long, NULL)) >= 0) {
+			switch (o) {
+				case OPT_CONFIG:
+					ps->o.config_path = mstrdup(optarg);
+					break;
+				case '?':
+				case 'h':
+					show_help();
+					// Return a non-zero value on unrecognized option
+					exit('h' == o ? RET_SUCCESS: RET_BADARG);
+				default:
+					break;
+			}
+		}
+		return;
+	}
+
+	while ((o = getopt_long(argc, argv, opts_short, opts_long, NULL)) >= 0) {
+		switch (o) {
+			case OPT_CONFIG: break;
+#define T_CASEBOOL(idx, option) case idx: ps->o.option = true; break
+			T_CASEBOOL('S', synchronize);
+			case OPT_ACTV_PICKER:
+				ps->o.mode = PROGMODE_ACTV_PICKER;
+				break;
+			T_CASEBOOL(OPT_DM_START, runAsDaemon);
+			case OPT_DM_STOP:
+				ps->o.mode = PROGMODE_DM_STOP;
+				break;
+#undef T_CASEBOOL
+			default:
+				printfef("(0): Unimplemented option %d.", o);
+				exit(RET_UNKNOWN);
+		}
+	}
+}
+	
+int main(int argc, char *argv[]) {
 	session_t *ps = NULL;
 	int ret = RET_SUCCESS;
 
@@ -580,14 +665,12 @@ int main(int argc, char *argv[])
 	Display *dpy = NULL;
 	MainWin *mw = NULL;
 	Bool invertShift = False;
-	Bool runAsDaemon = False;
 	Window leader, focused;
 	int result;
 	int flush_file = 0;
 	FILE *fp;
 	int piped_input;
 	int exitDaemon = 0;
-	bool synchronize = false;
 	
 	/* Set program locale */
 	setlocale (LC_ALL, "");
@@ -600,15 +683,17 @@ int main(int argc, char *argv[])
 		gettimeofday(&ps->time_start, NULL);
 	}
 
+	// First pass
+	parse_args(ps, argc, argv, true);
+
 	// Load configuration file
 	{
 		dlist *config = NULL;
 		{
-			char *path = get_cfg_path();
-			if (path) {
-				config = config_load(path);
-				free(path);
-			}
+			if (!ps->o.config_path)
+				ps->o.config_path = get_cfg_path();
+			if (ps->o.config_path)
+				config = config_load(ps->o.config_path);
 			else
 				printfef("(): WARNING: No configuration file found.");
 		}
@@ -624,6 +709,10 @@ int main(int argc, char *argv[])
 		ps->o.tooltip_text = mstrdup(config_get(config, "tooltip", "text", "#e0e0e0"));
 		ps->o.tooltip_textShadow = mstrdup(config_get(config, "tooltip", "textShadow", "black"));
 		ps->o.tooltip_font = mstrdup(config_get(config, "tooltip", "font", "fixed-11:weight=bold"));
+		if (!parse_cliop(ps, config_get(config, "bindings", "miwMouse1", "focus"), &ps->o.bindings_miwMouse[1])
+				|| !parse_cliop(ps, config_get(config, "bindings", "miwMouse2", "close-ewmh"), &ps->o.bindings_miwMouse[2])
+				|| !parse_cliop(ps, config_get(config, "bindings", "miwMouse3", "iconify"), &ps->o.bindings_miwMouse[3]))
+			return RET_BADARG;
 		if (config) {
 			config_get_int_wrap(config, "general", "distance", &ps->o.distance, 1, INT_MAX);
 			config_get_bool_wrap(config, "general", "useNetWMFullscreen", &ps->o.useNetWMFullscreen);
@@ -644,50 +733,23 @@ int main(int argc, char *argv[])
 			config_free(config);
 		}
 	}
+
+	// Second pass
+	parse_args(ps, argc, argv, false);
 	
 	const char* pipePath = ps->o.pipePath;
-	
-	// Parse commandline arguments
-	{
-		enum options {
-			OPT_ACTV_PICKER = 256,
-			OPT_DM_START,
-			OPT_DM_STOP,
-		};
-		static const char * opts_short = "hS";
-		static const struct option opts_long[] = {
-			{ "help",					no_argument,	NULL, 'h' },
-			{ "activate-window-picker", no_argument,	NULL, OPT_ACTV_PICKER },
-			{ "start-daemon",			no_argument,	NULL, OPT_DM_START },
-			{ "end-daemon",				no_argument,	NULL, OPT_DM_STOP },
-			{ NULL, no_argument, NULL, 0 }
-		};
-		int o = 0;
-		while ((o = getopt_long(argc, argv, opts_short, opts_long, NULL)) >= 0) {
-			switch (o) {
-				case 'S': synchronize = true; break;
-				case OPT_ACTV_PICKER:
-					printf("activating window picker...\n");
-					activate_window_picker(pipePath);
-					goto main_end;
-				case OPT_DM_START:
-					runAsDaemon = True;
-					break;
-				case OPT_DM_STOP:
-					printf("exiting daemon...\n");
-					exit_daemon(pipePath);
-					goto main_end;
-				case 'h':
-				default:
-					show_help();
-					// Return a non-zero value on unrecognized option
-					if ('h' != o)
-						ret = RET_BADARG;
-					goto main_end;
-			}
-		}
+
+	switch (ps->o.mode) {
+		case PROGMODE_NORMAL:
+			break;
+		case PROGMODE_ACTV_PICKER:
+			activate_window_picker(pipePath);
+			goto main_end;
+		case PROGMODE_DM_STOP:
+			exit_daemon(pipePath);
+			goto main_end;
 	}
-	
+
 	// Open connection to X
 	ps->dpy = dpy = XOpenDisplay(NULL);
 	if(!dpy) {
@@ -699,10 +761,13 @@ int main(int argc, char *argv[])
 		ret = RET_XFAIL;
 		goto main_end;
 	}
-	if (synchronize)
+	if (ps->o.synchronize)
 		XSynchronize(ps->dpy, True);
 	XSetErrorHandler(xerror);
 	
+	ps->screen = DefaultScreen(dpy);
+	ps->root = RootWindow(dpy, ps->screen);
+
 	wm_get_atoms(ps);
 	
 	if(! wm_check(dpy)) {
@@ -715,8 +780,7 @@ int main(int argc, char *argv[])
 	wm_ignore_skip_taskbar(ps->o.ignoreSkipTaskbar);
 	
 	mw = mainwin_create(ps);
-	if(! mw)
-	{
+	if (!mw) {
 		fprintf(stderr, "FATAL: Couldn't create main window.\n");
 		ret = 1;
 		goto main_end;
@@ -724,16 +788,14 @@ int main(int argc, char *argv[])
 	
 	invertShift = !ps->o.xinerama_showAll;
 	
-	XSelectInput(mw->dpy, mw->root, PropertyChangeMask);
+	XSelectInput(ps->dpy, ps->root, PropertyChangeMask);
 
-	if (runAsDaemon)
-	{
+	if (ps->o.runAsDaemon) {
 		printf("Running as daemon...\n");
 
 		if (access(pipePath, R_OK) == 0)
 		{
-			printf("access() returned 0\n");
-			printf("reading excess data to end...\n");
+			printf("access() returned 0.\n");
 			flush_file = 1;
 		}
 		
@@ -745,20 +807,29 @@ int main(int argc, char *argv[])
 			exit(2);
 		}
 		
-		fp = fopen(pipePath, "r");
-		
-		if (flush_file)
-		{
-			while (1)
-			{
-				piped_input = fgetc(fp);
-				if (piped_input == EOF)
-				{
-					break;
-				}
+		// Flush the file in non-blocking mode
+		if (flush_file) {
+			char *buf[BUF_LEN];
+			int fd = open(pipePath, O_RDONLY | O_NONBLOCK);
+
+			if (fd < 0) {
+				printfef("(): Failed to open() pipe \"%s\".", pipePath);
+				ret = RET_UNKNOWN;
+				goto main_end;
 			}
-			
-			fp = fopen(pipePath, "r");
+
+			while (read(fd, buf, sizeof(buf)) > 0)
+				continue;
+
+			close(fd);
+
+			printf("Finished flushing pipe...\n");
+		}
+		
+		if (!(fp = fopen(pipePath, "r"))) {
+			printfef("Failed to open pipe \"%s\".\n", pipePath);
+			ret = RET_UNKNOWN;
+			goto main_end;
 		}
 		
 		while (!exitDaemon)
@@ -767,7 +838,7 @@ int main(int argc, char *argv[])
 			switch (piped_input)
 			{
 				case ACTIVATE_WINDOW_PICKER:
-					leader = None, focused = wm_get_focused(mw->dpy);
+					leader = None, focused = wm_get_focused(ps->dpy);
 					clients = skippy_run(mw, clients, focused, leader, !invertShift);
 					break;
 				
@@ -794,7 +865,7 @@ int main(int argc, char *argv[])
 	else
 	{
 		printf("running once then quitting...\n");
-		leader = None, focused = wm_get_focused(mw->dpy);
+		leader = None, focused = wm_get_focused(ps->dpy);
 		clients = skippy_run(mw, clients, focused, leader, !invertShift);
 	}
 	
@@ -808,6 +879,7 @@ main_end:
 	if (ps) {
 		// Free configuration strings
 		{
+			free(ps->o.config_path);
 			free(ps->o.pipePath);
 			free(ps->o.normal_tint);
 			free(ps->o.highlight_tint);

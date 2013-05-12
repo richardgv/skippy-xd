@@ -24,18 +24,27 @@ Atom
 	_XROOTPMAP_ID,
 	ESETROOT_PMAP_ID,
 
+	// ICCWM atoms
+	WM_PROTOCOLS,
+	WM_DELETE_WINDOW,
+
 	// Window type atoms
 	_NET_WM_WINDOW_TYPE_DESKTOP,
 	_NET_WM_WINDOW_TYPE_DOCK,
 	_NET_WM_WINDOW_TYPE_NORMAL,
-	_NET_WM_WINDOW_TYPE_TOOLTIP;
-	
+	_NET_WM_WINDOW_TYPE_TOOLTIP,
+
+	// EWMH atoms
+	_NET_CLOSE_WINDOW,
+	_NET_WM_STATE,
+	_NET_WM_STATE_SHADED;
+
 static Atom
 	/* Generic atoms */
 	XA_WM_STATE,
 	WM_CLIENT_LEADER,
 	XA_UTF8_STRING,
-	
+
 	/* NetWM atoms */
 	_NET_SUPPORTING_WM_CHECK,
 	_NET_SUPPORTED,
@@ -44,12 +53,10 @@ static Atom
 	_NET_CLIENT_LIST_STACKING,
 	_NET_CURRENT_DESKTOP,
 	_NET_WM_DESKTOP,
-	_NET_WM_STATE,
 	_NET_WM_STATE_HIDDEN,
 	_NET_WM_STATE_SKIP_TASKBAR,
 	_NET_WM_STATE_SKIP_PAGER,
 	_NET_WM_STATE_FULLSCREEN,
-	_NET_WM_STATE_SHADED,
 	_NET_WM_STATE_ABOVE,
 	_NET_WM_STATE_STICKY,
 	_NET_WM_WINDOW_TYPE,
@@ -115,6 +122,9 @@ wm_get_atoms(session_t *ps) {
 	T_GETATOM(_XROOTPMAP_ID);
 	T_GETATOM(ESETROOT_PMAP_ID);
 	
+	T_GETATOM(WM_PROTOCOLS),
+	T_GETATOM(WM_DELETE_WINDOW),
+
 	T_GETATOM(_NET_SUPPORTING_WM_CHECK);
 	T_GETATOM(_NET_SUPPORTED);
 	T_GETATOM(_NET_NUMBER_OF_DESKTOPS);
@@ -127,7 +137,6 @@ wm_get_atoms(session_t *ps) {
 	T_GETATOM(_NET_WM_STATE_SKIP_TASKBAR);
 	T_GETATOM(_NET_WM_STATE_SKIP_PAGER);
 	T_GETATOM(_NET_WM_STATE_FULLSCREEN);
-	T_GETATOM(_NET_WM_STATE_SHADED);
 	T_GETATOM(_NET_WM_STATE_ABOVE);
 	T_GETATOM(_NET_WM_STATE_STICKY);
 	T_GETATOM(_NET_WM_WINDOW_TYPE);
@@ -137,6 +146,8 @@ wm_get_atoms(session_t *ps) {
 	T_GETATOM(_NET_WM_WINDOW_TYPE_TOOLTIP);
 	T_GETATOM(_NET_WM_VISIBLE_NAME);
 	T_GETATOM(_NET_WM_NAME);
+	T_GETATOM(_NET_CLOSE_WINDOW);
+	T_GETATOM(_NET_WM_STATE_SHADED);
 	
 	T_GETATOM(_WIN_SUPPORTING_WM_CHECK);
 	T_GETATOM(_WIN_WORKSPACE);
@@ -397,7 +408,7 @@ wm_get_window_title(session_t *ps, Window wid, int *length_return) {
 	if (ret && length_return)
 		*length_return = strlen(ret);
 
-	return ret;
+	return (FcChar8 *) ret;
 }
 
 Window
@@ -653,7 +664,7 @@ wm_wid_get_prop_rstr(session_t *ps, Window wid, Atom prop) {
 	if (Success == XGetWindowProperty(ps->dpy, wid, prop, 0, BUF_LEN,
 				False, AnyPropertyType, &type_ret, &fmt_ret, &nitems,
 				&bytes_after_ret, &data) && nitems && 8 == fmt_ret)
-		ret = mstrdup(data);
+		ret = mstrdup((char *) data);
 	sxfree(data);
 	return ret;
 }
@@ -728,3 +739,53 @@ wm_wid_set_info(session_t *ps, Window wid, const char *name,
 				PropModeReplace, (unsigned char *) &val, 1);
 	}
 }
+
+/**
+ * @brief Send a X client messsage.
+ */
+void
+wm_send_clientmsg(session_t *ps, Window twid, Window wid, Atom msg_type,
+		int fmt, long event_mask, int len, const unsigned char *data) {
+	assert(twid);
+	assert(8 == fmt || 16 == fmt || 32 == fmt);
+	assert(len * fmt <= 20 * 8);
+	XClientMessageEvent ev = {
+		.type = ClientMessage,
+		.window = wid,
+		.message_type = msg_type,
+		.format = fmt,
+	};
+	int seglen = 0;
+	switch (fmt) {
+		case 32: seglen = sizeof(long); break;
+		case 16: seglen = sizeof(short); break;
+		case 8: seglen = sizeof(char); break;
+	}
+	memcpy(ev.data.l, data, seglen * len);
+	XSendEvent(ps->dpy, twid, False, event_mask, (XEvent *) &ev);
+}
+
+/**
+ * @brief Find out the WM frame of a client window by querying X.
+ *
+ * @param ps current session
+ * @param wid window ID
+ * @return window ID of the frame window
+ */
+static Window
+wm_find_frame(session_t *ps, Window wid) {
+  // We traverse through its ancestors to find out the frame
+  for (Window cwid = wid; cwid && cwid != ps->root; ) {
+    Window rroot = None;
+    Window *children = NULL;
+    unsigned nchildren = 0;
+	wid = cwid;
+    if (!XQueryTree(ps->dpy, cwid, &rroot, &cwid, &children,
+          &nchildren))
+			cwid = 0;
+    sxfree(children);
+  }
+
+  return wid;
+}
+

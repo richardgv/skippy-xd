@@ -25,11 +25,20 @@ extern Atom
 	_XROOTPMAP_ID,
 	ESETROOT_PMAP_ID,
 
+	// ICCWM atoms
+	WM_PROTOCOLS,
+	WM_DELETE_WINDOW,
+
 	// Window type atoms
 	_NET_WM_WINDOW_TYPE_DESKTOP,
 	_NET_WM_WINDOW_TYPE_DOCK,
 	_NET_WM_WINDOW_TYPE_NORMAL,
-	_NET_WM_WINDOW_TYPE_TOOLTIP;
+	_NET_WM_WINDOW_TYPE_TOOLTIP,
+
+	// EWMH atoms
+	_NET_CLOSE_WINDOW,
+	_NET_WM_STATE,
+	_NET_WM_STATE_SHADED;
 
 void wm_get_atoms(session_t *ps);
 char wm_check(Display *dpy);
@@ -49,5 +58,43 @@ char *wm_wid_get_prop_rstr(session_t *ps, Window wid, Atom prop);
 char *wm_wid_get_prop_utf8(session_t *ps, Window wid, Atom prop);
 void wm_wid_set_info(session_t *ps, Window wid, const char *name,
 		Atom window_type);
+void wm_send_clientmsg(session_t *ps, Window twid, Window wid, Atom msg_type,
+		int fmt, long event_mask, int len, const unsigned char *data);
+
+static inline void
+wm_send_clientmsg_iccwm(session_t *ps, Window wid, Atom msg_type,
+		int len, const long *data) {
+	wm_send_clientmsg(ps, wid, wid, msg_type, 32, NoEventMask, len,
+			(const unsigned char *) data);
+}
+
+static inline void
+wm_close_window_iccwm(session_t *ps, Window wid) {
+	long data[] = { WM_DELETE_WINDOW, CurrentTime };
+	wm_send_clientmsg_iccwm(ps, wid, WM_PROTOCOLS,
+			sizeof(data) / sizeof(data[0]), data);
+}
+
+static inline void
+wm_send_clientmsg_ewmh_root(session_t *ps, Window wid, Atom msg_type,
+		int len, const long *data) {
+	wm_send_clientmsg(ps, ps->root, wid, msg_type, 32,
+			SubstructureNotifyMask | SubstructureRedirectMask, len,
+			(const unsigned char *) data);
+}
+
+static inline void
+wm_close_window_ewmh(session_t *ps, Window wid) {
+	long data[] = { CurrentTime, 2 };
+	wm_send_clientmsg_ewmh_root(ps, wid, _NET_CLOSE_WINDOW,
+			sizeof(data) / sizeof(data[0]), data);
+}
+
+static inline void
+wm_shade_window_ewmh(session_t *ps, Window wid) {
+	long data[] = { 2, _NET_WM_STATE_SHADED };
+	wm_send_clientmsg_ewmh_root(ps, wid, _NET_WM_STATE,
+			sizeof(data) / sizeof(data[0]), data);
+}
 
 #endif /* SKIPPY_WM_H */

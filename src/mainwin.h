@@ -25,15 +25,11 @@ struct _Tooltip;
 struct _MainWin
 {
 	session_t *ps;
-	Display *dpy;
-	int screen;
 	Visual *visual;
 	Colormap colormap;
 	int depth;
-	Window root;
 	
 	int poll_time;
-	Bool lazy_trans;
 	
 	Window window;
 	Picture background;

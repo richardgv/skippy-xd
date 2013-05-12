@@ -61,7 +61,7 @@ typedef struct {
 int clientwin_validate_func(dlist *, void *);
 int clientwin_sort_func(dlist *, dlist *, void *);
 ClientWin *clientwin_create(struct _MainWin *, Window);
-void clientwin_destroy(ClientWin *, Bool parentDestroyed);
+void clientwin_destroy(ClientWin *, bool destroyed);
 void clientwin_move(ClientWin *, float, int, int);
 void clientwin_map(ClientWin *);
 void clientwin_unmap(ClientWin *);

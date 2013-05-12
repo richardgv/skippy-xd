@@ -44,8 +44,8 @@ dir_focus(ClientWin *cw, match_func match, dist_func func)
 		}
 	}
 	
-	XWarpPointer(candidate->mainwin->dpy, None, candidate->mini.window, 0, 0, 0, 0, candidate->mini.width / 2, candidate->mini.height / 2);
-	XSetInputFocus(candidate->mainwin->dpy, candidate->mini.window, RevertToParent, CurrentTime);
+	XWarpPointer(candidate->mainwin->ps->dpy, None, candidate->mini.window, 0, 0, 0, 0, candidate->mini.width / 2, candidate->mini.height / 2);
+	XSetInputFocus(candidate->mainwin->ps->dpy, candidate->mini.window, RevertToParent, CurrentTime);
 	dlist_free(candidates);
 }
 

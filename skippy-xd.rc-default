@@ -23,6 +23,11 @@
 # - the 'shadowText' option can be a color or 'none', in which case the
 #   drop-shadow effect is disabled
 #
+# - Bindings in [bindings] section can bind to "no" (do nothing), "focus"
+#   (focus to window), "iconify", "shade-ewmh" (toggle window shade state),
+#   "close-iccwm" (close window with ICCWM method), "close-ewmh" (close
+#   window with EWMH method), or "destroy" (forcefully destroy the window).
+#
 
 [general]
 distance = 50
@@ -55,3 +60,8 @@ opacity = 128
 text = #ffffff
 textShadow = black
 font = fixed-11:weight=bold
+
+[bindings]
+miwMouse1 = focus
+miwMouse2 = close-ewmh
+miwMouse3 = iconify

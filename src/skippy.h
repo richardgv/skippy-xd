@@ -61,6 +61,8 @@
 
 #include "dlist.h"
 
+#define MAX_MOUSE_BUTTONS 4
+
 /// @brief Possible return values.
 enum {
 	RET_SUCCESS = 0,
@@ -70,8 +72,29 @@ enum {
 	RET_BADALLOC,
 };
 
+enum progmode {
+	PROGMODE_NORMAL,
+	PROGMODE_ACTV_PICKER,
+	PROGMODE_DM_STOP,
+};
+
+enum cliop {
+	CLIENTOP_NO,
+	CLIENTOP_FOCUS,
+	CLIENTOP_ICONIFY,
+	CLIENTOP_SHADE_EWMH,
+	CLIENTOP_CLOSE_ICCWM,
+	CLIENTOP_CLOSE_EWMH,
+	CLIENTOP_DESTROY,
+};
+
 /// @brief Option structure.
 typedef struct {
+	char *config_path;
+	enum progmode mode;
+	bool runAsDaemon;
+	bool synchronize;
+
 	int distance;
 	bool useNetWMFullscreen;
 	bool ignoreSkipTaskbar;
@@ -98,9 +121,16 @@ typedef struct {
 	char *tooltip_text;
 	char *tooltip_textShadow;
 	char *tooltip_font;
+
+	enum cliop bindings_miwMouse[MAX_MOUSE_BUTTONS];
 } options_t;
 
 #define OPTIONST_INIT { \
+	.config_path = NULL, \
+	.mode = PROGMODE_NORMAL, \
+	.runAsDaemon = false, \
+	.synchronize = false, \
+\
 	.distance = 50, \
 	.useNetWMFullscreen = true, \
 	.ignoreSkipTaskbar = false, \
@@ -151,6 +181,10 @@ typedef struct {
 	options_t o;
 	/// @brief X display.
 	Display *dpy;
+	/// @brief Current screen.
+	int screen;
+	/// @brief Root window ID.
+	Window root;
 	/// @brief Information about X.
 	xinfo_t xinfo;
 	/// @brief Time the program was started, in milliseconds.

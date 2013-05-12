@@ -23,6 +23,9 @@
 	(((x1 >= x2 && x1 < (x2 + w2)) || (x2 >= x1 && x2 < (x1 + w1))) && \
 	 ((y1 >= y2 && y1 < (y2 + h2)) || (y2 >= y1 && y2 < (y1 + h1))))
 
+static int
+clientwin_action(ClientWin *cw, enum cliop action);
+
 int
 clientwin_cmp_func(dlist *l, void *data)
 {
@@ -30,28 +33,29 @@ clientwin_cmp_func(dlist *l, void *data)
 }
 
 int
-clientwin_validate_func(dlist *l, void *data)
-{
+clientwin_validate_func(dlist *l, void *data) {
 	ClientWin *cw = (ClientWin *)l->data;
+	MainWin *mw = cw->mainwin;
+
 	CARD32 desktop = (*(CARD32*)data),
-		w_desktop = wm_get_window_desktop(cw->mainwin->dpy, cw->client.window);
+		w_desktop = wm_get_window_desktop(mw->ps->dpy, cw->client.window);
 	
 #ifdef CFG_XINERAMA
-	if(cw->mainwin->xin_active && ! INTERSECTS(cw->client.x, cw->client.y, cw->client.width, cw->client.height,
-	                                           cw->mainwin->xin_active->x_org, cw->mainwin->xin_active->y_org,
-	                                           cw->mainwin->xin_active->width, cw->mainwin->xin_active->height))
+	if(mw->xin_active && ! INTERSECTS(cw->client.x, cw->client.y, cw->client.width, cw->client.height,
+	                                           mw->xin_active->x_org, mw->xin_active->y_org,
+	                                           mw->xin_active->width, mw->xin_active->height))
 		return 0;
 #endif
 	
 	return (w_desktop == (CARD32)-1 || desktop == w_desktop) &&
-	       wm_validate_window(cw->mainwin->dpy, cw->client.window);
+	       wm_validate_window(mw->ps->dpy, cw->client.window);
 }
 
 int
 clientwin_check_group_leader_func(dlist *l, void *data)
 {
 	ClientWin *cw = (ClientWin *)l->data;
-	return wm_get_group_leader(cw->mainwin->dpy, cw->client.window) == *((Window*)data);
+	return wm_get_group_leader(cw->mainwin->ps->dpy, cw->client.window) == *((Window*)data);
 }
 
 int
@@ -63,8 +67,8 @@ clientwin_sort_func(dlist* a, dlist* b, void* data)
 }
 
 ClientWin *
-clientwin_create(MainWin *mw, Window client)
-{
+clientwin_create(MainWin *mw, Window client) {
+	session_t *ps = mw->ps;
 	ClientWin *cw = (ClientWin *)malloc(sizeof(ClientWin));
 	if (!cw)
 		return NULL;
@@ -96,11 +100,11 @@ clientwin_create(MainWin *mw, Window client)
 	                   ExposureMask |
 	                   FocusChangeMask;
 	
-	sattr.override_redirect = mw->lazy_trans;
+	sattr.override_redirect = ps->o.lazyTrans;
 	
 	cw->client.window = client;
 	cw->mini.format = mw->format;
-	cw->mini.window = XCreateWindow(mw->dpy, mw->lazy_trans ? mw->root : mw->window, 0, 0, 1, 1, 0,
+	cw->mini.window = XCreateWindow(ps->dpy, ps->o.lazyTrans ? ps->root : mw->window, 0, 0, 1, 1, 0,
 	                                mw->depth, InputOutput, mw->visual,
 	                                CWColormap | CWBackPixel | CWBorderPixel | CWEventMask | CWOverrideRedirect, &sattr);
 	if (!cw->mini.window)
@@ -109,30 +113,30 @@ clientwin_create(MainWin *mw, Window client)
 	wm_wid_set_info(cw->mainwin->ps, cw->mini.window, "mini window", None);
 	// Listen to events on the window. We don't want to miss any changes so
 	// this is to be done as early as possible
-	XSelectInput(cw->mainwin->dpy, cw->client.window, SubstructureNotifyMask | StructureNotifyMask);
+	XSelectInput(cw->mainwin->ps->dpy, cw->client.window, SubstructureNotifyMask | StructureNotifyMask);
 
-	XGetWindowAttributes(mw->dpy, client, &attr);
-	cw->client.format = XRenderFindVisualFormat(mw->dpy, attr.visual);
+	XGetWindowAttributes(ps->dpy, client, &attr);
+	cw->client.format = XRenderFindVisualFormat(ps->dpy, attr.visual);
 	
 	// Get window pixmap
 	// Seemingly we could only redirect IsViewable windows
-	if (mw->ps->o.useNameWindowPixmap && IsViewable == attr.map_state) {
-		XCompositeRedirectWindow(mw->dpy, cw->client.window, CompositeRedirectAutomatic);
+	if (ps->o.useNameWindowPixmap && IsViewable == attr.map_state) {
+		XCompositeRedirectWindow(ps->dpy, cw->client.window, CompositeRedirectAutomatic);
 		cw->redirected = true;
-		cw->cpixmap = XCompositeNameWindowPixmap(mw->dpy, cw->client.window);
+		cw->cpixmap = XCompositeNameWindowPixmap(ps->dpy, cw->client.window);
 	}
 	// Create window picture
 	{
 		Drawable draw = cw->cpixmap;
 		if (!draw) draw = cw->client.window;
 		XRenderPictureAttributes pa = { .subwindow_mode = IncludeInferiors };
-		cw->origin = XRenderCreatePicture (cw->mainwin->dpy,
+		cw->origin = XRenderCreatePicture (cw->mainwin->ps->dpy,
 				draw, cw->client.format, CPSubwindowMode, &pa);
 	}
 	if (!cw->origin)
 		goto clientwin_create_err;
 	
-	XRenderSetPictureFilter(cw->mainwin->dpy, cw->origin, FilterBest, 0, 0);
+	XRenderSetPictureFilter(cw->mainwin->ps->dpy, cw->origin, FilterBest, 0, 0);
 	
 	
 	return cw;
@@ -150,10 +154,10 @@ clientwin_update(ClientWin *cw)
 	Window tmpwin;
 	XWindowAttributes wattr;
 	
-	XGetWindowAttributes(cw->mainwin->dpy, cw->client.window, &wattr);
+	XGetWindowAttributes(cw->mainwin->ps->dpy, cw->client.window, &wattr);
 	
-	cw->client.format = XRenderFindVisualFormat(cw->mainwin->dpy, wattr.visual);
-	XTranslateCoordinates(cw->mainwin->dpy, cw->client.window, wattr.root,
+	cw->client.format = XRenderFindVisualFormat(cw->mainwin->ps->dpy, wattr.visual);
+	XTranslateCoordinates(cw->mainwin->ps->dpy, cw->client.window, wattr.root,
 		                      -wattr.border_width,
 		                      -wattr.border_width,
 		                      &cw->client.x, &cw->client.y, &tmpwin);
@@ -166,30 +170,32 @@ clientwin_update(ClientWin *cw)
 }
 
 void
-clientwin_destroy(ClientWin *cw, Bool parentDestroyed)
-{
+clientwin_destroy(ClientWin *cw, bool destroyed) {
 	MainWin *mw = cw->mainwin;
-	if (!parentDestroyed)
-	{
-		free_picture(mw->ps, &cw->origin);
-		free_damage(mw->ps, &cw->damage);
+	session_t * const ps = mw->ps;
 
-		if (cw->client.window) {
-			// Stop listening to events, this should be safe because we don't
-			// monitor window re-map anyway
-			XSelectInput(mw->dpy, cw->client.window, 0);
+	free_picture(ps, &cw->origin);
+	free_picture(ps, &cw->destination);
+	free_pixmap(ps, &cw->pixmap);
+	free_pixmap(ps, &cw->cpixmap);
 
-			if (cw->redirected)
-				XCompositeUnredirectWindow(mw->dpy, cw->client.window, CompositeRedirectAutomatic);
-		}
+	if (cw->client.window && !destroyed) {
+		free_damage(ps, &cw->damage);
+
+		// Stop listening to events, this should be safe because we don't
+		// monitor window re-map anyway
+		XSelectInput(ps->dpy, cw->client.window, 0);
+
+		if (cw->redirected)
+			XCompositeUnredirectWindow(ps->dpy, cw->client.window, CompositeRedirectAutomatic);
 	}
-	free_picture(mw->ps, &cw->destination);
-	free_pixmap(mw->ps, &cw->pixmap);
-	free_pixmap(mw->ps, &cw->cpixmap);
-	
-	if (cw->mini.window)
-		XDestroyWindow(mw->dpy, cw->mini.window);
-	
+
+	if (cw->mini.window) {
+		// Somehow it doesn't work without unmapping firstly
+		XUnmapWindow(ps->dpy, cw->mini.window);
+		XDestroyWindow(ps->dpy, cw->mini.window);
+	}
+
 	free(cw);
 }
 
@@ -202,24 +208,24 @@ clientwin_repaint(ClientWin *cw, XRectangle *rect)
 	    s_w = (double)rect->width * cw->factor,
 	    s_h = (double)rect->height * cw->factor;
 	
-	if(cw->mainwin->lazy_trans)
+	if(cw->mainwin->ps->o.lazyTrans)
 	{
-		XRenderComposite(cw->mainwin->dpy, PictOpSrc, cw->origin,
+		XRenderComposite(cw->mainwin->ps->dpy, PictOpSrc, cw->origin,
 		                 cw->focused ? cw->mainwin->highlightPicture : cw->mainwin->normalPicture,
 		                 cw->destination, s_x, s_y, 0, 0, s_x, s_y, s_w, s_h);
 	}
 	else
 	{
-		XRenderComposite(cw->mainwin->dpy, PictOpSrc, cw->mainwin->background, None, cw->destination, cw->mini.x + s_x, cw->mini.y + s_y, 0, 0, s_x, s_y, s_w, s_h);
-		XRenderComposite(cw->mainwin->dpy, PictOpOver, cw->origin,
+		XRenderComposite(cw->mainwin->ps->dpy, PictOpSrc, cw->mainwin->background, None, cw->destination, cw->mini.x + s_x, cw->mini.y + s_y, 0, 0, s_x, s_y, s_w, s_h);
+		XRenderComposite(cw->mainwin->ps->dpy, PictOpOver, cw->origin,
 		                 cw->focused ? cw->mainwin->highlightPicture : cw->mainwin->normalPicture,
 		                 cw->destination, s_x, s_y, 0, 0, s_x, s_y, s_w, s_h);
 	}
 	
 	if(tint->alpha)
-		XRenderFillRectangle(cw->mainwin->dpy, PictOpOver, cw->destination, tint, s_x, s_y, s_w, s_h);
+		XRenderFillRectangle(cw->mainwin->ps->dpy, PictOpOver, cw->destination, tint, s_x, s_y, s_w, s_h);
 	
-	XClearArea(cw->mainwin->dpy, cw->mini.window, s_x, s_y, s_w, s_h, False);
+	XClearArea(cw->mainwin->ps->dpy, cw->mini.window, s_x, s_y, s_w, s_h, False);
 }
 
 void
@@ -237,12 +243,12 @@ clientwin_repair(ClientWin *cw)
 {
 	int nrects, i;
 	XRectangle *rects;
-	XserverRegion rgn = XFixesCreateRegion(cw->mainwin->dpy, 0, 0);
+	XserverRegion rgn = XFixesCreateRegion(cw->mainwin->ps->dpy, 0, 0);
 	
-	XDamageSubtract(cw->mainwin->dpy, cw->damage, None, rgn);
+	XDamageSubtract(cw->mainwin->ps->dpy, cw->damage, None, rgn);
 	
-	rects = XFixesFetchRegion(cw->mainwin->dpy, rgn, &nrects);
-	XFixesDestroyRegion(cw->mainwin->dpy, rgn);
+	rects = XFixesFetchRegion(cw->mainwin->ps->dpy, rgn, &nrects);
+	XFixesDestroyRegion(cw->mainwin->ps->dpy, rgn);
 	
 	for(i = 0; i < nrects; i++)
 		clientwin_repaint(cw, &rects[i]);
@@ -264,44 +270,44 @@ clientwin_move(ClientWin *cw, float f, int x, int y)
 {
 	/* int border = MAX(1, (double)DISTANCE(cw->mainwin) * f * 0.25); */
 	int border = 0;
-	XSetWindowBorderWidth(cw->mainwin->dpy, cw->mini.window, border);
+	XSetWindowBorderWidth(cw->mainwin->ps->dpy, cw->mini.window, border);
 	
 	cw->factor = f;
 	cw->mini.x = x + (int)cw->x * f;
 	cw->mini.y = y + (int)cw->y * f;
-	if(cw->mainwin->lazy_trans)
+	if(cw->mainwin->ps->o.lazyTrans)
 	{
 		cw->mini.x += cw->mainwin->x;
 		cw->mini.y += cw->mainwin->y;
 	}
 	cw->mini.width = MAX(1, (int)cw->client.width * f);
 	cw->mini.height = MAX(1, (int)cw->client.height * f);
-	XMoveResizeWindow(cw->mainwin->dpy, cw->mini.window, cw->mini.x - border, cw->mini.y - border, cw->mini.width, cw->mini.height);
+	XMoveResizeWindow(cw->mainwin->ps->dpy, cw->mini.window, cw->mini.x - border, cw->mini.y - border, cw->mini.width, cw->mini.height);
 	
 	if(cw->pixmap)
-		XFreePixmap(cw->mainwin->dpy, cw->pixmap);
+		XFreePixmap(cw->mainwin->ps->dpy, cw->pixmap);
 	
 	if(cw->destination)
-		XRenderFreePicture(cw->mainwin->dpy, cw->destination);
+		XRenderFreePicture(cw->mainwin->ps->dpy, cw->destination);
 	
-	cw->pixmap = XCreatePixmap(cw->mainwin->dpy, cw->mini.window, cw->mini.width, cw->mini.height, cw->mainwin->depth);
-	XSetWindowBackgroundPixmap(cw->mainwin->dpy, cw->mini.window, cw->pixmap);
+	cw->pixmap = XCreatePixmap(cw->mainwin->ps->dpy, cw->mini.window, cw->mini.width, cw->mini.height, cw->mainwin->depth);
+	XSetWindowBackgroundPixmap(cw->mainwin->ps->dpy, cw->mini.window, cw->pixmap);
 	
-	cw->destination = XRenderCreatePicture(cw->mainwin->dpy, cw->pixmap, cw->mini.format, 0, 0);
+	cw->destination = XRenderCreatePicture(cw->mainwin->ps->dpy, cw->pixmap, cw->mini.format, 0, 0);
 }
 
 void
 clientwin_map(ClientWin *cw)
 {
 	if(cw->damage)
-		XDamageDestroy(cw->mainwin->dpy, cw->damage);
+		XDamageDestroy(cw->mainwin->ps->dpy, cw->damage);
 	
-	cw->damage = XDamageCreate(cw->mainwin->dpy, cw->client.window, XDamageReportDeltaRectangles);
-	XRenderSetPictureTransform(cw->mainwin->dpy, cw->origin, &cw->mainwin->transform);
+	cw->damage = XDamageCreate(cw->mainwin->ps->dpy, cw->client.window, XDamageReportDeltaRectangles);
+	XRenderSetPictureTransform(cw->mainwin->ps->dpy, cw->origin, &cw->mainwin->transform);
 	
 	clientwin_render(cw);
 	
-	XMapWindow(cw->mainwin->dpy, cw->mini.window);
+	XMapWindow(cw->mainwin->ps->dpy, cw->mini.window);
 }
 
 void
@@ -309,24 +315,24 @@ clientwin_unmap(ClientWin *cw)
 {
 	if(cw->damage)
 	{
-		XDamageDestroy(cw->mainwin->dpy, cw->damage);
+		XDamageDestroy(cw->mainwin->ps->dpy, cw->damage);
 		cw->damage = None;
 	}
 	
 	if(cw->destination)
 	{
-		XRenderFreePicture(cw->mainwin->dpy, cw->destination);
+		XRenderFreePicture(cw->mainwin->ps->dpy, cw->destination);
 		cw->destination = None;
 	}
 	
 	if(cw->pixmap)
 	{
-		XFreePixmap(cw->mainwin->dpy, cw->pixmap);
+		XFreePixmap(cw->mainwin->ps->dpy, cw->pixmap);
 		cw->pixmap = None;
 	}
 	
-	XUnmapWindow(cw->mainwin->dpy, cw->mini.window);
-	XSetWindowBackgroundPixmap(cw->mainwin->dpy, cw->mini.window, None);
+	XUnmapWindow(cw->mainwin->ps->dpy, cw->mini.window);
+	XSetWindowBackgroundPixmap(cw->mainwin->ps->dpy, cw->mini.window, None);
 	
 	cw->focused = 0;
 }
@@ -334,19 +340,23 @@ clientwin_unmap(ClientWin *cw)
 static void
 childwin_focus(ClientWin *cw)
 {
-	XWarpPointer(cw->mainwin->dpy, None, cw->client.window, 0, 0, 0, 0, cw->client.width / 2, cw->client.height / 2);
-	XRaiseWindow(cw->mainwin->dpy, cw->client.window);
-	XSetInputFocus(cw->mainwin->dpy, cw->client.window, RevertToParent, CurrentTime);
+	XWarpPointer(cw->mainwin->ps->dpy, None, cw->client.window, 0, 0, 0, 0, cw->client.width / 2, cw->client.height / 2);
+	XRaiseWindow(cw->mainwin->ps->dpy, cw->client.window);
+	XSetInputFocus(cw->mainwin->ps->dpy, cw->client.window, RevertToParent, CurrentTime);
 }
 
 int
 clientwin_handle(ClientWin *cw, XEvent *ev)
 {
-	if((ev->type == ButtonRelease && ev->xbutton.button == 1 && cw->mainwin->pressed == cw)) {
-		if((ev->xbutton.x >= 0 && ev->xbutton.y >= 0 && ev->xbutton.x < cw->mini.width && ev->xbutton.y < cw->mini.height))
-			childwin_focus(cw);
-		cw->mainwin->pressed = 0;
-		return 1;
+	if(ev->type == ButtonRelease) {
+		const unsigned button = ev->xbutton.button;
+		if (button < MAX_MOUSE_BUTTONS) {
+			int ret = clientwin_action(cw, cw->mainwin->ps->o.bindings_miwMouse[button]);
+			if (ret) {
+				printfef("(): Quitting.");
+				return ret;
+			}
+		}
 	} else if(ev->type == KeyRelease) {
 		if(ev->xkey.keycode == cw->mainwin->key_up)
 			focus_up(cw);
@@ -365,11 +375,11 @@ clientwin_handle(ClientWin *cw, XEvent *ev)
 	} else if(ev->type == FocusIn) {
 		cw->focused = 1;
 		clientwin_render(cw);
-		XFlush(cw->mainwin->dpy);
+		XFlush(cw->mainwin->ps->dpy);
 	} else if(ev->type == FocusOut) {
 		cw->focused = 0;
 		clientwin_render(cw);
-		XFlush(cw->mainwin->dpy);
+		XFlush(cw->mainwin->ps->dpy);
 	} else if(ev->type == EnterNotify) {
 		if(cw->mainwin->tooltip)
 		{
@@ -387,5 +397,36 @@ clientwin_handle(ClientWin *cw, XEvent *ev)
 		if(cw->mainwin->tooltip)
 			tooltip_unmap(cw->mainwin->tooltip);
 	}
+	return 0;
+}
+
+static int
+clientwin_action(ClientWin *cw, enum cliop action) {
+	session_t * const ps = cw->mainwin->ps;
+	const Window wid = cw->client.window;
+
+	switch (action) {
+		case CLIENTOP_NO:
+			break;
+		case CLIENTOP_FOCUS:
+			childwin_focus(cw);
+			return 1;
+		case CLIENTOP_ICONIFY:
+			XIconifyWindow(ps->dpy, wid, ps->screen);
+			break;
+		case CLIENTOP_SHADE_EWMH:
+			wm_shade_window_ewmh(ps, wid);
+			break;
+		case CLIENTOP_CLOSE_ICCWM:
+			wm_close_window_iccwm(ps, wid);
+			break;
+		case CLIENTOP_CLOSE_EWMH:
+			wm_close_window_ewmh(ps, wid);
+			break;
+		case CLIENTOP_DESTROY:
+			XDestroyWindow(cw->mainwin->ps->dpy, cw->client.window);
+			break;
+	}
+
 	return 0;
 }

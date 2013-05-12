@@ -65,8 +65,7 @@ entry_set(dlist *config, const char *section, char *key, char *value)
 }
 
 static dlist *
-config_parse(char *config)
-{
+config_parse(const char *config) {
 	regex_t re_section, re_empty, re_entry;
 	regmatch_t matches[5];
 	char line[8192], *section = 0;
@@ -79,8 +78,8 @@ config_parse(char *config)
 	
 	while(1)
 	{
-		if((config[ix] == '\0' || config[ix] == '\n'))
-		{
+		// strchr() considers '\0' at the end of the string as well
+		if (strchr("\n\r", config[ix])) {
 			line[l_ix] = 0;
 			if(regexec(&re_empty, line, 5, matches, 0) == 0) {
 				/* do nothing */
@@ -100,7 +99,7 @@ config_parse(char *config)
 			line[l_ix] = config[ix];
 			l_ix++;
 		}
-		if(config[ix] == 0)
+		if (!config[ix])
 			break;
 		++ix;
 	}
@@ -141,7 +140,8 @@ config_load(const char *path)
 	
 	fseek(fin, 0, SEEK_SET);
 	
-	data = (char *)malloc(flen + 1);
+	data = allocchk(malloc(flen + 1));
+	data[flen] = '\0';
 	if(fread(data, 1, flen, fin) != flen)
 	{
 		fprintf(stderr, "WARNING: Couldn't read from config file '%s'.\n", path);
