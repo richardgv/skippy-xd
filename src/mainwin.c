@@ -58,7 +58,8 @@ mainwin_create(session_t *ps) {
 	XRenderPictureAttributes pa;
 	XRenderColor clear;
 	
-	MainWin *mw = allocchk(malloc(sizeof(MainWin)));
+	// calloc() makes sure it's filled with zero
+	MainWin *mw = allocchk(calloc(1, sizeof(MainWin)));
 	
 	mw->ps = ps;
 	if (ps->o.lazyTrans) {
@@ -101,15 +102,16 @@ mainwin_create(session_t *ps) {
 	
 	wattr.colormap = mw->colormap;
 	wattr.background_pixel = wattr.border_pixel = 0;
+	wattr.override_redirect = True;
 	// I have no idea why, but seemingly without ButtonPressMask, we can't
 	// receive ButtonRelease events in some cases
 	wattr.event_mask = VisibilityChangeMask | ButtonPressMask
-		| ButtonReleaseMask | KeyReleaseMask;
+		| ButtonReleaseMask | KeyPressMask | KeyReleaseMask;
 	
 	mw->window = XCreateWindow(dpy, ps->root, 0, 0, mw->width, mw->height, 0,
-	                           mw->depth, InputOutput, mw->visual,
-	                           CWBackPixel|CWBorderPixel|CWColormap|CWEventMask, &wattr);
-	if(mw->window == None) {
+			mw->depth, InputOutput, mw->visual,
+			CWBackPixel | CWBorderPixel | CWColormap | CWEventMask | CWOverrideRedirect, &wattr);
+	if (!mw->window) {
 		free(mw);
 		return 0;
 	}
@@ -271,12 +273,18 @@ mainwin_update(MainWin *mw)
 }
 
 void
-mainwin_map(MainWin *mw)
-{
-	wm_set_fullscreen(mw->ps->dpy, mw->window, mw->x, mw->y, mw->width, mw->height);
+mainwin_map(MainWin *mw) {
+	session_t *ps = mw->ps;
+
+	wm_set_fullscreen(ps->dpy, mw->window, mw->x, mw->y, mw->width, mw->height);
 	mw->pressed = 0;
-	XMapWindow(mw->ps->dpy, mw->window);
-	XRaiseWindow(mw->ps->dpy, mw->window);
+	XMapWindow(ps->dpy, mw->window);
+	XRaiseWindow(ps->dpy, mw->window);
+
+	// Might because of WM reparent, XSetInput() doesn't work here
+	// XSetInputFocus(ps->dpy, mw->window, RevertToParent, CurrentTime);
+	XGrabKeyboard(ps->dpy, mw->window, True, GrabModeAsync, GrabModeAsync,
+			CurrentTime);
 }
 
 void
@@ -289,6 +297,7 @@ mainwin_unmap(MainWin *mw)
 		XFreePixmap(mw->ps->dpy, mw->bg_pixmap);
 		mw->bg_pixmap = None;
 	}
+	XUngrabKeyboard(mw->ps->dpy, CurrentTime);
 	XUnmapWindow(mw->ps->dpy, mw->window);
 }
 
@@ -347,12 +356,24 @@ mainwin_handle(MainWin *mw, XEvent *ev)
 	switch(ev->type)
 	{
 	case KeyPress:
-		if(ev->xkey.keycode == XKeysymToKeycode(mw->ps->dpy, XK_q))
-			return 2;
+		mw->pressed_key = true;
+		break;
+	case KeyRelease:
+		if (mw->pressed_key) {
+			if (ev->xkey.keycode == XKeysymToKeycode(mw->ps->dpy, XK_q))
+				return 2;
+		}
+		break;
+	case ButtonPress:
+		mw->pressed_mouse = true;
 		break;
 	case ButtonRelease:
-		printfef("(): Detected mouse button release on main window, exiting.");
-		return 1;
+		if (mw->pressed_mouse) {
+			printfef("(): Detected mouse button release on main window, "
+					"exiting.");
+			return 1;
+		}
+		break;
 	case VisibilityNotify:
 		if(ev->xvisibility.state && mw->focus)
 		{

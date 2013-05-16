@@ -29,6 +29,10 @@ struct _MainWin
 	Colormap colormap;
 	int depth;
 	
+	/// @brief Whether the KeyRelease events should already be acceptable.
+	bool pressed_key;
+	/// @brief Whether the ButtonRelease events should already be acceptable.
+	bool pressed_mouse;
 	int poll_time;
 	
 	Window window;

@@ -249,6 +249,7 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xi
 	/* Map the main window and run our event loop */
 	if (!ps->o.lazyTrans)
 		mainwin_map(mw);
+	XFlush(ps->dpy);
 	
 	last_rendered = time_in_millis();
 	while(! die) {
@@ -368,6 +369,7 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xi
 	XFlush(ps->dpy);
 	
 	REDUCE(clientwin_unmap((ClientWin*)iter->data), mw->cod);
+	XFlush(ps->dpy);
 	dlist_free(mw->cod);
 	mw->cod = 0;
 	

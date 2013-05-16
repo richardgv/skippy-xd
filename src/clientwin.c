@@ -93,6 +93,7 @@ clientwin_create(MainWin *mw, Window client) {
 	
 	sattr.event_mask = ButtonPressMask |
 	                   ButtonReleaseMask |
+	                   KeyPressMask |
 	                   KeyReleaseMask |
 	                   EnterWindowMask |
 	                   LeaveWindowMask |
@@ -297,17 +298,17 @@ clientwin_move(ClientWin *cw, float f, int x, int y)
 }
 
 void
-clientwin_map(ClientWin *cw)
-{
-	if(cw->damage)
-		XDamageDestroy(cw->mainwin->ps->dpy, cw->damage);
+clientwin_map(ClientWin *cw) {
+	session_t *ps = cw->mainwin->ps;
+	free_damage(ps, &cw->damage);
 	
-	cw->damage = XDamageCreate(cw->mainwin->ps->dpy, cw->client.window, XDamageReportDeltaRectangles);
-	XRenderSetPictureTransform(cw->mainwin->ps->dpy, cw->origin, &cw->mainwin->transform);
+	cw->damage = XDamageCreate(ps->dpy, cw->client.window, XDamageReportDeltaRectangles);
+	XRenderSetPictureTransform(ps->dpy, cw->origin, &cw->mainwin->transform);
 	
 	clientwin_render(cw);
 	
-	XMapWindow(cw->mainwin->ps->dpy, cw->mini.window);
+	XMapWindow(ps->dpy, cw->mini.window);
+	XRaiseWindow(ps->dpy, cw->mini.window);
 }
 
 void
@@ -348,7 +349,7 @@ childwin_focus(ClientWin *cw)
 int
 clientwin_handle(ClientWin *cw, XEvent *ev)
 {
-	if(ev->type == ButtonRelease) {
+	if (ev->type == ButtonRelease && cw->mainwin->pressed_mouse) {
 		const unsigned button = ev->xbutton.button;
 		if (button < MAX_MOUSE_BUTTONS) {
 			int ret = clientwin_action(cw, cw->mainwin->ps->o.bindings_miwMouse[button]);
@@ -357,7 +358,7 @@ clientwin_handle(ClientWin *cw, XEvent *ev)
 				return ret;
 			}
 		}
-	} else if(ev->type == KeyRelease) {
+	} else if(ev->type == KeyRelease && cw->mainwin->pressed_key) {
 		if(ev->xkey.keycode == cw->mainwin->key_up)
 			focus_up(cw);
 		else if(ev->xkey.keycode == cw->mainwin->key_down)
@@ -370,9 +371,16 @@ clientwin_handle(ClientWin *cw, XEvent *ev)
 			childwin_focus(cw);
 			return 1;
 		}
-	} else if(ev->type == ButtonPress && ev->xbutton.button == 1) {
-		cw->mainwin->pressed = cw;
-	} else if(ev->type == FocusIn) {
+	}
+	else if (ev->type == ButtonPress) {
+		cw->mainwin->pressed_mouse = true;
+		/* if (ev->xbutton.button == 1)
+			cw->mainwin->pressed = cw; */
+	}
+	else if (KeyPress == ev->type) {
+		cw->mainwin->pressed_key = true;
+	}
+	else if(ev->type == FocusIn) {
 		cw->focused = 1;
 		clientwin_render(cw);
 		XFlush(cw->mainwin->ps->dpy);
