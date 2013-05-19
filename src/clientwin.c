@@ -77,7 +77,6 @@ clientwin_create(MainWin *mw, Window client) {
 		memcpy(cw, &CLIENTWT_DEF, sizeof(ClientWin));
 	}
 
-	XSetWindowAttributes sattr;
 	XWindowAttributes attr;
 	
 	cw->mainwin = mw;
@@ -88,26 +87,23 @@ clientwin_create(MainWin *mw, Window client) {
 	cw->damaged = false;
 	/* cw->repair = None; */
 	
-	sattr.border_pixel = sattr.background_pixel = 0;
-	sattr.colormap = mw->colormap;
-	
-	sattr.event_mask = ButtonPressMask |
-	                   ButtonReleaseMask |
-	                   KeyPressMask |
-	                   KeyReleaseMask |
-	                   EnterWindowMask |
-	                   LeaveWindowMask |
-	                   PointerMotionMask |
-	                   ExposureMask |
-	                   FocusChangeMask;
-	
-	sattr.override_redirect = ps->o.lazyTrans;
-	
 	cw->client.window = client;
 	cw->mini.format = mw->format;
-	cw->mini.window = XCreateWindow(ps->dpy, ps->o.lazyTrans ? ps->root : mw->window, 0, 0, 1, 1, 0,
-	                                mw->depth, InputOutput, mw->visual,
-	                                CWColormap | CWBackPixel | CWBorderPixel | CWEventMask | CWOverrideRedirect, &sattr);
+	{
+		XSetWindowAttributes sattr = {
+			.border_pixel = 0,
+			.background_pixel = 0,
+			.colormap = mw->colormap,
+			.event_mask = ButtonPressMask | ButtonReleaseMask | KeyPressMask
+				| KeyReleaseMask | EnterWindowMask | LeaveWindowMask
+				| PointerMotionMask | ExposureMask | FocusChangeMask,
+			.override_redirect = ps->o.lazyTrans,
+		};
+		cw->mini.window = XCreateWindow(ps->dpy,
+				(ps->o.lazyTrans ? ps->root : mw->window), 0, 0, 1, 1, 0,
+				mw->depth, InputOutput, mw->visual,
+				CWColormap | CWBackPixel | CWBorderPixel | CWEventMask | CWOverrideRedirect, &sattr);
+	}
 	if (!cw->mini.window)
 		goto clientwin_create_err;
 	

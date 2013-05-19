@@ -66,11 +66,9 @@ update_clients(MainWin *mw, dlist *clients, Bool *touched)
 		*touched = False;
 	
 	/* Terminate clients that are no longer managed */
-	while(iter)
-	{
+	while (iter) {
 		ClientWin *cw = (ClientWin *)iter->data;
-		if(! dlist_find_data(stack, (void *)cw->client.window))
-		{
+		if (!dlist_find_data(stack, (void *) cw->client.window)) {
 			dlist *tmp = iter->next;
 			clientwin_destroy((ClientWin *)iter->data, True);
 			clients = dlist_remove(iter);
@@ -82,6 +80,7 @@ update_clients(MainWin *mw, dlist *clients, Bool *touched)
 		clientwin_update(cw);
 		iter = iter->next;
 	}
+	XFlush(mw->ps->dpy);
 	
 	/* Add new clients */
 	for(iter = dlist_first(stack); iter; iter = iter->next)
@@ -203,13 +202,56 @@ ev_dumpstr_type(const XEvent *ev) {
 	return "Unknown";
 }
 
+static inline Window
+ev_window(session_t *ps, const XEvent *ev) {
+#define T_SETWID(type, ele) case type: return ev->ele.window
+	switch (ev->type) {
+		case KeyPress:
+		T_SETWID(KeyRelease, xkey);
+		case ButtonPress:
+		T_SETWID(ButtonRelease, xbutton);
+		T_SETWID(MotionNotify, xmotion);
+		case EnterNotify:
+		T_SETWID(LeaveNotify, xcrossing);
+		case FocusIn:
+		T_SETWID(FocusOut, xfocus);
+		T_SETWID(KeymapNotify, xkeymap);
+		T_SETWID(Expose, xexpose);
+		case GraphicsExpose: return ev->xgraphicsexpose.drawable;
+		case NoExpose: return ev->xnoexpose.drawable;
+		T_SETWID(CirculateNotify, xcirculate);
+		T_SETWID(ConfigureNotify, xconfigure);
+		T_SETWID(CreateNotify, xcreatewindow);
+		T_SETWID(DestroyNotify, xdestroywindow);
+		T_SETWID(GravityNotify, xgravity);
+		T_SETWID(MapNotify, xmap);
+		T_SETWID(MappingNotify, xmapping);
+		T_SETWID(ReparentNotify, xreparent);
+		T_SETWID(UnmapNotify, xunmap);
+		T_SETWID(VisibilityNotify, xvisibility);
+		T_SETWID(ColormapNotify, xcolormap);
+		T_SETWID(ClientMessage, xclient);
+		T_SETWID(PropertyNotify, xproperty);
+		T_SETWID(SelectionClear, xselectionclear);
+		case SelectionNotify: return ev->xselection.requestor;
+	}
+#undef T_SETWID
+    if (ps->xinfo.damage_ev_base + XDamageNotify == ev->type)
+      return ((XDamageNotifyEvent *) ev)->drawable;
+
+	printf("(): Failed to find window for event type %d. Troubles ahead.",
+			ev->type);
+
+	return ev->xany.window;
+}
+
 static inline void
 ev_dump(session_t *ps, const MainWin *mw, const XEvent *ev) {
 	if (!ev || (ps->xinfo.damage_ev_base + XDamageNotify) == ev->type) return;
 
 	const char *name = ev_dumpstr_type(ev);
-	Window wid = ev->xany.window;
 
+	Window wid = ev_window(ps, ev);
 	const char *wextra = "";
 	if (ps->root == wid) wextra = "(Root)";
 	if (mw && mw->window == wid) wextra = "(Main)";
@@ -281,6 +323,7 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xi
 #ifdef DEBUG_EVENTS
 			ev_dump(ps, mw, &ev);
 #endif
+			const Window wid = ev_window(ps, &ev);
 
 			if (ev.type == MotionNotify)
 			{
@@ -288,12 +331,11 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xi
 				move_y = ev.xmotion.y_root;
 			}
 			else if (ev.type == DestroyNotify || ev.type == UnmapNotify) {
-				dlist *iter = dlist_find(clients, clientwin_cmp_func, (void *)ev.xany.window);
-				if(iter)
-				{
+				dlist *iter = (wid ? dlist_find(clients, clientwin_cmp_func, (void *) wid): NULL);
+				if (iter) {
 					ClientWin *cw = (ClientWin *)iter->data;
 					clients = dlist_first(dlist_remove(iter));
-					iter = dlist_find(mw->cod, clientwin_cmp_func, (void *)ev.xany.window);
+					iter = dlist_find(mw->cod, clientwin_cmp_func, (void *) wid);
 					if(iter)
 						mw->cod = dlist_first(dlist_remove(iter));
 					clientwin_destroy(cw, true);
@@ -329,7 +371,7 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xi
 				die = 1;
 				break;
 			}
-			else if(ev.xany.window == mw->window)
+			else if (wid == mw->window)
 				die = mainwin_handle(mw, &ev);
 			else if(ev.type == PropertyNotify)
 			{
@@ -340,19 +382,18 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xi
 				}
 
 			}
-			else if(mw->tooltip && ev.xany.window == mw->tooltip->window)
+			else if (mw->tooltip && wid == mw->tooltip->window)
 				tooltip_handle(mw->tooltip, &ev);
 			else
 			{
-				dlist *iter;
-				for(iter = mw->cod; iter; iter = iter->next)
-				{
-					ClientWin *cw = (ClientWin *)iter->data;
-					if(cw->mini.window == ev.xany.window)
-					{
-						die = clientwin_handle(cw, &ev);
-						if(die)
-							break;
+				if (wid) {
+					for (dlist *iter = mw->cod; iter; iter = iter->next) {
+						ClientWin *cw = (ClientWin *)iter->data;
+						if (cw->mini.window == wid) {
+							die = clientwin_handle(cw, &ev);
+							if (die)
+								break;
+						}
 					}
 				}
 				if(die)
