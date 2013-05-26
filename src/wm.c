@@ -316,7 +316,7 @@ wm_get_stack(Display *dpy)
 	Atom real_type;
 	unsigned long items_read, items_left, i;
 	
-	if(WM_PERSONALITY == WM_PERSONALITY_NETWM)
+	if (WM_PERSONALITY == WM_PERSONALITY_NETWM)
 		status = XGetWindowProperty(dpy, DefaultRootWindow(dpy), _NET_CLIENT_LIST,
 		                  0L, 8192L, False, XA_WINDOW, &real_type, &real_format,
 		                  &items_read, &items_left, &data);

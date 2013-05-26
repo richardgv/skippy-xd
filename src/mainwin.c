@@ -282,7 +282,7 @@ mainwin_map(MainWin *mw) {
 	XRaiseWindow(ps->dpy, mw->window);
 
 	// Might because of WM reparent, XSetInput() doesn't work here
-	// XSetInputFocus(ps->dpy, mw->window, RevertToParent, CurrentTime);
+	XSetInputFocus(ps->dpy, mw->window, RevertToParent, CurrentTime);
 	XGrabKeyboard(ps->dpy, mw->window, True, GrabModeAsync, GrabModeAsync,
 			CurrentTime);
 }
@@ -351,18 +351,19 @@ mainwin_transform(MainWin *mw, float f)
 }
 
 int
-mainwin_handle(MainWin *mw, XEvent *ev)
-{
+mainwin_handle(MainWin *mw, XEvent *ev) {
+	session_t *ps = mw->ps;
+
 	switch(ev->type)
 	{
 	case KeyPress:
 		mw->pressed_key = true;
 		break;
 	case KeyRelease:
-		if (mw->pressed_key) {
-			if (ev->xkey.keycode == XKeysymToKeycode(mw->ps->dpy, XK_q))
-				return 2;
-		}
+		if (mw->pressed_key)
+			report_key_unbinded(ev);
+		else
+			report_key_ignored(ev);
 		break;
 	case ButtonPress:
 		mw->pressed_mouse = true;
@@ -373,11 +374,13 @@ mainwin_handle(MainWin *mw, XEvent *ev)
 					"exiting.");
 			return 1;
 		}
+		else
+			printfef("(): ButtonRelease %u ignored.", ev->xbutton.button);
 		break;
 	case VisibilityNotify:
 		if(ev->xvisibility.state && mw->focus)
 		{
-			XSetInputFocus(mw->ps->dpy, mw->focus->mini.window, RevertToParent, CurrentTime);
+			XSetInputFocus(ps->dpy, mw->focus->mini.window, RevertToParent, CurrentTime);
 			mw->focus = 0;
 		}
 		break;

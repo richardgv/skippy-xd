@@ -28,8 +28,6 @@
 
 session_t *ps_g = NULL;
 
-static int DIE_NOW = 0;
-
 /**
  * @brief Parse a string representation of enum cliop.
  */
@@ -46,6 +44,26 @@ parse_cliop(session_t *ps, const char *str, enum cliop *dest) {
 	};
 	for (int i = 0; i < sizeof(STRS_CLIENTOP) / sizeof(STRS_CLIENTOP[0]); ++i)
 		if (!strcmp(STRS_CLIENTOP[i], str)) {
+			*dest = i;
+			return true;
+		}
+
+	printfef("(\"%s\"): Unrecognized operation.", str);
+	return false;
+}
+
+/**
+ * @brief Parse a string representation of enum align.
+ */
+static bool
+parse_align(session_t *ps, const char *str, enum align *dest) {
+	static const char * const STRS_ALIGN[] = {
+		[ ALIGN_LEFT  ] = "left",
+		[ ALIGN_MID   ] = "mid",
+		[ ALIGN_RIGHT ] = "right",
+	};
+	for (int i = 0; i < sizeof(STRS_ALIGN) / sizeof(STRS_ALIGN[0]); ++i)
+		if (!strcmp(STRS_ALIGN[i], str)) {
 			*dest = i;
 			return true;
 		}
@@ -266,8 +284,7 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xi
 	session_t * const ps = mw->ps;
 	XEvent ev;
 	int die = 0;
-	Bool refocus = False;
-	int last_rendered;
+	bool refocus = false;
 	
 	/* Update the main window's geometry (and Xinerama info if applicable) */
 	mainwin_update(mw);
@@ -285,18 +302,19 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xi
 	}
 	
 	clients = do_layout(mw, clients, focus, leader);
-	if(! mw->cod)
+	if (!mw->cod) {
+		printfef("(): No client windows found.");
 		return clients;
+	}
 	
 	/* Map the main window and run our event loop */
 	if (!ps->o.lazyTrans)
 		mainwin_map(mw);
 	XFlush(ps->dpy);
 	
-	last_rendered = time_in_millis();
-	while(! die) {
-		int i, j, now, timeout;
-		int move_x = -1, move_y = -1;
+	int last_rendered = time_in_millis();
+	while (!die) {
+		int i, now, timeout;
 		struct pollfd r_fd;
 
 		XFlush(ps->dpy);
@@ -317,18 +335,17 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xi
 		}
 
 		i = XPending(ps->dpy);
-		for(j = 0; j < i; ++j)
-		{
+		for (int j = 0; j < i && !die; ++j) {
 			XNextEvent(ps->dpy, &ev);
 #ifdef DEBUG_EVENTS
 			ev_dump(ps, mw, &ev);
 #endif
 			const Window wid = ev_window(ps, &ev);
 
-			if (ev.type == MotionNotify)
-			{
-				move_x = ev.xmotion.x_root;
-				move_y = ev.xmotion.y_root;
+			if (MotionNotify == ev.type) {
+				if (mw->tooltip && ps->o.tooltip_followsMouse)
+					tooltip_move(mw->tooltip,
+							ev.xmotion.x_root, ev.xmotion.y_root);
 			}
 			else if (ev.type == DestroyNotify || ev.type == UnmapNotify) {
 				dlist *iter = (wid ? dlist_find(clients, clientwin_cmp_func, (void *) wid): NULL);
@@ -342,7 +359,6 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xi
 					if (!mw->cod) {
 						printfef("(): Last client window destroyed/unmapped, exiting.");
 						die = 1;
-						break;
 					}
 				}
 			}
@@ -359,50 +375,37 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xi
 				}
 
 			}
-			else if(ev.type == KeyRelease && ev.xkey.keycode == mw->key_q)
-			{
-				DIE_NOW = 1;
-				die = 1;
-				break;
-			}
-			else if(ev.type == KeyRelease && ev.xkey.keycode == mw->key_escape)
-			{
-				refocus = True;
-				die = 1;
-				break;
+			else if (KeyRelease == ev.type && (mw->key_q == ev.xkey.keycode
+						|| mw->key_escape == ev.xkey.keycode)) {
+				if (mw->pressed_key) {
+					die = 1;
+					if (mw->key_escape == ev.xkey.keycode)
+						refocus = true;
+				}
+				else
+					report_key_ignored(&ev);
 			}
 			else if (wid == mw->window)
 				die = mainwin_handle(mw, &ev);
-			else if(ev.type == PropertyNotify)
-			{
-				if(ev.xproperty.atom == ESETROOT_PMAP_ID || ev.xproperty.atom == _XROOTPMAP_ID)
-				{
+			else if(ev.type == PropertyNotify) {
+				if(ev.xproperty.atom == ESETROOT_PMAP_ID
+						|| ev.xproperty.atom == _XROOTPMAP_ID) {
 					mainwin_update_background(mw);
 					REDUCE(clientwin_render((ClientWin *)iter->data), mw->cod);
 				}
-
 			}
 			else if (mw->tooltip && wid == mw->tooltip->window)
 				tooltip_handle(mw->tooltip, &ev);
-			else
-			{
-				if (wid) {
-					for (dlist *iter = mw->cod; iter; iter = iter->next) {
-						ClientWin *cw = (ClientWin *)iter->data;
-						if (cw->mini.window == wid) {
-							die = clientwin_handle(cw, &ev);
-							if (die)
-								break;
-						}
+			else if (wid) {
+				for (dlist *iter = mw->cod; iter; iter = iter->next) {
+					ClientWin *cw = (ClientWin *) iter->data;
+					if (cw->mini.window == wid) {
+						die = clientwin_handle(cw, &ev);
+						break;
 					}
 				}
-				if(die)
-					break;
 			}
 		}
-
-		if(mw->tooltip && move_x != -1)
-			tooltip_move(mw->tooltip, move_x + 20, move_y + 20);
 	}
 	
 	/* Unmap the main window and clean up */
@@ -414,13 +417,8 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xi
 	dlist_free(mw->cod);
 	mw->cod = 0;
 	
-	if(die == 2)
-		DIE_NOW = 1;
-	
-	if(refocus)
-	{
+	if (refocus)
 		XSetInputFocus(ps->dpy, focus, RevertToPointerRoot, CurrentTime);
-	}
 	
 	return clients;
 }
@@ -770,6 +768,11 @@ int main(int argc, char *argv[]) {
 			config_get_int_wrap(config, "highlight", "tintOpacity", &ps->o.highlight_tintOpacity, 0, 256);
 			config_get_int_wrap(config, "highlight", "opacity", &ps->o.highlight_opacity, 0, 256);
 			config_get_bool_wrap(config, "tooltip", "show", &ps->o.tooltip_show);
+			config_get_bool_wrap(config, "tooltip", "followsMouse", &ps->o.tooltip_followsMouse);
+			config_get_int_wrap(config, "tooltip", "offsetX", &ps->o.tooltip_offsetX, INT_MIN, INT_MAX);
+			config_get_int_wrap(config, "tooltip", "offsetY", &ps->o.tooltip_offsetY, INT_MIN, INT_MAX);
+			if (!parse_align(ps, config_get(config, "tooltip", "align", "left"), &ps->o.tooltip_align))
+				return RET_BADARG;
 			config_get_int_wrap(config, "tooltip", "tintOpacity", &ps->o.highlight_tintOpacity, 0, 256);
 			config_get_int_wrap(config, "tooltip", "opacity", &ps->o.tooltip_opacity, 0, 256);
 
@@ -813,10 +816,11 @@ int main(int argc, char *argv[]) {
 
 	wm_get_atoms(ps);
 	
-	if(! wm_check(dpy)) {
-		fprintf(stderr, "FATAL: WM not NETWM or GNOME WM Spec compliant.\n");
-		ret = 1;
-		goto main_end;
+	if (!wm_check(dpy)) {
+		printfef("(): WM not NETWM or GNOME WM Spec compliant. "
+				"Troubles ahead.");
+		/* ret = 1;
+		goto main_end; */
 	}
 	
 	wm_use_netwm_fullscreen(ps->o.useNetWMFullscreen);

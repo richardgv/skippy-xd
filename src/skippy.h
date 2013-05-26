@@ -43,6 +43,7 @@
 #include <X11/extensions/Xcomposite.h>
 #include <X11/extensions/Xdamage.h>
 #include <X11/extensions/Xfixes.h>
+#include <X11/extensions/shape.h>
 
 #ifdef CFG_XINERAMA
 # include <X11/extensions/Xinerama.h>
@@ -88,6 +89,12 @@ enum cliop {
 	CLIENTOP_DESTROY,
 };
 
+enum align {
+	ALIGN_LEFT,
+	ALIGN_MID,
+	ALIGN_RIGHT,
+};
+
 /// @brief Option structure.
 typedef struct {
 	char *config_path;
@@ -115,6 +122,10 @@ typedef struct {
 	int highlight_opacity;
 
 	bool tooltip_show;
+	bool tooltip_followsMouse;
+	int tooltip_offsetX;
+	int tooltip_offsetY;
+	enum align tooltip_align;
 	char *tooltip_border;
 	char *tooltip_background;
 	int tooltip_opacity;
@@ -147,6 +158,10 @@ typedef struct {
 	.highlight_tintOpacity = 64, \
 	.highlight_opacity = 255, \
 	.tooltip_show = true, \
+	.tooltip_followsMouse = true, \
+	.tooltip_offsetX = 20, \
+	.tooltip_offsetY = 20, \
+	.tooltip_align = ALIGN_LEFT, \
 	.tooltip_border = NULL, \
 	.tooltip_background = NULL, \
 	.tooltip_opacity = 128, \
@@ -203,7 +218,7 @@ typedef struct {
 
 /// @brief Print out an error message.
 #define printfe(format, ...) \
-  fprintf(stderr, format "\n", ## __VA_ARGS__)
+  (fprintf(stderr, format "\n", ## __VA_ARGS__), fflush(stderr))
 
 /// @brief Print out an error message with function name.
 #define printfef(format, ...) \
@@ -394,7 +409,7 @@ alphaconv(int alpha) {
 }
 
 /**
- * Wrapper of XFree() for convenience.
+ * @brief Wrapper of XFree() for convenience.
  *
  * Because a NULL pointer cannot be passed to XFree(), its man page says.
  */
@@ -403,6 +418,22 @@ sxfree(void *data) {
   if (data)
     XFree(data);
 }
+
+/**
+ * @brief Return a string representation for the keycode in a KeyEvent.
+ */
+static inline const char *
+ev_key_str(XKeyEvent *ev) {
+	return XKeysymToString(XLookupKeysym(ev, 0));
+}
+
+#define report_key_ignored(ev) \
+	printfef("(): KeyRelease %u (%s) ignored.", (ev)->xkey.keycode, \
+			ev_key_str(&(ev)->xkey))
+
+#define report_key_unbinded(ev) \
+	printfef("(): KeyRelease %u (%s) not binded to anything.", \
+			(ev)->xkey.keycode, ev_key_str(&(ev)->xkey))
 
 #include "wm.h"
 #include "clientwin.h"

@@ -151,12 +151,20 @@ tooltip_create(MainWin *mw) {
 	
 	tt->font_height = tt->font->ascent + tt->font->descent;
 	
+	// Set tooltip window input region to empty to prevent disgusting
+	// racing situations
+	{
+		XserverRegion region = XFixesCreateRegion(ps->dpy, NULL, 0);
+		XFixesSetWindowShapeRegion(ps->dpy, tt->window, ShapeInput, 0, 0, region);
+		XFixesDestroyRegion(ps->dpy, region);
+	}
+
 	return tt;
 }
 
 void
-tooltip_map(Tooltip *tt, int x, int y, const FcChar8 *text, int len)
-{
+tooltip_map(Tooltip *tt, int mouse_x, int mouse_y,
+		const FcChar8 *text, int len) {
 	session_t * const ps = tt->mainwin->ps;
 
 	XUnmapWindow(ps->dpy, tt->window);
@@ -166,7 +174,7 @@ tooltip_map(Tooltip *tt, int x, int y, const FcChar8 *text, int len)
 	tt->width = tt->extents.width + 8;
 	tt->height = tt->font_height + 5 + (tt->shadow.pixel ? 2 : 0);
 	XResizeWindow(ps->dpy, tt->window, tt->width, tt->height);
-	tooltip_move(tt, x, y);
+	tooltip_move(tt, mouse_x, mouse_y);
 	
 	if(tt->text)
 		free(tt->text);
@@ -181,15 +189,24 @@ tooltip_map(Tooltip *tt, int x, int y, const FcChar8 *text, int len)
 }
 
 void
-tooltip_move(Tooltip *tt, int x, int y)
-{
-	if(x + tt->extents.width + 9 > tt->mainwin->x + tt->mainwin->width)
-		x = tt->mainwin->x + tt->mainwin->width - tt->extents.width - 9;
-	x = MAX(0, x);
-	
-	if(y + tt->extents.height + 8 > tt->mainwin->y + tt->mainwin->height)
-		y = tt->mainwin->height + tt->mainwin->y - tt->extents.height - 8;
-	y = MAX(0, y);
+tooltip_move(Tooltip *tt, int mouse_x, int mouse_y) {
+	session_t *ps = tt->mainwin->ps;
+	int x = ps->o.tooltip_offsetX, y = ps->o.tooltip_offsetY;
+	if (ps->o.tooltip_followsMouse) {
+		x += mouse_x;
+		y += mouse_y;
+	}
+	switch (ps->o.tooltip_align) {
+		case ALIGN_LEFT: break;
+		case ALIGN_MID:
+						 x -= tt->width / 2;
+						 break;
+		case ALIGN_RIGHT:
+						 x -= tt->width;
+						 break;
+	}
+	x = MIN(MAX(0, x), tt->mainwin->x + tt->mainwin->width - tt->width);
+	y = MIN(MAX(0, y), tt->mainwin->y + tt->mainwin->height - tt->height);
 	
 	XMoveWindow(tt->mainwin->ps->dpy, tt->window, x, y);
 }
@@ -207,11 +224,10 @@ tooltip_unmap(Tooltip *tt)
 void
 tooltip_handle(Tooltip *tt, XEvent *ev)
 {
-	if(! tt->text)
+	if (!tt->text)
 		return;
 	
-	if(ev->type == Expose && ev->xexpose.count == 0)
-	{
+	if (ev->type == Expose && ev->xexpose.count == 0) {
 		XftDrawRect(tt->draw, &tt->border, 0, 0, tt->width, 1);
 		XftDrawRect(tt->draw, &tt->border, 0, 1, 1, tt->height - 2);
 		XftDrawRect(tt->draw, &tt->border, 0, tt->height - 1, tt->width, 1);

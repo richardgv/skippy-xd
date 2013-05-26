@@ -39,9 +39,10 @@ typedef struct _Tooltip Tooltip;
 
 Tooltip *tooltip_create(MainWin *mw);
 void tooltip_destroy(Tooltip *);
-void tooltip_map(Tooltip *, int, int, const FcChar8 *, int);
+void tooltip_map(Tooltip *tt, int mouse_x, int mouse_y,
+		const FcChar8 *text, int len);
 void tooltip_unmap(Tooltip *);
 void tooltip_handle(Tooltip *, XEvent *);
-void tooltip_move(Tooltip *, int, int);
+void tooltip_move(Tooltip *tt, int mouse_x, int mouse_y);
 
 #endif /* SKIPPY_TOOLTIP_H */

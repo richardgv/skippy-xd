@@ -54,6 +54,10 @@ opacity = 255
 
 [tooltip]
 show = true
+followsMouse = true
+offsetX = 20
+offsetY = 20
+align = left
 border = #ffffff
 background = #404040
 opacity = 128
