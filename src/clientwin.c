@@ -362,13 +362,17 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 			printfef("(): ButtonRelease %u ignored.", button);
 	} else if (ev->type == KeyRelease) {
 		if (cw->mainwin->pressed_key) {
-			if (ev->xkey.keycode == cw->mainwin->key_up)
+			if (ev->xkey.keycode == cw->mainwin->key_up ||
+					ev->xkey.keycode == cw->mainwin->key_k)
 				focus_up(cw);
-			else if (ev->xkey.keycode == cw->mainwin->key_down)
+			else if (ev->xkey.keycode == cw->mainwin->key_down ||
+					ev->xkey.keycode == cw->mainwin->key_j)
 				focus_down(cw);
-			else if (ev->xkey.keycode == cw->mainwin->key_left)
+			else if (ev->xkey.keycode == cw->mainwin->key_left ||
+					ev->xkey.keycode == cw->mainwin->key_h)
 				focus_left(cw);
-			else if (ev->xkey.keycode == cw->mainwin->key_right)
+			else if (ev->xkey.keycode == cw->mainwin->key_right ||
+					ev->xkey.keycode == cw->mainwin->key_l)
 				focus_right(cw);
 			else if (ev->xkey.keycode == cw->mainwin->key_enter
 					|| ev->xkey.keycode == cw->mainwin->key_space) {
