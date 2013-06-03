@@ -90,6 +90,10 @@ mainwin_create(session_t *ps) {
 	mw->key_down = XKeysymToKeycode(dpy, XK_Down);
 	mw->key_left = XKeysymToKeycode(dpy, XK_Left);
 	mw->key_right = XKeysymToKeycode(dpy, XK_Right);
+	mw->key_h = XKeysymToKeycode(dpy, XK_h);
+	mw->key_j = XKeysymToKeycode(dpy, XK_j);
+	mw->key_k = XKeysymToKeycode(dpy, XK_k);
+	mw->key_l = XKeysymToKeycode(dpy, XK_l);
 	mw->key_enter = XKeysymToKeycode(dpy, XK_Return);
 	mw->key_space = XKeysymToKeycode(dpy, XK_space);
 	mw->key_escape = XKeysymToKeycode(dpy, XK_Escape);
