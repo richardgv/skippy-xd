@@ -54,24 +54,15 @@ layout_run_desktop(MainWin *mw, dlist *windows, unsigned int *total_width, unsig
 	windows_get_rect2i(&rect_all ,windows);
 	for (iter=windows; iter; iter=iter->next) {
 		ClientWin* cw=(ClientWin*) iter->data;
-		//printf("%d %d %d %d\n",cw->client.x,cw->client.y,cw->client.width,cw->client.height);
-		//Vec2i vp=clientwin_pos(&cw->client);
-		//vec2i_print(vp);
-		//rect2i_print(&cwr);
-//		cw->x = cw->client.x-rect_all.min.x; cw->y=cw->client.y-rect_all.min.y;
 
 		cw->x = cw->client.x-rect_all.min.x;
 		cw->y = cw->client.y- rect_all.min.y;
-//		cw->x=rect_all.min.x; cw->y=0;
 	}
 	Vec2i size_all=rect2i_size(&rect_all);
-	printf("total bounds:-");
-	rect2i_print(&rect_all);
-	printf("\n");
-	vec2i_print(size_all);
+
 
 	*total_width=size_all.x; *total_height=size_all.y;
-	layout_dump(windows,total_width,total_height);
+	//layout_dump(windows,total_width,total_height);
 
 
 }
@@ -97,7 +88,7 @@ layout_run_original(MainWin *mw, dlist *windows, unsigned int *total_width, unsi
 		sum_w += cw->client.width;
 		max_w = MAX(max_w, cw->client.width);
 		max_h = MAX(max_h, cw->client.height);
-		logd("win %d,%d %dx%d\n ",  cw->client.x,cw->client.y, cw->client.width, cw->client.height);
+		//logd("win %d,%d %dx%d\n ",  cw->client.x,cw->client.y, cw->client.width, cw->client.height);
 	}
 	
 	for(iter = windows; iter; iter = iter->next)
@@ -162,7 +153,7 @@ layout_run_original(MainWin *mw, dlist *windows, unsigned int *total_width, unsi
 		dlist_free(row);
 	}
 
-	layout_dump(windows,total_width,total_height);
+	//layout_dump(windows,total_width,total_height);
 
 	layout_run_scale_all(mw,windows,*total_width,*total_height);
 	
@@ -198,7 +189,8 @@ void layout_run_scale_all(MainWin *mw, dlist *windows, unsigned int total_width,
 
 		cw->mini.width = MAX(1, (int)cw->client.width * factor);
 		cw->mini.height = MAX(1, (int)cw->client.height * factor);
-		printf("%d %d %d %d\n",cw->mini.x,cw->mini.y, cw->mini.width,cw->mini.height);
+
+		//printf("%d %d %d %d\n",cw->mini.x,cw->mini.y, cw->mini.width,cw->mini.height);
 	}
 }
 

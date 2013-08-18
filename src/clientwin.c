@@ -291,7 +291,6 @@ clientwin_create_scaled_image(ClientWin *cw)
 	int border = 0;
 	XSetWindowBorderWidth(cw->mainwin->ps->dpy, cw->mini.window, border);
 
-	printf("%d %d %d %d",cw->mini.x,cw->mini.y, cw->mini.width,cw->mini.height);
 	XMoveResizeWindow(cw->mainwin->ps->dpy, cw->mini.window, cw->mini.x - border, cw->mini.y - border, cw->mini.width, cw->mini.height);
 	
 	if(cw->pixmap)
@@ -304,6 +303,20 @@ clientwin_create_scaled_image(ClientWin *cw)
 	XSetWindowBackgroundPixmap(cw->mainwin->ps->dpy, cw->mini.window, cw->pixmap);
 	
 	cw->destination = XRenderCreatePicture(cw->mainwin->ps->dpy, cw->pixmap, cw->mini.format, 0, 0);
+}
+
+
+void 
+clientwin_lerp_client_to_mini(ClientWin* cw,float t){
+	Rect2i dst_rc=skippywindow_rect(&cw->mini);
+	Rect2i src_rc=skippywindow_rect(&cw->client);
+	int	denom=1<<12;
+	int ti=(int)(t*(float)denom);
+	Rect2i rc;
+	rc.min=v2i_lerp(src_rc.min,dst_rc.min, ti, denom);
+	rc.max=v2i_lerp(src_rc.max,dst_rc.max, ti, denom);
+	skippywindow_set_rect(&cw->mini,&rc);
+
 }
 
 void

@@ -133,7 +133,7 @@ get_layout_mode(const session_t* ps) {
 }
 
 static dlist *
-do_layout(MainWin *mw, dlist *clients, Window focus, Window leader)
+do_layout(MainWin *mw, dlist *clients, Window focus, Window leader,float t)
 {
 	session_t * const ps = mw->ps;
 
@@ -166,6 +166,10 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader)
 	layout_run(mw, mode, mw->cod, &width, &height);
 	int extra_border=mw->distance;
 //	float factor=layout_factor(mw,width,height,mw->distance);
+	for(iter = mw->cod; iter; iter = iter->next)
+		clientwin_lerp_client_to_mini((ClientWin*)iter->data,t);
+
+
 	float factor = (float)(mw->width - extra_border) / width;
 	if(factor * height > mw->height - extra_border)
 		factor = (float)(mw->height - extra_border) / height;
@@ -191,6 +195,13 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader)
 				mw->focus->mini.width / 2, mw->focus->mini.height / 2);
 	
 	return clients;
+}
+
+void mw_animate(MainWin* mw) {
+	dlist* iter;
+	for (iter=mw->cod;iter;iter=iter->next){
+		ClientWin* cw=(ClientWin*) iter->data;
+	}
 }
 
 static inline const char *
@@ -315,7 +326,9 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xi
 		XFlush(ps->dpy);
 	}
 	
-	clients = do_layout(mw, clients, focus, leader);
+	float anim_t=1.f;	// disabled. to enable, set to 0.0
+	float anim_dt=0.05f;
+	clients = do_layout(mw, clients, focus, leader,anim_t);
 	if (!mw->cod) {
 		printfef("(): No client windows found.");
 		return clients;
@@ -328,6 +341,7 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xi
 	
 	int last_rendered = time_in_millis();
 	while (!die) {
+		//printf("polling\n7");
 		int i, now, timeout;
 		struct pollfd r_fd;
 
@@ -344,11 +358,17 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xi
 		now = time_in_millis();
 		if(now >= last_rendered + mw->poll_time)
 		{
+
 			REDUCE(if( ((ClientWin*)iter->data)->damaged ) clientwin_repair(iter->data), mw->cod);
 			last_rendered = now;
 		}
 
 		i = XPending(ps->dpy);
+		if (!i && anim_t<1.0f) {
+			anim_t=MIN(1.0f,(anim_t+anim_dt));
+			mw_animate(mw);
+			do_layout(mw,clients,focus,leader,anim_t);
+		}
 		for (int j = 0; j < i && !die; ++j) {
 			XNextEvent(ps->dpy, &ev);
 #ifdef DEBUG_EVENTS

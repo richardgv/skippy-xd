@@ -332,7 +332,6 @@ wm_get_stack(Display *dpy)
 	{
 		l = dlist_add(l, (void *)((long *)data)[i]);
 	}
-	printf("read %d in stack\n",items_read);
 	
 	XFree(data);
 	
@@ -492,7 +491,6 @@ wm_validate_window(Display *dpy, Window win)
 	Atom real_type;
 	unsigned long items_read, items_left, i;
 	int result = 1;
-	printf("validate call\n");
 	
 	if(WM_PERSONALITY == WM_PERSONALITY_NETWM)
 	{
@@ -501,7 +499,6 @@ wm_validate_window(Display *dpy, Window win)
 		                  &items_read, &items_left, &data);
 		
 		if(status != Success) {
-			printf("prop failed\n");
 			return 0;
 		}
 		
@@ -521,7 +518,6 @@ wm_validate_window(Display *dpy, Window win)
 		XFree(data);
 		
 		if(! result) {
-			printf("hidden/skip/taskbar\n");
 			return 0;
 		}
 		
@@ -534,7 +530,6 @@ wm_validate_window(Display *dpy, Window win)
 		atoms = (Atom *)data;
 		
 		if(items_read && (atoms[0] == _NET_WM_WINDOW_TYPE_DESKTOP || atoms[0] == _NET_WM_WINDOW_TYPE_DOCK)) {
-			printf("dock\n");
 			result = 0;
 		}
 		
@@ -562,7 +557,6 @@ wm_validate_window(Display *dpy, Window win)
 		}
 		XFree(data);
 		if(! result){
-			printf("hidden/skip/taskbar\n");
 			return 0;
 		}
 		
@@ -579,7 +573,6 @@ wm_validate_window(Display *dpy, Window win)
 			}
 			attr = ((CARD32*)data)[0];
 			if(attr & WIN_HINTS_SKIP_TASKBAR) {
-				printf("taskbar\n");
 				result = 0;
 			}
 			XFree(data);

@@ -58,7 +58,7 @@ inline int rect2i_overlap( const Rect2i* a,const Rect2i* b) { Rect2i ri=rect2i_i
 inline bool rect2i_valid(const Rect2i* a) { return a->max.x>=a->min.x && a->max.y >= a->min.y; }
 inline void vec2i_print(const Vec2i v) { printf("(%d %d)", v.x,v.y);}
 inline void rect2i_print(const Rect2i* a) { printf("("); vec2i_print(a->min); printf(" "); vec2i_print(a->max); printf(")");}
-
+inline Vec2i rect2i_centre(const Rect2i* r) { return v2i_lerp(r->min,r->max,1,2);}
 typedef struct {
 	Window window;
 	int x, y;
@@ -114,9 +114,16 @@ int clientwin_check_group_leader_func(dlist *l, void *data);
 void clientwin_render(ClientWin *);
 void clientwin_schedule_repair(ClientWin *cw, XRectangle *area);
 void clientwin_repair(ClientWin *cw);
+
+void 
+clientwin_lerp_client_to_mini(ClientWin* cw,float t);
+
 // accessors, less needed if code is refactored to use vec2i etc.
 inline Vec2i skippywindow_pos(const SkippyWindow* w)	{ return vec2i_mk(w->x,w->y); }
 inline Vec2i skippywindow_size(const SkippyWindow* w)	{ return vec2i_mk(w->width,w->height); }
+inline Rect2i skippywindow_rect(const SkippyWindow* w)	{ return rect2i_mk_at(skippywindow_pos(w),skippywindow_size(w));}
+inline void skippywindow_set_pos(SkippyWindow* sw, const Vec2i p) { sw->x=p.x; sw->y=p.y; }
+inline void skippywindow_set_rect(SkippyWindow* sw, const Rect2i* r) { skippywindow_set_pos(sw,r->min); sw->width=r->max.x-r->min.x; sw->height=r->max.y-r->min.y;}
 inline Rect2i clientwin_rect(const ClientWin* w)	{ return rect2i_mk_at(skippywindow_pos(&w->client),skippywindow_size(&w->client));}
 inline Rect2i clientwin_mini_rect(const ClientWin* w)	{ return rect2i_mk_at(skippywindow_pos(&w->mini),skippywindow_size(&w->mini));}
 inline Vec2i clientwin_pos(const ClientWin* w)	{ return skippywindow_pos(&w->client);}
