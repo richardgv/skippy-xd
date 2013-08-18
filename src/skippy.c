@@ -192,7 +192,7 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader,float t)
 		clientwin_map((ClientWin*)iter->data);
 	if (ps->o.movePointerOnStart)
 		XWarpPointer(mw->ps->dpy, None, mw->focus->mini.window, 0, 0, 0, 0,
-				mw->focus->mini.width / 2, mw->focus->mini.height / 2);
+				sw_width(&mw->focus->mini) / 2, sw_height(&mw->focus->mini) / 2);
 	
 	return clients;
 }

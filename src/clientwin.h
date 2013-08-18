@@ -68,10 +68,15 @@ inline PosSize pos_size_mk(const Vec2i pos, const Vec2i size) { PosSize psz;psz.
 inline PosSize pos_size_from_rect(const Rect2i* r) { PosSize psz;psz.pos=r->min; psz.size=rect2i_size(r); return psz;}
 inline Rect2i rect2i_from_pos_size(const PosSize* psz) { rect2i_mk_at(psz->pos, psz->size);}
 
+//#define SW_POS_SIZE
 typedef struct {
 	Window window;
+#ifndef SW_POS_SIZE
 	int x, y;
 	unsigned int width, height;
+#else
+	PosSize	rect;
+#endif
 	XRenderPictFormat *format;
 } SkippyWindow;
 
@@ -128,20 +133,37 @@ void
 clientwin_lerp_client_to_mini(ClientWin* cw,float t);
 
 // accessors, less needed if code is refactored to use vec2i etc.
+// bloats the headers whilst the change is in progress, can be search-replaced when done
+#ifdef SW_POS_SIZE
+inline Vec2i sw_pos(const SkippyWindow* w)	{ return w->rect.pos; }
+inline Vec2i sw_size(const SkippyWindow* w)	{ return w->rect.size; }
+inline void sw_set_pos(SkippyWindow* sw, const Vec2i p) { sw->rect.pos=p; }
+inline void sw_set_size(SkippyWindow* sw, const Vec2i sz) { sw->rect.size=sz; }
+inline void sw_set_rect(SkippyWindow* sw, const Rect2i* r) { sw_set_pos(sw,r->min); sw_set_size(sw, rect2i_size(r));}
+inline int sw_width(const SkippyWindow* w) { return w->rect.size.x;} // => w->rect.size.x
+inline int sw_height(const SkippyWindow* w) { return w->rect.size.y;} // => w->rect.size.y
+inline int sw_x(const SkippyWindow* w) { return w->rect.pos.x;} // => w->rect.pos.x
+inline int sw_y(const SkippyWindow* w) { return w->rect.pos.y;} // => w->rect.pos.y
+#else
 inline Vec2i sw_pos(const SkippyWindow* w)	{ return vec2i_mk(w->x,w->y); }
 inline Vec2i sw_size(const SkippyWindow* w)	{ return vec2i_mk(w->width,w->height); }
-inline Rect2i sw_rect(const SkippyWindow* w)	{ return rect2i_mk_at(sw_pos(w),sw_size(w));}
-inline PosSize sw_pos_size(const SkippyWindow* w)	{ return pos_size_mk(sw_pos(w),sw_size(w));}
 inline void sw_set_pos(SkippyWindow* sw, const Vec2i p) { sw->x=p.x; sw->y=p.y; }
 inline void sw_set_size(SkippyWindow* sw, const Vec2i sz) { sw->width=sz.x; sw->height=sz.y; }
 inline void sw_set_rect(SkippyWindow* sw, const Rect2i* r) { sw_set_pos(sw,r->min); sw->width=r->max.x-r->min.x; sw->height=r->max.y-r->min.y;}
-inline void sw_set_pos_size(SkippyWindow* sw, const Vec2i p,const Vec2i sz) { sw_set_pos(sw,p); sw_set_size(sw,sz);}
-inline Rect2i clientwin_rect(const ClientWin* w)	{ return rect2i_mk_at(sw_pos(&w->client),sw_size(&w->client));}
-inline Rect2i clientwin_mini_rect(const ClientWin* w)	{ return rect2i_mk_at(sw_pos(&w->mini),sw_size(&w->mini));}
-inline Vec2i clientwin_pos(const ClientWin* w)	{ return sw_pos(&w->client);}
-inline Vec2i clientwin_size(const ClientWin* w)	{ return sw_size(&w->client);}
 inline int sw_width(const SkippyWindow* w) { return w->width;} // => w->rect.size.x
 inline int sw_height(const SkippyWindow* w) { return w->height;} // => w->rect.size.y
 inline int sw_x(const SkippyWindow* w) { return w->x;} // => w->rect.pos.x
 inline int sw_y(const SkippyWindow* w) { return w->y;} // => w->rect.pos.y
+#endif
+inline Vec2i sw_set_xy(SkippyWindow* sw,int x,int y)	{ sw_set_pos(sw,vec2i_mk(x,y)); }
+inline Vec2i sw_set_width_height(SkippyWindow* sw,int w,int h)	{ sw_set_size(sw,vec2i_mk(w,h)); }
+inline Rect2i sw_rect(const SkippyWindow* sw)	{ return rect2i_mk_at(sw_pos(sw),sw_size(sw));}
+inline PosSize sw_pos_size(const SkippyWindow* sw)	{ return pos_size_mk(sw_pos(sw),sw_size(sw));}
+inline void sw_set_pos_size(SkippyWindow* sw, const Vec2i p,const Vec2i sz) { sw_set_pos(sw,p); sw_set_size(sw,sz);}
+
+
+inline Rect2i clientwin_rect(const ClientWin* w)	{ return rect2i_mk_at(sw_pos(&w->client),sw_size(&w->client));}
+inline Rect2i clientwin_mini_rect(const ClientWin* w)	{ return rect2i_mk_at(sw_pos(&w->mini),sw_size(&w->mini));}
+inline Vec2i clientwin_pos(const ClientWin* w)	{ return sw_pos(&w->client);}
+inline Vec2i clientwin_size(const ClientWin* w)	{ return sw_size(&w->client);}
 #endif /* SKIPPY_CLIENT_H */
