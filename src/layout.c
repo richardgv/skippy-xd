@@ -162,7 +162,7 @@ float layout_factor(const MainWin *mw,Vec2i size, unsigned int extra_border) {
 
 	float factor = (float)(mw_width(mw) - extra_border) / size.x;
 	if(factor * size.y > mw_height(mw) - extra_border)
-		factor = (float)(mw_width(mw) - extra_border) / size.y;
+		factor = (float)(mw_height(mw) - extra_border) / size.y;
 	return factor;
 }
 void layout_run_scale_all(const MainWin *mw, dlist *windows, Vec2i total_size)
