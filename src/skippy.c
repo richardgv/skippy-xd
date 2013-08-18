@@ -121,10 +121,10 @@ update_clients(MainWin *mw, dlist *clients, Bool *touched)
 	
 	return clients;
 }
+
 static LAYOUT_MODE
-get_layout_mode(const ps = mw->ps) {
-	session_t * const ps = mw->ps;
-	if (ps->layout_grid) { 
+get_layout_mode(const session_t* ps) {
+	if (ps->o.layout_desktop) { 
 		return LAYOUT_DESKTOP;
 	}
 	else {
@@ -545,6 +545,7 @@ void show_help()
 			"\t--help                    - show this message.\n"
 			"\t-S                        - Synchronize X operation (debugging).\n"
 			"\t-a                        - show windows from all desktops.\n"
+			"\t-d                        - 'expo' style Desktop layout .\n"
 			, stdout);
 }
 
