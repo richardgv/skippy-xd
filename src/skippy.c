@@ -115,7 +115,7 @@ update_clients(MainWin *mw, dlist *clients, Bool *touched)
 		}
 	}
 
-	printf("update clients: %d active\n ", dlist_len(clients));
+	logd("update clients: %d active\n ", dlist_len(clients));
 	
 	dlist_free(stack);
 	
@@ -140,7 +140,7 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader)
 		dlist_free(mw->cod);
 	
 	tmp = dlist_first(dlist_find_all(clients, (dlist_match_func)clientwin_validate_func, &desktop));
-	printf("clients:%d,valid:%d\n",dlist_len(clients),dlist_len(tmp));
+	logd("clients:%d,valid:%d\n",dlist_len(clients),dlist_len(tmp));
 	if(leader != None)
 	{
 		mw->cod = dlist_first(dlist_find_all(tmp, clientwin_check_group_leader_func, (void*)&leader));

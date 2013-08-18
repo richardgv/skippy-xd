@@ -70,5 +70,8 @@ int mainwin_handle(MainWin *, XEvent *);
 void mainwin_update_background(MainWin *mw);
 void mainwin_update(MainWin *mw);
 void mainwin_transform(MainWin *mw, float f);
+inline  Vec2i mainwin_pos(const MainWin* mw) 	{ vec2i_mk( mw->x,mw->y);}
+inline  Vec2i mainwin_size(const MainWin* mw) 	{ vec2i_mk( mw->width,mw->height);}
+inline  Rect2i mainwin_rect(const MainWin* mw) 	{ rect2i_mk_at( mainwin_pos(mw), mainwin_size(mw) );}
 
 #endif /* SKIPPY_MAINWIN_H */

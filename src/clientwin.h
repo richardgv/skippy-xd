@@ -32,6 +32,7 @@ typedef struct Rect2i {
 inline int invlerpi(int lo,int hi,int v,int one) { return ((v-lo)*one)/(hi-lo);}
 inline int lerpi(int lo,int hi,int f,int one) { return lo+(((hi-lo)*f)/one);}
 inline void v2i_set(Vec2i* dst, int x, int y) { dst->x=x;dst->y=y;}
+inline Vec2i vec2i_mk(int x, int y) { Vec2i v; v.x=x; v.y=y; return v;}
 inline Vec2i v2i_sub(Vec2i a,Vec2i b) { Vec2i ret= {b.x-a.x,b.y-a.y};return ret; }
 inline Vec2i v2i_add(Vec2i a,Vec2i b) { Vec2i ret= {b.x+a.x,b.y+a.y};return ret; }
 inline Vec2i v2i_mul(Vec2i a,int f,int prec) { Vec2i ret= {(a.x*f)/prec,(a.y*f)/prec};return ret; }
@@ -43,6 +44,8 @@ inline Vec2i rect2i_invlerp(const Rect2i* r, Vec2i v, int precision) { return v2
 inline Vec2i v2i_min(Vec2i a,Vec2i b) { Vec2i ret={MIN(a.x,b.x),MIN(a.y,b.y)}; return ret;}
 inline Vec2i v2i_max(Vec2i a,Vec2i b) { Vec2i ret={MAX(a.x,b.x),MAX(a.y,b.y)}; return ret;}
 inline Rect2i rect2i_init(void){ Rect2i ret={{INT_MAX,INT_MAX},{-INT_MAX,-INT_MAX}}; return ret;}
+inline Rect2i rect2i_mk_at(Vec2i pos, Vec2i size){ Rect2i ret; ret.min=pos; ret.max=v2i_add(pos,size);  return ret;}
+inline Rect2i rect2i_mk(Vec2i a, Vec2i b){ Rect2i ret; ret.min=a; ret.max=b;  return ret;}
 inline void rect2i_set_init(Rect2i* ret){  v2i_set(&ret->min,INT_MAX,INT_MAX);v2i_set(&ret->max,-INT_MAX,-INT_MAX); }
 inline void rect2i_include(Rect2i* r,Vec2i v){ r->min=v2i_min(r->min,v);r->max=v2i_max(r->max,v); }
 inline void rect2i_include_rect2i(Rect2i* r,const Rect2i* src){ r->min=v2i_min(r->min,src->min);r->max=v2i_max(r->max,src->max); }
@@ -106,5 +109,10 @@ int clientwin_check_group_leader_func(dlist *l, void *data);
 void clientwin_render(ClientWin *);
 void clientwin_schedule_repair(ClientWin *cw, XRectangle *area);
 void clientwin_repair(ClientWin *cw);
+// accessors, less needed if code is refactored to use vec2i etc.
+inline Vec2i skippywindow_pos(const SkippyWindow* w)	{ vec2i_mk(w->x,w->y); }
+inline Vec2i skippywindow_size(const SkippyWindow* w)	{ vec2i_mk(w->width,w->height); }
+inline Rect2i clientwin_rect(const ClientWin* w)	{ return rect2i_mk_at(skippywindow_pos(&w->client),skippywindow_size(&w->client));}
+inline Rect2i clientwin_mini_rect(const ClientWin* w)	{ return rect2i_mk_at(skippywindow_pos(&w->mini),skippywindow_size(&w->mini));}
 
 #endif /* SKIPPY_CLIENT_H */
