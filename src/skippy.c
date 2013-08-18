@@ -129,7 +129,6 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader)
 
 	CARD32 desktop = wm_get_current_desktop(ps->dpy);
 	unsigned int width, height;
-	float factor;
 	int xoff, yoff;
 	dlist *iter, *tmp;
 	
@@ -153,16 +152,18 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader)
 	dlist_sort(mw->cod, clientwin_sort_func, 0);
 	
 	/* Move the mini windows around */
-	layout_run(mw, mw->cod, &width, &height);
-	factor = (float)(mw->width - 100) / width;
-	if(factor * height > mw->height - 100)
-		factor = (float)(mw->height - 100) / height;
+	layout_run(mw, LAYOUT_DESKTOP, mw->cod, &width, &height);
+	int extra_border=mw->distance;
+//	float factor=layout_factor(mw,width,height,mw->distance);
+	float factor = (float)(mw->width - extra_border) / width;
+	if(factor * height > mw->height - extra_border)
+		factor = (float)(mw->height - extra_border) / height;
 	
 	xoff = (mw->width - (float)width * factor) / 2;
 	yoff = (mw->height - (float)height * factor) / 2;
 	mainwin_transform(mw, factor);
 	for(iter = mw->cod; iter; iter = iter->next)
-		clientwin_move((ClientWin*)iter->data, factor, xoff, yoff);
+		clientwin_create_scaled_image((ClientWin*)iter->data /*, factor, xoff, yoff*/);
 	
 	/* Get the currently focused window and select which mini-window to focus */
 	iter = dlist_find(mw->cod, clientwin_cmp_func, (void *)focus);

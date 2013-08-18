@@ -20,6 +20,15 @@
 #ifndef SKIPPY_LAYOUT_H
 #define SKIPPY_LAYOUT_H
 
-void layout_run(MainWin *, dlist *, unsigned int *, unsigned int *);
+typedef enum LAYOUT_MODE {
+	LAYOUT_ORIGINAL,
+	LAYOUT_DESKTOP,
+	LAYOUT_GRID
+}
+LAYOUT_MODE;
+
+void layout_run(MainWin *, LAYOUT_MODE m, dlist *, unsigned int *, unsigned int *);
+float layout_factor(const MainWin*,unsigned int width,unsigned int height, unsigned int extra_border);
+
 
 #endif /* SKIPPY_LAYOUT_H */

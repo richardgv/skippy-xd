@@ -33,8 +33,8 @@ inline int invlerpi(int lo,int hi,int v,int one) { return ((v-lo)*one)/(hi-lo);}
 inline int lerpi(int lo,int hi,int f,int one) { return lo+(((hi-lo)*f)/one);}
 inline void v2i_set(Vec2i* dst, int x, int y) { dst->x=x;dst->y=y;}
 inline Vec2i vec2i_mk(int x, int y) { Vec2i v; v.x=x; v.y=y; return v;}
-inline Vec2i v2i_sub(Vec2i a,Vec2i b) { Vec2i ret= {b.x-a.x,b.y-a.y};return ret; }
-inline Vec2i v2i_add(Vec2i a,Vec2i b) { Vec2i ret= {b.x+a.x,b.y+a.y};return ret; }
+inline Vec2i v2i_sub(Vec2i a,Vec2i b) { Vec2i ret= {a.x-b.x,a.y-b.y};return ret; }
+inline Vec2i v2i_add(Vec2i a,Vec2i b) { Vec2i ret= {a.x+b.x,a.y+b.y};return ret; }
 inline Vec2i v2i_mul(Vec2i a,int f,int prec) { Vec2i ret= {(a.x*f)/prec,(a.y*f)/prec};return ret; }
 inline Vec2i v2i_mad(Vec2i a,Vec2i b,int f,int prec) { return v2i_add(a, v2i_mul(b,f,prec)); }
 inline Vec2i v2i_lerp(Vec2i a,Vec2i b,int f,int prec) { return v2i_add(a, v2i_mul(v2i_sub(b,a),f,prec)); }
@@ -47,7 +47,7 @@ inline Rect2i rect2i_init(void){ Rect2i ret={{INT_MAX,INT_MAX},{-INT_MAX,-INT_MA
 inline Rect2i rect2i_mk_at(Vec2i pos, Vec2i size){ Rect2i ret; ret.min=pos; ret.max=v2i_add(pos,size);  return ret;}
 inline Rect2i rect2i_mk(Vec2i a, Vec2i b){ Rect2i ret; ret.min=a; ret.max=b;  return ret;}
 inline void rect2i_set_init(Rect2i* ret){  v2i_set(&ret->min,INT_MAX,INT_MAX);v2i_set(&ret->max,-INT_MAX,-INT_MAX); }
-inline void rect2i_include(Rect2i* r,Vec2i v){ r->min=v2i_min(r->min,v);r->max=v2i_max(r->max,v); }
+inline void rect2i_include(Rect2i* r,Vec2i v){ r->min=v2i_min(r->min,v); r->max=v2i_max(r->max,v); }
 inline void rect2i_include_rect2i(Rect2i* r,const Rect2i* src){ r->min=v2i_min(r->min,src->min);r->max=v2i_max(r->max,src->max); }
 inline Vec2i rect2i_size(const Rect2i* r) { return v2i_sub(r->max,r->min);}
 inline int rect2i_aspect(const Rect2i* r,int precision) { Vec2i sz=rect2i_size(r); return (sz.x*precision)/sz.y;}
@@ -56,6 +56,8 @@ inline int rect2i_area( const Rect2i* r) { Vec2i sz=rect2i_size(r); return (sz.x
 inline Rect2i rect2i_intersect( const Rect2i* a,const Rect2i* b ) { Rect2i r; r.min=v2i_max(a->min,b->min); r.max=v2i_min(a->max,b->max); return r;}
 inline int rect2i_overlap( const Rect2i* a,const Rect2i* b) { Rect2i ri=rect2i_intersect(a,b);Vec2i sz= rect2i_size(&ri);if (sz.x>0 && sz.y>0) return sz.x*sz.y; else return 0;}
 inline bool rect2i_valid(const Rect2i* a) { return a->max.x>=a->min.x && a->max.y >= a->min.y; }
+inline void vec2i_print(const Vec2i v) { printf("(%d %d)", v.x,v.y);}
+inline void rect2i_print(const Rect2i* a) { printf("("); vec2i_print(a->min); printf(" "); vec2i_print(a->max); printf(")");}
 
 typedef struct {
 	Window window;
@@ -100,6 +102,9 @@ int clientwin_sort_func(dlist *, dlist *, void *);
 ClientWin *clientwin_create(struct _MainWin *, Window);
 void clientwin_destroy(ClientWin *, bool destroyed);
 void clientwin_move(ClientWin *, float, int, int);
+void clientwin_create_scaled_image(ClientWin *cw);
+void clientwin_move_and_create_scaled_image(ClientWin *cw, float f, int dx, int dy);
+
 void clientwin_map(ClientWin *);
 void clientwin_unmap(ClientWin *);
 int clientwin_handle(ClientWin *, XEvent *);
@@ -110,9 +115,10 @@ void clientwin_render(ClientWin *);
 void clientwin_schedule_repair(ClientWin *cw, XRectangle *area);
 void clientwin_repair(ClientWin *cw);
 // accessors, less needed if code is refactored to use vec2i etc.
-inline Vec2i skippywindow_pos(const SkippyWindow* w)	{ vec2i_mk(w->x,w->y); }
-inline Vec2i skippywindow_size(const SkippyWindow* w)	{ vec2i_mk(w->width,w->height); }
+inline Vec2i skippywindow_pos(const SkippyWindow* w)	{ return vec2i_mk(w->x,w->y); }
+inline Vec2i skippywindow_size(const SkippyWindow* w)	{ return vec2i_mk(w->width,w->height); }
 inline Rect2i clientwin_rect(const ClientWin* w)	{ return rect2i_mk_at(skippywindow_pos(&w->client),skippywindow_size(&w->client));}
 inline Rect2i clientwin_mini_rect(const ClientWin* w)	{ return rect2i_mk_at(skippywindow_pos(&w->mini),skippywindow_size(&w->mini));}
-
+inline Vec2i clientwin_pos(const ClientWin* w)	{ return skippywindow_pos(&w->client);}
+inline Vec2i clientwin_size(const ClientWin* w)	{ return skippywindow_size(&w->client);}
 #endif /* SKIPPY_CLIENT_H */

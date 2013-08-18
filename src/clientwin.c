@@ -262,16 +262,12 @@ clientwin_schedule_repair(ClientWin *cw, XRectangle *area)
 	cw->damaged = true;
 }
 
-void
-clientwin_move(ClientWin *cw, float f, int x, int y)
-{
-	/* int border = MAX(1, (double)DISTANCE(cw->mainwin) * f * 0.25); */
-	int border = 0;
-	XSetWindowBorderWidth(cw->mainwin->ps->dpy, cw->mini.window, border);
-	
+// This functionality moved into layout -"layout_run_scale_all".
+void clientwin_move_sub(ClientWin* cw, int dx,int dy,float f) {
+
 	cw->factor = f;
-	cw->mini.x = x + (int)cw->x * f;
-	cw->mini.y = y + (int)cw->y * f;
+	cw->mini.x = dx + (int)cw->x * f;
+	cw->mini.y = dy + (int)cw->y * f;
 	if(cw->mainwin->ps->o.lazyTrans)
 	{
 		cw->mini.x += cw->mainwin->x;
@@ -279,6 +275,23 @@ clientwin_move(ClientWin *cw, float f, int x, int y)
 	}
 	cw->mini.width = MAX(1, (int)cw->client.width * f);
 	cw->mini.height = MAX(1, (int)cw->client.height * f);
+
+}
+
+
+void
+clientwin_move_and_create_scaled_image(ClientWin *cw, float f, int dx, int dy) {
+	clientwin_move_sub(cw,  dx,dy,f);
+	clientwin_create_scaled_image( cw);
+}
+void
+clientwin_create_scaled_image(ClientWin *cw)
+{
+	/* int border = MAX(1, (double)DISTANCE(cw->mainwin) * f * 0.25); */
+	int border = 0;
+	XSetWindowBorderWidth(cw->mainwin->ps->dpy, cw->mini.window, border);
+
+	printf("%d %d %d %d",cw->mini.x,cw->mini.y, cw->mini.width,cw->mini.height);
 	XMoveResizeWindow(cw->mainwin->ps->dpy, cw->mini.window, cw->mini.x - border, cw->mini.y - border, cw->mini.width, cw->mini.height);
 	
 	if(cw->pixmap)

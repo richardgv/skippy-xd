@@ -19,8 +19,66 @@
 
 #include "skippy.h"
 
+void layout_run_scale_all(MainWin *mw, dlist *windows, unsigned int total_width, unsigned int total_height);
+
+void 
+layout_dump(const dlist* windows,unsigned int *total_width,unsigned int* total_height) {
+	const dlist* iter;
+	for(iter = windows; iter; iter = iter->next){
+		const ClientWin *cw = (const ClientWin*)iter->data;
+		printf("mini pos:%d %d / %d %d\n",cw->x,cw->y,*total_width,*total_height);
+	}
+
+}
+
 void
-layout_run(MainWin *mw, dlist *windows, unsigned int *total_width, unsigned int *total_height)
+windows_get_rect2i(Rect2i* ret,const dlist* windows) {
+	const dlist* iter;
+	*ret=rect2i_init();
+	for (iter=windows; iter; iter=iter->next) {
+		const ClientWin* cw=(const ClientWin*) iter->data;
+		Rect2i cwr=clientwin_rect(cw);
+		rect2i_include_rect2i(ret, &cwr);
+	}
+}
+
+
+void
+layout_run_desktop(MainWin *mw, dlist *windows, unsigned int *total_width, unsigned int *total_height)
+{
+	// dumb grid layout; TODO: Find aspect ratios, use to calculate w/hoptimal
+	dlist* iter;
+	int	num_win=dlist_len(windows);
+
+	Rect2i rect_all;
+	windows_get_rect2i(&rect_all ,windows);
+	for (iter=windows; iter; iter=iter->next) {
+		ClientWin* cw=(ClientWin*) iter->data;
+		//printf("%d %d %d %d\n",cw->client.x,cw->client.y,cw->client.width,cw->client.height);
+		//Vec2i vp=clientwin_pos(&cw->client);
+		//vec2i_print(vp);
+		//rect2i_print(&cwr);
+//		cw->x = cw->client.x-rect_all.min.x; cw->y=cw->client.y-rect_all.min.y;
+
+		cw->x = cw->client.x-rect_all.min.x;
+		cw->y = cw->client.y- rect_all.min.y;
+//		cw->x=rect_all.min.x; cw->y=0;
+	}
+	Vec2i size_all=rect2i_size(&rect_all);
+	printf("total bounds:-");
+	rect2i_print(&rect_all);
+	printf("\n");
+	vec2i_print(size_all);
+
+	*total_width=size_all.x; *total_height=size_all.y;
+	layout_dump(windows,total_width,total_height);
+
+
+}
+
+
+void
+layout_run_original(MainWin *mw, dlist *windows, unsigned int *total_width, unsigned int *total_height)
 {
 	mw->distance=8;
 	int sum_w = 0, max_h = 0, max_w = 0, max_row_w = 0;
@@ -103,6 +161,56 @@ layout_run(MainWin *mw, dlist *windows, unsigned int *total_width, unsigned int 
 		REDUCE(((ClientWin*)iter->data)->x += xoff, row);
 		dlist_free(row);
 	}
+
+	layout_dump(windows,total_width,total_height);
+
+	layout_run_scale_all(mw,windows,*total_width,*total_height);
 	
 	dlist_free(rows);
 }
+
+float layout_factor(const MainWin *mw,unsigned int width,unsigned int height, unsigned int extra_border) {
+	float factor = (float)(mw->width - extra_border) / width;
+	if(factor * height > mw->height - extra_border)
+		factor = (float)(mw->height - extra_border) / height;
+	return factor;
+}
+void layout_run_scale_all(MainWin *mw, dlist *windows, unsigned int total_width, unsigned int total_height)
+{
+	dlist* iter;
+	
+	float factor=layout_factor(mw,total_width,total_height, mw->distance);
+
+	int xoff = (mw->width - (float)total_width * factor) / 2;
+	int yoff = (mw->height - (float)total_height * factor) / 2;
+
+	int dx = (mw->width - (float)total_width * factor) / 2;
+	int dy = (mw->height - (float)total_height * factor) / 2;
+
+	for(iter = windows; iter; iter = iter->next)
+	{
+		ClientWin *cw = (ClientWin*)iter->data;
+
+		cw->factor=factor;
+
+		cw->mini.x = dx + (int)cw->x * factor;
+		cw->mini.y = dy + (int)cw->y * factor;
+
+		cw->mini.width = MAX(1, (int)cw->client.width * factor);
+		cw->mini.height = MAX(1, (int)cw->client.height * factor);
+		printf("%d %d %d %d\n",cw->mini.x,cw->mini.y, cw->mini.width,cw->mini.height);
+	}
+}
+
+
+void
+layout_run(MainWin *mw,LAYOUT_MODE mode, dlist *windows, unsigned int *total_width, unsigned int *total_height) 
+{
+	if (mode==LAYOUT_DESKTOP){ 
+		layout_run_desktop(mw,windows,total_width,total_height);
+	} else
+		layout_run_original(mw,windows,total_width,total_height);
+
+	layout_run_scale_all(mw, windows, *total_width, *total_height);
+}
+
