@@ -31,7 +31,7 @@ clientwin_cmp_func(dlist *l, void *data)
 {
 	return ((ClientWin*)l->data)->client.window == (Window)data;
 }
-
+//int g_all_desktops=1;
 int
 clientwin_validate_func(dlist *l, void *data) {
 	ClientWin *cw = (ClientWin *)l->data;
@@ -41,9 +41,9 @@ clientwin_validate_func(dlist *l, void *data) {
 		w_desktop = wm_get_window_desktop(mw->ps->dpy, cw->client.window);
 	
 #ifdef CFG_XINERAMA
-	if(mw->xin_active && ! INTERSECTS(cw->client.x, cw->client.y, cw->client.width, cw->client.height,
+	if(mw->xin_active && (!INTERSECTS(cw->client.x, cw->client.y, cw->client.width, cw->client.height,
 	                                           mw->xin_active->x_org, mw->xin_active->y_org,
-	                                           mw->xin_active->width, mw->xin_active->height))
+	                                           mw->xin_active->width, mw->xin_active->height)))
 		return 0;
 #endif
 	

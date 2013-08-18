@@ -114,6 +114,8 @@ update_clients(MainWin *mw, dlist *clients, Bool *touched)
 				*touched = True;
 		}
 	}
+
+	printf("update clients: %d active\n ", dlist_len(clients));
 	
 	dlist_free(stack);
 	
@@ -138,13 +140,13 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader)
 		dlist_free(mw->cod);
 	
 	tmp = dlist_first(dlist_find_all(clients, (dlist_match_func)clientwin_validate_func, &desktop));
+	printf("clients:%d,valid:%d\n",dlist_len(clients),dlist_len(tmp));
 	if(leader != None)
 	{
 		mw->cod = dlist_first(dlist_find_all(tmp, clientwin_check_group_leader_func, (void*)&leader));
 		dlist_free(tmp);
 	} else
 		mw->cod = tmp;
-	
 	if(! mw->cod)
 		return clients;
 	
@@ -530,6 +532,7 @@ void show_help()
 			"\t--activate-window-picker  - tells the daemon to show the window picker.\n"
 			"\t--help                    - show this message.\n"
 			"\t-S                        - Synchronize X operation (debugging).\n"
+			"\t-a                        - show windows from all desktops.\n"
 			, stdout);
 }
 
@@ -646,13 +649,17 @@ parse_args(session_t *ps, int argc, char **argv, bool first_pass) {
 		OPT_DM_START,
 		OPT_DM_STOP,
 	};
-	static const char * opts_short = "hS";
+	static const char * opts_short = "hSa";
 	static const struct option opts_long[] = {
-		{ "help",					no_argument,	NULL, 'h' },
-		{ "config",					required_argument, NULL, OPT_CONFIG },
-		{ "activate-window-picker", no_argument,	NULL, OPT_ACTV_PICKER },
-		{ "start-daemon",			no_argument,	NULL, OPT_DM_START },
-		{ "stop-daemon",			no_argument,	NULL, OPT_DM_STOP },
+		{ "help",					no_argument,	NULL, 'h'},
+		{ "config",					required_argument, NULL, OPT_CONFIG},
+		{ "activate-window-picker", no_argument,	NULL, OPT_ACTV_PICKER},
+		{ "start-daemon",			no_argument,	NULL, OPT_DM_START},
+		{ "stop-daemon",			no_argument,	NULL, OPT_DM_STOP},
+		{ "all desktops",			no_argument,	NULL, 'a'},
+//		{ "keep layout",			no_argument,	NULL, 'k' },
+//		{ "grid layout",			no_argument,	NULL, 'g' },
+//		{ "smart layout",			no_argument,	NULL, 's' },
 		{ NULL, no_argument, NULL, 0 }
 	};
 
@@ -666,6 +673,9 @@ parse_args(session_t *ps, int argc, char **argv, bool first_pass) {
 				case OPT_CONFIG:
 					ps->o.config_path = mstrdup(optarg);
 					break;
+//				case 'k':	ps->keep_layout=1; break;
+//				case 'g':	ps->grid_layout=1; break;
+//				case 's':	ps->smart_layout=1; break;
 				case '?':
 				case 'h':
 					show_help();
@@ -683,6 +693,7 @@ parse_args(session_t *ps, int argc, char **argv, bool first_pass) {
 			case OPT_CONFIG: break;
 #define T_CASEBOOL(idx, option) case idx: ps->o.option = true; break
 			T_CASEBOOL('S', synchronize);
+			T_CASEBOOL('a',	xinerama_showAll);
 			case OPT_ACTV_PICKER:
 				ps->o.mode = PROGMODE_ACTV_PICKER;
 				break;

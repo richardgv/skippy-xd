@@ -142,7 +142,7 @@ typedef struct {
 	.runAsDaemon = false, \
 	.synchronize = false, \
 \
-	.distance = 50, \
+	.distance = 8, \
 	.useNetWMFullscreen = true, \
 	.ignoreSkipTaskbar = false, \
 	.updateFreq = 10.0, \
@@ -153,9 +153,9 @@ typedef struct {
 	.xinerama_showAll = false, \
 	.normal_tint = NULL, \
 	.normal_tintOpacity = 0, \
-	.normal_opacity = 200, \
+	.normal_opacity = 248, \
 	.highlight_tint = NULL, \
-	.highlight_tintOpacity = 64, \
+	.highlight_tintOpacity = 32, \
 	.highlight_opacity = 255, \
 	.tooltip_show = true, \
 	.tooltip_followsMouse = true, \
@@ -444,6 +444,8 @@ ev_key_str(XKeyEvent *ev) {
 #include "tooltip.h"
 
 extern session_t *ps_g;
+
+#define logd //
 
 #define ACTIVATE_WINDOW_PICKER 1
 #define EXIT_RUNNING_DAEMON 2

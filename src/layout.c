@@ -22,6 +22,7 @@
 void
 layout_run(MainWin *mw, dlist *windows, unsigned int *total_width, unsigned int *total_height)
 {
+	mw->distance=8;
 	int sum_w = 0, max_h = 0, max_w = 0, max_row_w = 0;
 	int row_y = 0, y = 0, x = 0, row_h = 0;
 	
@@ -38,6 +39,7 @@ layout_run(MainWin *mw, dlist *windows, unsigned int *total_width, unsigned int 
 		sum_w += cw->client.width;
 		max_w = MAX(max_w, cw->client.width);
 		max_h = MAX(max_h, cw->client.height);
+		logd("win %d,%d %dx%d\n ",  cw->client.x,cw->client.y, cw->client.width, cw->client.height);
 	}
 	
 	for(iter = windows; iter; iter = iter->next)
