@@ -166,6 +166,9 @@ inline Rect2i cw_client_rect(const ClientWin* w)	{ return rect2i_mk_at(sw_pos(&w
 inline Rect2i cw_client_mini_rect(const ClientWin* w)	{ return rect2i_mk_at(sw_pos(&w->mini),sw_size(&w->mini));}
 inline Vec2i cw_client_pos(const ClientWin* w)	{ return sw_pos(&w->client);}
 inline Vec2i cw_client_size(const ClientWin* w)	{ return sw_size(&w->client);}
-inline Vec2i cw_set_xy(ClientWin* w, int x, int y) { w->x = x; w->y=y;}
-inline Vec2i cw_set_pos(ClientWin* w, Vec2i pos) { w->x = pos.x; w->y=pos.y;}
+inline int cw_client_width(const ClientWin* w)	{ return sw_size(&w->client).x;}
+inline int cw_client_height(const ClientWin* w)	{ return sw_size(&w->client).y;}
+inline Vec2i cw_set_tmp_xy(ClientWin* w, int x, int y) { w->x = x; w->y=y;}
+inline Vec2i cw_set_tmp_pos(ClientWin* w, Vec2i pos) { w->x = pos.x; w->y=pos.y;}
+inline Vec2i cw_tmp_pos(ClientWin* w) { return vec2i_mk(w->x,w->y);}
 #endif /* SKIPPY_CLIENT_H */

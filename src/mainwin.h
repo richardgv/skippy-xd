@@ -73,6 +73,8 @@ struct _MainWin
 #define mw_min(mw) ((mw)->rect.pos)
 #define mw_max(mw) (v2i_add((mw)->rect.pos,(mw)->rect.size))
 #define mw_rect(mw) (rect2i_mk_at(mw_pos(mw),mw_size(mw)))
+#define mw_width(mw) (mw_size(mw).x)
+#define mw_height(mw) (mw_size(mw).y)
 
 typedef struct _MainWin MainWin;
 

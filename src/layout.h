@@ -27,8 +27,8 @@ typedef enum LAYOUT_MODE {
 }
 LAYOUT_MODE;
 
-void layout_run(MainWin *, LAYOUT_MODE m, dlist *, unsigned int *, unsigned int *);
-float layout_factor(const MainWin*,unsigned int width,unsigned int height, unsigned int extra_border);
+void layout_run(MainWin *, LAYOUT_MODE m, dlist *, Vec2i* total_size);
+float layout_factor(const MainWin*,Vec2i size, unsigned int extra_border);
 
 
 #endif /* SKIPPY_LAYOUT_H */

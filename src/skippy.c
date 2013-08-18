@@ -163,19 +163,20 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader,float t)
 	
 	/* Move the mini windows around */
 	LAYOUT_MODE mode=get_layout_mode(ps);
-	layout_run(mw, mode, mw->cod, &width, &height);
+	Vec2i total_size;
+	layout_run(mw, mode, mw->cod, &total_size);
 	int extra_border=mw->distance;
 //	float factor=layout_factor(mw,width,height,mw->distance);
 	for(iter = mw->cod; iter; iter = iter->next)
 		clientwin_lerp_client_to_mini((ClientWin*)iter->data,t);
 
 
-	float factor = (float)(mw->width - extra_border) / width;
+	float factor = (float)(mw->width - extra_border) / total_size.x;
 	if(factor * height > mw->height - extra_border)
-		factor = (float)(mw->height - extra_border) / height;
+		factor = (float)(mw->height - extra_border) / total_size.y;
 	
-	xoff = (mw->width - (float)width * factor) / 2;
-	yoff = (mw->height - (float)height * factor) / 2;
+	xoff = (mw->width - (float)total_size.x * factor) / 2;
+	yoff = (mw->height - (float)total_size.y * factor) / 2;
 	mainwin_transform(mw, factor);
 	for(iter = mw->cod; iter; iter = iter->next)
 		clientwin_create_scaled_image((ClientWin*)iter->data /*, factor, xoff, yoff*/);
