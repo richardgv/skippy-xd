@@ -29,6 +29,11 @@ typedef struct Rect2i {
 	Vec2i min,max;
 } Rect2i;
 
+typedef struct PosSize {
+	Vec2i pos,size;
+} PosSize;
+
+
 inline int invlerpi(int lo,int hi,int v,int one) { return ((v-lo)*one)/(hi-lo);}
 inline int lerpi(int lo,int hi,int f,int one) { return lo+(((hi-lo)*f)/one);}
 inline void v2i_set(Vec2i* dst, int x, int y) { dst->x=x;dst->y=y;}
@@ -59,6 +64,9 @@ inline bool rect2i_valid(const Rect2i* a) { return a->max.x>=a->min.x && a->max.
 inline void vec2i_print(const Vec2i v) { printf("(%d %d)", v.x,v.y);}
 inline void rect2i_print(const Rect2i* a) { printf("("); vec2i_print(a->min); printf(" "); vec2i_print(a->max); printf(")");}
 inline Vec2i rect2i_centre(const Rect2i* r) { return v2i_lerp(r->min,r->max,1,2);}
+inline PosSize pos_size_mk(const Vec2i pos, const Vec2i size) { PosSize psz;psz.pos=pos; psz.size=size; return psz;}
+inline PosSize pos_size_from_rect(const Rect2i* r) { PosSize psz;psz.pos=r->min; psz.size=rect2i_size(r); return psz;}
+inline Rect2i rect2i_from_pos_size(const PosSize* psz) { rect2i_mk_at(psz->pos, psz->size);}
 typedef struct {
 	Window window;
 	int x, y;
@@ -119,13 +127,16 @@ void
 clientwin_lerp_client_to_mini(ClientWin* cw,float t);
 
 // accessors, less needed if code is refactored to use vec2i etc.
-inline Vec2i skippywindow_pos(const SkippyWindow* w)	{ return vec2i_mk(w->x,w->y); }
-inline Vec2i skippywindow_size(const SkippyWindow* w)	{ return vec2i_mk(w->width,w->height); }
-inline Rect2i skippywindow_rect(const SkippyWindow* w)	{ return rect2i_mk_at(skippywindow_pos(w),skippywindow_size(w));}
-inline void skippywindow_set_pos(SkippyWindow* sw, const Vec2i p) { sw->x=p.x; sw->y=p.y; }
-inline void skippywindow_set_rect(SkippyWindow* sw, const Rect2i* r) { skippywindow_set_pos(sw,r->min); sw->width=r->max.x-r->min.x; sw->height=r->max.y-r->min.y;}
-inline Rect2i clientwin_rect(const ClientWin* w)	{ return rect2i_mk_at(skippywindow_pos(&w->client),skippywindow_size(&w->client));}
-inline Rect2i clientwin_mini_rect(const ClientWin* w)	{ return rect2i_mk_at(skippywindow_pos(&w->mini),skippywindow_size(&w->mini));}
-inline Vec2i clientwin_pos(const ClientWin* w)	{ return skippywindow_pos(&w->client);}
-inline Vec2i clientwin_size(const ClientWin* w)	{ return skippywindow_size(&w->client);}
+inline Vec2i sw_pos(const SkippyWindow* w)	{ return vec2i_mk(w->x,w->y); }
+inline Vec2i sw_size(const SkippyWindow* w)	{ return vec2i_mk(w->width,w->height); }
+inline Rect2i sw_rect(const SkippyWindow* w)	{ return rect2i_mk_at(sw_pos(w),sw_size(w));}
+inline PosSize sw_pos_size(const SkippyWindow* w)	{ return pos_size_mk(sw_pos(w),sw_size(w));}
+inline void sw_set_pos(SkippyWindow* sw, const Vec2i p) { sw->x=p.x; sw->y=p.y; }
+inline void sw_set_size(SkippyWindow* sw, const Vec2i sz) { sw->width=sz.x; sw->height=sz.y; }
+inline void sw_set_rect(SkippyWindow* sw, const Rect2i* r) { sw_set_pos(sw,r->min); sw->width=r->max.x-r->min.x; sw->height=r->max.y-r->min.y;}
+inline void sw_set_pos_size(SkippyWindow* sw, const Vec2i p,const Vec2i sz) { sw_set_pos(sw,p); sw_set_size(sw,sz);}
+inline Rect2i clientwin_rect(const ClientWin* w)	{ return rect2i_mk_at(sw_pos(&w->client),sw_size(&w->client));}
+inline Rect2i clientwin_mini_rect(const ClientWin* w)	{ return rect2i_mk_at(sw_pos(&w->mini),sw_size(&w->mini));}
+inline Vec2i clientwin_pos(const ClientWin* w)	{ return sw_pos(&w->client);}
+inline Vec2i clientwin_size(const ClientWin* w)	{ return sw_size(&w->client);}
 #endif /* SKIPPY_CLIENT_H */

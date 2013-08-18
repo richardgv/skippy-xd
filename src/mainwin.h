@@ -39,7 +39,9 @@ struct _MainWin
 	Picture background;
 	Pixmap bg_pixmap;
 	int x, y;
-	unsigned int width, height, distance;
+	unsigned int width, height;
+	//PosSize	rect;
+	unsigned int distance;
 	XRenderPictFormat *format;
 	XTransform transform;
 	
@@ -60,6 +62,18 @@ struct _MainWin
 	XineramaScreenInfo *xin_info, *xin_active;
 #endif /* CFG_XINERAMA */
 };
+#ifdef MW_POS_SIZE
+#define mw_pos(mw) ((mw)->rect.pos)
+#define mw_size(mw) ((mw)->rect.max)
+#define mw_max(mw) (vec2i_add(mw_pos(mw),mw_size(mw)))
+#else
+#define mw_pos(mw) (vec2i_mk((mw)->x,(mw)->y))
+#define mw_size(mw) (vec2i_mk((mw)->width,(mw)->height))
+#endif
+#define mw_min(mw) ((mw)->rect.pos)
+#define mw_max(mw) (v2i_add((mw)->rect.pos,(mw)->rect.size))
+#define mw_rect(mw) (rect2i_mk_at(mw_pos(mw),mw_size(mw)))
+
 typedef struct _MainWin MainWin;
 
 MainWin *mainwin_create(session_t *ps);

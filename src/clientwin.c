@@ -308,14 +308,14 @@ clientwin_create_scaled_image(ClientWin *cw)
 
 void 
 clientwin_lerp_client_to_mini(ClientWin* cw,float t){
-	Rect2i dst_rc=skippywindow_rect(&cw->mini);
-	Rect2i src_rc=skippywindow_rect(&cw->client);
+	Rect2i dst_rc=sw_rect(&cw->mini);
+	Rect2i src_rc=sw_rect(&cw->client);
 	int	denom=1<<12;
 	int ti=(int)(t*(float)denom);
 	Rect2i rc;
 	rc.min=v2i_lerp(src_rc.min,dst_rc.min, ti, denom);
 	rc.max=v2i_lerp(src_rc.max,dst_rc.max, ti, denom);
-	skippywindow_set_rect(&cw->mini,&rc);
+	sw_set_rect(&cw->mini,&rc);
 
 }
 
