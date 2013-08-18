@@ -162,8 +162,10 @@ inline PosSize sw_pos_size(const SkippyWindow* sw)	{ return pos_size_mk(sw_pos(s
 inline void sw_set_pos_size(SkippyWindow* sw, const Vec2i p,const Vec2i sz) { sw_set_pos(sw,p); sw_set_size(sw,sz);}
 
 
-inline Rect2i clientwin_rect(const ClientWin* w)	{ return rect2i_mk_at(sw_pos(&w->client),sw_size(&w->client));}
-inline Rect2i clientwin_mini_rect(const ClientWin* w)	{ return rect2i_mk_at(sw_pos(&w->mini),sw_size(&w->mini));}
-inline Vec2i clientwin_pos(const ClientWin* w)	{ return sw_pos(&w->client);}
-inline Vec2i clientwin_size(const ClientWin* w)	{ return sw_size(&w->client);}
+inline Rect2i cw_client_rect(const ClientWin* w)	{ return rect2i_mk_at(sw_pos(&w->client),sw_size(&w->client));}
+inline Rect2i cw_client_mini_rect(const ClientWin* w)	{ return rect2i_mk_at(sw_pos(&w->mini),sw_size(&w->mini));}
+inline Vec2i cw_client_pos(const ClientWin* w)	{ return sw_pos(&w->client);}
+inline Vec2i cw_client_size(const ClientWin* w)	{ return sw_size(&w->client);}
+inline Vec2i cw_set_xy(ClientWin* w, int x, int y) { w->x = x; w->y=y;}
+inline Vec2i cw_set_pos(ClientWin* w, Vec2i pos) { w->x = pos.x; w->y=pos.y;}
 #endif /* SKIPPY_CLIENT_H */

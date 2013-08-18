@@ -55,8 +55,10 @@ layout_run_desktop(MainWin *mw, dlist *windows, unsigned int *total_width, unsig
 	for (iter=windows; iter; iter=iter->next) {
 		ClientWin* cw=(ClientWin*) iter->data;
 
-		cw->x = cw->client.x-rect_all.min.x;
-		cw->y = cw->client.y- rect_all.min.y;
+		Vec2i ofs = vec2i_sub(sw_pos(&cw->client), rect_all.min));
+		cw_set_xy(ofs);
+//		cw->x = cw->client.x-rect_all.min.x;
+//		cw->y = cw->client.y- rect_all.min.y;
 	}
 	Vec2i size_all=rect2i_size(&rect_all);
 
