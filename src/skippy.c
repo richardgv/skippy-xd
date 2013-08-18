@@ -121,6 +121,16 @@ update_clients(MainWin *mw, dlist *clients, Bool *touched)
 	
 	return clients;
 }
+static LAYOUT_MODE
+get_layout_mode(const ps = mw->ps) {
+	session_t * const ps = mw->ps;
+	if (ps->layout_grid) { 
+		return LAYOUT_DESKTOP;
+	}
+	else {
+		return LAYOUT_ORIGINAL;
+	}
+}
 
 static dlist *
 do_layout(MainWin *mw, dlist *clients, Window focus, Window leader)
@@ -152,7 +162,8 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader)
 	dlist_sort(mw->cod, clientwin_sort_func, 0);
 	
 	/* Move the mini windows around */
-	layout_run(mw, LAYOUT_DESKTOP, mw->cod, &width, &height);
+	LAYOUT_MODE mode=get_layout_mode(ps);
+	layout_run(mw, mode, mw->cod, &width, &height);
 	int extra_border=mw->distance;
 //	float factor=layout_factor(mw,width,height,mw->distance);
 	float factor = (float)(mw->width - extra_border) / width;
@@ -650,7 +661,7 @@ parse_args(session_t *ps, int argc, char **argv, bool first_pass) {
 		OPT_DM_START,
 		OPT_DM_STOP,
 	};
-	static const char * opts_short = "hSa";
+	static const char * opts_short = "hSagds";
 	static const struct option opts_long[] = {
 		{ "help",					no_argument,	NULL, 'h'},
 		{ "config",					required_argument, NULL, OPT_CONFIG},
@@ -674,9 +685,6 @@ parse_args(session_t *ps, int argc, char **argv, bool first_pass) {
 				case OPT_CONFIG:
 					ps->o.config_path = mstrdup(optarg);
 					break;
-//				case 'k':	ps->keep_layout=1; break;
-//				case 'g':	ps->grid_layout=1; break;
-//				case 's':	ps->smart_layout=1; break;
 				case '?':
 				case 'h':
 					show_help();
@@ -695,6 +703,9 @@ parse_args(session_t *ps, int argc, char **argv, bool first_pass) {
 #define T_CASEBOOL(idx, option) case idx: ps->o.option = true; break
 			T_CASEBOOL('S', synchronize);
 			T_CASEBOOL('a',	xinerama_showAll);
+			T_CASEBOOL('d',	layout_desktop);
+			T_CASEBOOL('s',	layout_smart);
+			T_CASEBOOL('g',	layout_grid);
 			case OPT_ACTV_PICKER:
 				ps->o.mode = PROGMODE_ACTV_PICKER;
 				break;

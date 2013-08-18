@@ -112,6 +112,9 @@ typedef struct {
 	bool movePointerOnStart;
 
 	bool xinerama_showAll;
+	bool layout_desktop;
+	bool layout_grid;
+	bool layout_smart;
 
 	char *normal_tint;
 	int normal_tintOpacity;
