@@ -316,7 +316,6 @@ clientwin_lerp_client_to_mini(ClientWin* cw,float t){
 	rc.min=v2i_lerp(src_rc.min,dst_rc.min, ti, denom);
 	rc.max=v2i_lerp(src_rc.max,dst_rc.max, ti, denom);
 	sw_set_rect(&cw->mini,&rc);
-
 }
 
 void
@@ -363,7 +362,7 @@ clientwin_unmap(ClientWin *cw)
 static void
 childwin_focus(ClientWin *cw)
 {
-	XWarpPointer(cw->mainwin->ps->dpy, None, cw->client.window, 0, 0, 0, 0, cw->client.width / 2, cw->client.height / 2);
+	XWarpPointer(cw->mainwin->ps->dpy, None, cw->client.window, 0, 0, 0, 0, sw_width(cw) / 2, sw_height(cw) / 2);
 	XRaiseWindow(cw->mainwin->ps->dpy, cw->client.window);
 	XSetInputFocus(cw->mainwin->ps->dpy, cw->client.window, RevertToParent, CurrentTime);
 }
