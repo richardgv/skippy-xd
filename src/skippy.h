@@ -438,6 +438,7 @@ ev_key_str(XKeyEvent *ev) {
 	printfef("(): KeyRelease %u (%s) not binded to anything.", \
 			(ev)->xkey.keycode, ev_key_str(&(ev)->xkey))
 
+#include "vecmath2d.h"
 #include "wm.h"
 #include "clientwin.h"
 #include "mainwin.h"

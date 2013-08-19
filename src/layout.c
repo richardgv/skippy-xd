@@ -318,6 +318,8 @@ void layout_run_scale_all(const MainWin *mw, dlist *windows, Vec2i total_size)
 	}
 }
 
+// TODO - layout which biases desktop sizes according to recent use.
+// or grid mode including desktops placed as individual windows similar to gnomeshell
 
 void
 layout_run(MainWin *mw,LAYOUT_MODE mode, dlist *windows, Vec2i* total_size) 
