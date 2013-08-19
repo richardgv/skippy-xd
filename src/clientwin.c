@@ -200,11 +200,12 @@ static void
 clientwin_repaint(ClientWin *cw, XRectangle *rect)
 {
 	XRenderColor *tint = cw->focused ? &cw->mainwin->highlightTint : &cw->mainwin->normalTint;
-	int s_x = (double)rect->x * cw->factor,
+/*	int s_x = (double)rect->x * cw->factor,
 	    s_y = (double)rect->y * cw->factor,
 	    s_w = (double)rect->width * cw->factor,
 	    s_h = (double)rect->height * cw->factor;
-	
+*/
+	int s_x=0,s_y=0, s_w=cw->mini.width, s_h=cw->mini.height;
 	if(cw->mainwin->ps->o.lazyTrans)
 	{
 		XRenderComposite(cw->mainwin->ps->dpy, PictOpSrc, cw->origin,
@@ -214,6 +215,7 @@ clientwin_repaint(ClientWin *cw, XRectangle *rect)
 	else
 	{
 		XRenderComposite(cw->mainwin->ps->dpy, PictOpSrc, cw->mainwin->background, None, cw->destination, cw->mini.x + s_x, cw->mini.y + s_y, 0, 0, s_x, s_y, s_w, s_h);
+
 		XRenderComposite(cw->mainwin->ps->dpy, PictOpOver, cw->origin,
 		                 cw->focused ? cw->mainwin->highlightPicture : cw->mainwin->normalPicture,
 		                 cw->destination, s_x, s_y, 0, 0, s_x, s_y, s_w, s_h);
@@ -230,8 +232,8 @@ clientwin_render(ClientWin *cw)
 {
 	XRectangle rect;
 	rect.x = rect.y = 0;
-	rect.width = cw->client.width;
-	rect.height = cw->client.height;
+	rect.width = cw->mini.width;
+	rect.height = cw->mini.height;
 	clientwin_repaint(cw, &rect);
 }
 
@@ -264,8 +266,8 @@ clientwin_schedule_repair(ClientWin *cw, XRectangle *area)
 
 // This functionality moved into layout -"layout_run_scale_all".
 void clientwin_move_sub(ClientWin* cw, int dx,int dy,float f) {
-
-	cw->factor = f;
+	printf("OBSELETE\n");
+//	cw->factor = f;
 	cw->mini.x = dx + (int)cw->x * f;
 	cw->mini.y = dy + (int)cw->y * f;
 	if(cw->mainwin->ps->o.lazyTrans)
@@ -298,7 +300,7 @@ clientwin_create_scaled_image(ClientWin *cw)
 	
 	if(cw->destination)
 		XRenderFreePicture(cw->mainwin->ps->dpy, cw->destination);
-	
+	printf("create image %d %d %d %d\n",cw->mini.x,cw->mini.y, cw->mini.width,cw->mini.height);
 	cw->pixmap = XCreatePixmap(cw->mainwin->ps->dpy, cw->mini.window, cw->mini.width, cw->mini.height, cw->mainwin->depth);
 	XSetWindowBackgroundPixmap(cw->mainwin->ps->dpy, cw->mini.window, cw->pixmap);
 	
@@ -324,7 +326,23 @@ clientwin_map(ClientWin *cw) {
 	free_damage(ps, &cw->damage);
 	
 	cw->damage = XDamageCreate(ps->dpy, cw->client.window, XDamageReportDeltaRectangles);
-	XRenderSetPictureTransform(ps->dpy, cw->origin, &cw->mainwin->transform);
+	
+// calculate transform for scaling..
+	XTransform transform;
+
+	transform.matrix[0][0] = XDoubleToFixed((float)cw->client.width/(float)cw->mini.width);
+	transform.matrix[0][1] = 0.0;
+	transform.matrix[0][2] = 0.0;
+	transform.matrix[1][0] = 0.0;
+	transform.matrix[1][1] = XDoubleToFixed((float)cw->client.height/(float)cw->mini.height);
+	transform.matrix[1][2] = 0.0;
+	transform.matrix[2][0] = 0.0;
+	transform.matrix[2][1] = 0.0;
+	transform.matrix[2][2] = XDoubleToFixed(1.0);
+
+	XRenderSetPictureTransform(ps->dpy, cw->origin, &transform);
+
+//	XRenderSetPictureTransform(ps->dpy, cw->origin, &cw->mainwin->transform);
 	
 	clientwin_render(cw);
 	
@@ -366,7 +384,7 @@ childwin_focus(ClientWin *cw)
 	XRaiseWindow(cw->mainwin->ps->dpy, cw->client.window);
 	XSetInputFocus(cw->mainwin->ps->dpy, cw->client.window, RevertToParent, CurrentTime);
 }
-
+extern int g_redo_layout;
 int
 clientwin_handle(ClientWin *cw, XEvent *ev) {
 	session_t *ps = cw->mainwin->ps;
@@ -403,6 +421,14 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 					|| ev->xkey.keycode == cw->mainwin->key_space) {
 				childwin_focus(cw);
 				return 1;
+			} else if (ev->xkey.keycode == cw->mainwin->key_page_up) {
+				ps->o.layout_grid^=true;
+				if (!(ps->o.layout_grid)) { ps->o.xinerama_showAll^=true;}
+				g_redo_layout=1;
+			} else if (ev->xkey.keycode == cw->mainwin->key_page_up) {
+				ps->o.layout_grid=true;
+				ps->o.xinerama_showAll=false;
+				g_redo_layout=1;
 			}
 			else
 				report_key_unbinded(ev);

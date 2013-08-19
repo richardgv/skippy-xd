@@ -41,6 +41,7 @@ inline Vec2i vec2i_mk(int x, int y) { Vec2i v; v.x=x; v.y=y; return v;}
 inline Vec2i v2i_sub(Vec2i a,Vec2i b) { Vec2i ret= {a.x-b.x,a.y-b.y};return ret; }
 inline Vec2i v2i_add(Vec2i a,Vec2i b) { Vec2i ret= {a.x+b.x,a.y+b.y};return ret; }
 inline Vec2i v2i_mul(Vec2i a,int f,int prec) { Vec2i ret= {(a.x*f)/prec,(a.y*f)/prec};return ret; }
+inline Vec2i v2i_avr(Vec2i a,Vec2i b) { Vec2i ret=v2i_mul(v2i_add(a,b),1,2); return ret;}
 inline Vec2i v2i_mad(Vec2i a,Vec2i b,int f,int prec) { return v2i_add(a, v2i_mul(b,f,prec)); }
 inline Vec2i v2i_lerp(Vec2i a,Vec2i b,int f,int prec) { return v2i_add(a, v2i_mul(v2i_sub(b,a),f,prec)); }
 inline Vec2i v2i_invlerp(const Vec2i vmin,const Vec2i vmax, Vec2i v,int precision ) { Vec2i ret={invlerpi(vmin.x, vmax.x, v.x,precision), invlerpi(vmin.y, vmax.y, v.y,precision)}; return ret; }
@@ -63,7 +64,7 @@ inline int rect2i_overlap( const Rect2i* a,const Rect2i* b) { Rect2i ri=rect2i_i
 inline bool rect2i_valid(const Rect2i* a) { return a->max.x>=a->min.x && a->max.y >= a->min.y; }
 inline void vec2i_print(const Vec2i v) { printf("(%d %d)", v.x,v.y);}
 inline void rect2i_print(const Rect2i* a) { printf("("); vec2i_print(a->min); printf(" "); vec2i_print(a->max); printf(")");}
-inline Vec2i rect2i_centre(const Rect2i* r) { return v2i_lerp(r->min,r->max,1,2);}
+inline Vec2i rect2i_centre(const Rect2i* r) { return v2i_avr(r->min,r->max);}
 inline PosSize pos_size_mk(const Vec2i pos, const Vec2i size) { PosSize psz;psz.pos=pos; psz.size=size; return psz;}
 inline PosSize pos_size_from_rect(const Rect2i* r) { PosSize psz;psz.pos=r->min; psz.size=rect2i_size(r); return psz;}
 inline Rect2i rect2i_from_pos_size(const PosSize* psz) { rect2i_mk_at(psz->pos, psz->size);}
@@ -94,7 +95,6 @@ typedef struct {
 	Pixmap pixmap;
 	Picture origin, destination;
 	Damage damage;
-	float factor;
 	
 	int focused;
 	
@@ -171,4 +171,7 @@ inline int cw_client_height(const ClientWin* w)	{ return sw_size(&w->client).y;}
 inline Vec2i cw_set_tmp_xy(ClientWin* w, int x, int y) { w->x = x; w->y=y;}
 inline Vec2i cw_set_tmp_pos(ClientWin* w, Vec2i pos) { w->x = pos.x; w->y=pos.y;}
 inline Vec2i cw_tmp_pos(ClientWin* w) { return vec2i_mk(w->x,w->y);}
+inline float cw_client_aspect(const ClientWin* w) { Vec2i delta=sw_size(&w->client); return MAX(1,delta.x)/(float)MAX(1,delta.y);}
+inline void cw_set_mini_size( ClientWin* w,Vec2i sz)	{  sw_set_size(&w->mini,sz);}
+
 #endif /* SKIPPY_CLIENT_H */

@@ -124,10 +124,14 @@ update_clients(MainWin *mw, dlist *clients, Bool *touched)
 
 static LAYOUT_MODE
 get_layout_mode(const session_t* ps) {
+	// TODO: some of these modes will be combined flags.
 	if (ps->o.layout_desktop) { 
 		return LAYOUT_DESKTOP;
 	}
-	else {
+	else if (ps->o.layout_grid) {
+		return LAYOUT_GRID;
+
+	} else {
 		return LAYOUT_ORIGINAL;
 	}
 }
@@ -304,6 +308,7 @@ ev_dump(session_t *ps, const MainWin *mw, const XEvent *ev) {
 	printfd("Event %-13.13s wid %#010lx %s", name, wid, wextra);
 }
 
+int	g_redo_layout=0;	// todo, poast message back?!
 static dlist *
 skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xin)
 {
@@ -327,8 +332,8 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xi
 		XFlush(ps->dpy);
 	}
 	
-	float anim_t=1.f;	// disabled. to enable, set to 0.0
-	float anim_dt=0.05f;
+	float anim_t=0.f;	// disabled. to enable, set to 0.0
+	float anim_time=0.2f;	// slow for debug
 	clients = do_layout(mw, clients, focus, leader,anim_t);
 	if (!mw->cod) {
 		printfef("(): No client windows found.");
@@ -361,14 +366,19 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xi
 		{
 
 			REDUCE(if( ((ClientWin*)iter->data)->damaged ) clientwin_repair(iter->data), mw->cod);
-			last_rendered = now;
+			//last_rendered = now;
 		}
 
+		if (g_redo_layout) { g_redo_layout=0; anim_t=0.f;}
 		i = XPending(ps->dpy);
-		if (!i && anim_t<1.0f) {
-			anim_t=MIN(1.0f,(anim_t+anim_dt));
+		if (!i && ((anim_t<1.0f) || (last_rendered<now))) {
+			bool move=(anim_t<1.0);
+			anim_t=MIN(1.0f,(anim_t+((now-last_rendered)/(1000*anim_time))));
 			mw_animate(mw);
-			do_layout(mw,clients,focus,leader,anim_t);
+			if (move) {
+				do_layout(mw,clients,focus,leader,anim_t);
+			}
+			last_rendered = now;
 		}
 		for (int j = 0; j < i && !die; ++j) {
 			XNextEvent(ps->dpy, &ev);
