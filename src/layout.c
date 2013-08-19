@@ -255,7 +255,7 @@ void layout_grid(int separation, Vec2i size, dlist* windows) {
 	float av_aspect = sum_aspect/(float) num;
 
 	//printf("rowum=%.3f %.3f %.3f\n",(num*win_aspect)/av_aspect, av_aspect,win_aspect);
-	int num_rows = MAX(1,sqrt((num*win_aspect)/ av_aspect  ));
+	int num_rows = MAX(1,sqrt((num/win_aspect)* av_aspect  ));
 	int num_cols = (num+(num_rows-1))/num_rows;// todo: per row, for last one..
 	
 
