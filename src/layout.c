@@ -188,14 +188,64 @@ layout_original(int separation, dlist *windows, Vec2i* total_size)
 
 // simple grid layout
 
+void sort_objects_by_fn(void** pp,int count, int(*f_sort_val)(void*)) {
+	// yikes, do we have ptr-to-member in C? would take templates to write safe/generic
+	int	i,ii=count-1;
+	for (ii=count-1; ii>0;ii--) {
+		bool	ok=true;
+		for (i=0; i<ii; i++) {
+			void* p0=pp[i];
+			void* p1=pp[i+1];
+			int	v0=f_sort_val(p0);
+			int	v1=f_sort_val(p1);
+			if (v0<v1)
+				continue;
+			pp[i+1]=p0; pp[i]=p1;
+			ok=false;
+		}
+		if (ok) 
+			break;		
+	}
+}
+int	cw_centre_x(void* p) {
+	return cw_client_centre((ClientWin*)p).x;
+}
+int	cw_centre_y(void* p) {
+	return cw_client_centre((ClientWin*)p).y;
+}
+int	cw_neg_centre_y(void* p) {
+	return -cw_client_centre((ClientWin*)p).y;
+}
+
+void dump_row_col_xy(ClientWin** wins,int num,int num_cols,int num_rows) {
+	//printf("col %d :%d %d sort..\n",j, col_i_start,col_i_end);
+	for (int j=0; j<num_rows; j++) {
+		for (int i=0; i<num_cols; i++) {
+			int	ii=j*num_cols+i;
+			if (ii>num) continue;
+			printf("win(%d/%d)/(i,j=%d,%d)\tx=y=\t%d\t%d\n",ii,num,i,j, wins[ii]->client.x,wins[ii]->client.y);
+		}
+	}
+}
+
 
 void layout_grid(int separation, Vec2i size, dlist* windows) {
 	int num= dlist_len(windows);
 	if (!num) return;
 	int denom=1<<12;
+	// duplicate the pointer array-for sorting
+	// sort by x TODO - pick major sort axis based on outer aspect ratio
+	ClientWin** wins = (ClientWin*) malloc(sizeof(ClientWin)*num);
+	int	i=0;
+	DLIST_FOREACH(ClientWin, cw,/*IN*/ windows ) 
+		wins[i++]=cw;
+	DLIST_NEXT
+//	sort_objects_by_fn((void**)wins,num,cw_centre_x);
+
 	// get min,max aspect ratios. if the windows are all landscape or portrait it changes numx/numy
 	float min_aspect=100000.0f,max_aspect=0.f;
 	float sum_aspect=0.f;
+	
 	DLIST_FOREACH(ClientWin, cw,/*IN*/ windows )
 		float aspect=cw_client_aspect(cw);
 		min_aspect=MIN(min_aspect,aspect); max_aspect=MAX(max_aspect,aspect);	
@@ -204,17 +254,33 @@ void layout_grid(int separation, Vec2i size, dlist* windows) {
 	float win_aspect=(float)size.x/(float)size.y;
 	float av_aspect = sum_aspect/(float) num;
 
-	printf("rowum=%.3f %.3f %.3f\n",(num*win_aspect)/av_aspect, av_aspect,win_aspect);
+	//printf("rowum=%.3f %.3f %.3f\n",(num*win_aspect)/av_aspect, av_aspect,win_aspect);
 	int num_rows = MAX(1,sqrt((num*win_aspect)/ av_aspect  ));
 	int num_cols = (num+(num_rows-1))/num_rows;// todo: per row, for last one..
 	
 
-	printf("%.3f num=%d rows=%d cols=%d \n",av_aspect, num,num_rows,num_cols);
+	//printf("%.3f num=%d rows=%d cols=%d \n",av_aspect, num,num_rows,num_cols);
+
 	
-	// todo: placement for minimum movement.
+
+	// TODO Sort horizontally. 	
+	// todo: pick major axis. widescreen monitor, its usually horiz, but we might be placing in subwindows.
+
+	sort_objects_by_fn((void**)wins,num,cw_centre_x);
+	// within each column, sort by Y
 	int	row=0,col=0;
 	Vec2i pos=vec2i_mk(0,0);
-	DLIST_FOREACH(ClientWin, cw, windows )
+	int	j=0;
+	for (j=0; j<num_cols; j++) {
+		int col_i_start=j*num_rows;
+		int col_i_end=MIN(num,col_i_start+num_rows);
+		sort_objects_by_fn((void**)(wins+col_i_start), col_i_end-col_i_start, cw_centre_y);
+		int	ii;		
+	}
+	
+//	DLIST_FOREACH(ClientWin, cw, windows )
+	for (i=0; i<num; i++) {
+		ClientWin* cw=wins[i];
 		// create grid cell to hold the window
 		Rect2i cell=rect2i_mk(
 			vec2i_mk((col*size.x)/num_cols,(row*size.y)/num_rows),
@@ -225,7 +291,7 @@ void layout_grid(int separation, Vec2i size, dlist* windows) {
 		float client_aspect=cw_client_aspect(cw);
 		float cell_aspect=cell_size.x/(float)cell_size.y;
 		Vec2i mini_size=v2i_sub(cell_size,vec2i_mk(separation,separation));
-		printf("%.3f\n",client_aspect);
+		//printf("%.3f\n",client_aspect);
 		float f=client_aspect/cell_aspect;
 		if (f>1.0) {
 			mini_size.y*=(1.0/f);
@@ -236,14 +302,16 @@ void layout_grid(int separation, Vec2i size, dlist* windows) {
 
 		cw_set_tmp_pos(cw, v2i_sub(rect2i_centre(&cell),v2i_half(mini_size)));
 		cw->mini.x=cw->x; cw->mini.y=cw->y;
-		col++; 
-		if (col>=num_cols) {
-			col=0; row++; 
+		row++; 
+		if (row>=num_rows) {
+			row=0; col++; 
 		}
 		// todo: size per row.
-	DLIST_NEXT
+	}
 
-	layout_dump(windows,size);
+	
+	//layout_dump(windows,size);
+	free(wins);
 }
 
 
