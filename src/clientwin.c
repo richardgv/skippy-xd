@@ -40,8 +40,9 @@ clientwin_validate_func(dlist *l, void *data) {
 	CARD32 desktop = (*(CARD32*)data),
 		w_desktop = wm_get_window_desktop(mw->ps->dpy, cw->client.window);
 	
+	// Todo: resolve how multi-desktops vs multi-monitor works.
 #ifdef CFG_XINERAMA
-	if(mw->xin_active && (!INTERSECTS(cw->client.x, cw->client.y, cw->client.width, cw->client.height,
+	if(!(mw->ps->o.xinerama_showAll) && mw->xin_active && (!INTERSECTS(cw->client.x, cw->client.y, cw->client.width, cw->client.height,
 	                                           mw->xin_active->x_org, mw->xin_active->y_org,
 	                                           mw->xin_active->width, mw->xin_active->height)))
 		return 0;
@@ -380,6 +381,8 @@ clientwin_unmap(ClientWin *cw)
 static void
 childwin_focus(ClientWin *cw)
 {
+	// how to handle it offscreen? need to map to screen coords, if its outside, do this warp in screen space
+//	if (!cw->mainwin->ps->o.xinerama_showAll)
 	XWarpPointer(cw->mainwin->ps->dpy, None, cw->client.window, 0, 0, 0, 0, sw_width(&cw->client) / 2, sw_height(&cw->client) / 2);
 	XRaiseWindow(cw->mainwin->ps->dpy, cw->client.window);
 	XSetInputFocus(cw->mainwin->ps->dpy, cw->client.window, RevertToParent, CurrentTime);
@@ -425,7 +428,7 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 				ps->o.layout_grid^=true;
 				if (!(ps->o.layout_grid)) { ps->o.xinerama_showAll^=true;}
 				g_redo_layout=1;
-			} else if (ev->xkey.keycode == cw->mainwin->key_page_up) {
+			} else if (ev->xkey.keycode == cw->mainwin->key_page_down) {
 				ps->o.layout_grid=true;
 				ps->o.xinerama_showAll=false;
 				g_redo_layout=1;
