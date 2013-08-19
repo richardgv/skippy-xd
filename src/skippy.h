@@ -259,7 +259,17 @@ allocchk_(void *ptr, const char *func_name) {
 		statement; \
 }
 
+#ifndef TYPEOF
+#ifdef __cplusplus
+	#define TYPEOF __decltype
+#else 
+	#define TYPEOF typeof
+#endif
+#endif
 #define LET(varname,expr) typeof(expr) varname = expr;
+#define MALLOCS(TYPE,COUNT) ((TYPE*)malloc(sizeof(TYPE)*COUNT))
+#define REALLOCS(ptr,COUNT) ((TYPEOF(ptr)realloc(ptr,sizeof(*ptr)*COUNT))
+#define FREE(PTR) {if (PTR) {free((void*)(PTR)); PTR=0;}}
 
 /**
  * @brief Get current time, in milliseconds.

@@ -288,8 +288,7 @@ mainwin_map(MainWin *mw) {
 	XRaiseWindow(ps->dpy, mw->window);
 
 	// Might because of WM reparent, XSetInput() doesn't work here
-	XSetInputFocus(ps->dpy, mw->window, RevertToParent, CurrentTime);
-	XGrabKeyboard(ps->dpy, mw->window, True, GrabModeAsync, GrabModeAsync,
+	XSetInputFocus(ps->dpy, mw->window, RevertToParent, CurrentTime);	XGrabKeyboard(ps->dpy, mw->window, True, GrabModeAsync, GrabModeAsync,
 			CurrentTime);
 }
 
