@@ -173,7 +173,7 @@ typedef struct {
 	.tooltip_text = NULL, \
 	.tooltip_textShadow = NULL, \
 	.tooltip_font = NULL, \
-	.animTime = 0.15f \
+	.animTime = 0.f \
 }
 
 /// @brief X information structure.
