@@ -91,4 +91,9 @@ void dlist_swap(dlist *, dlist *);
 typedef int (*dlist_cmp_func)(dlist *, dlist *, void *);
 void dlist_sort(dlist *, dlist_cmp_func, void *);
 
+/* Iteration helper macro */
+#define DLIST_FOREACH(TYPE,ITER_PTR,IN_LIST) for (dlist* iter=IN_LIST; iter;iter=iter->next){ TYPE* ITER_PTR=(TYPE*)(iter->data);
+#define DLIST_NEXT }
+
+
 #endif /* SKIPPY_DLIST_H */

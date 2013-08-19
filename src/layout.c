@@ -163,8 +163,6 @@ layout_run_original(int separation, dlist *windows, Vec2i* total_size)
 
 // simple grid layout
 
-#define DLIST_ITER_BEGIN(list, type, ptr) for (dlist* iter=list; iter;iter=iter->next){ type* ptr=(type*)(iter->data);
-#define DLIST_ITER_END }
 
 void layout_run_grid(int separation, Vec2i size, dlist* windows) {
 	int num= dlist_len(windows);
@@ -173,30 +171,26 @@ void layout_run_grid(int separation, Vec2i size, dlist* windows) {
 	// get min,max aspect ratios. if the windows are all landscape or portrait it changes numx/numy
 	float min_aspect=100000.0f,max_aspect=0.f;
 	float sum_aspect=0.f;
-	DLIST_ITER_BEGIN(windows, ClientWin, cw)
+	DLIST_FOREACH(ClientWin, cw,/*IN*/ windows )
 		float aspect=cw_client_aspect(cw);
 		min_aspect=MIN(min_aspect,aspect); max_aspect=MAX(max_aspect,aspect);	
 		sum_aspect+=aspect;
-	DLIST_ITER_END	
+	DLIST_NEXT
 	float win_aspect=(float)size.x/(float)size.y;
 	float av_aspect = sum_aspect/(float) num;
 
-//	int num_cols = MAX(1,sqrt(num *win_aspect/av_aspect  ));
-//	int num_rows = (num+(num_cols-1))/num_cols;// todo: per row, for last one..
 	printf("rowum=%.3f %.3f %.3f\n",(num*win_aspect)/av_aspect, av_aspect,win_aspect);
 	int num_rows = MAX(1,sqrt((num*win_aspect)/ av_aspect  ));
 	int num_cols = (num+(num_rows-1))/num_rows;// todo: per row, for last one..
 	
 
-// rows*cols = num
 	printf("%.3f num=%d rows=%d cols=%d \n",av_aspect, num,num_rows,num_cols);
 	
 	// todo: placement for minimum movement.
 	int	row=0,col=0;
 	Vec2i pos=vec2i_mk(0,0);
-	DLIST_ITER_BEGIN(windows, ClientWin, cw)
+	DLIST_FOREACH(ClientWin, cw, windows )
 		// create grid cell to hold the window
-//		Vec2i cell_min=vec2i_(size.x*denom/ num_cols, size.y*denom / num_rows);
 		Rect2i cell=rect2i_mk(
 			vec2i_mk((col*size.x)/num_cols,(row*size.y)/num_rows),
 			vec2i_mk(((col+1)*size.x)/num_cols,((row+1)*size.y)/num_rows));
@@ -205,23 +199,16 @@ void layout_run_grid(int separation, Vec2i size, dlist* windows) {
 			v2i_sub(cell.max,cell.min);
 		float client_aspect=cw_client_aspect(cw);
 		float cell_aspect=cell_size.x/(float)cell_size.y;
-		Vec2i mini_size;
+		Vec2i mini_size=v2i_sub(cell_size,vec2i_mk(separation,separation));
 		printf("%.3f\n",client_aspect);
 		float f=client_aspect/cell_aspect;
 		if (f>1.0) {
-			
-			mini_size.x=cell_size.x ;
-			mini_size.y=(cell_size.y/f);
+			mini_size.y*=(1.0/f);
 		} else {
-			mini_size.x=(cell_size.x*f);
-			mini_size.y=cell_size.y;
+			mini_size.x*=f;
 		}
-		//mini_size=v2i_sub(cell_size,vec2i_mk(separation,separation));
-		//mini_size=v2i_mul(mini_size,1,2);
 		cw_set_mini_size(cw,mini_size);
-//		cw->factor = 0.5f*mini_size.x/(float)cw_client_size(cw).x;
-		
-//		cw_set_tmp_pos(cw, v2i_sub(rect2i_centre(&cell), v2i_mul(mini_size,-1,2)));
+
 		cw_set_tmp_pos(cw, v2i_mad(rect2i_centre(&cell),mini_size,-1,2));
 		cw->mini.x=cw->x; cw->mini.y=cw->y;
 		col++; 
@@ -229,10 +216,75 @@ void layout_run_grid(int separation, Vec2i size, dlist* windows) {
 			col=0; row++; 
 		}
 		// todo: size per row.
-	DLIST_ITER_END
+	DLIST_NEXT
 
 	layout_dump(windows,size);
+}
 
+
+void fill_within_region(dlist* windows, const Rect2i* region,bool preserve_win_aspect) {
+	int denom=1<<12;
+	if (!rect2i_area(region,denom)) {
+		printf("divide by zero,can't do this");
+		return;
+	}
+	// find all the windows in a region (eg desktop?), expand their mini's to fill it
+	// [.1] Find the extents of everything within this rect
+	rect2i_print(region);
+	Rect2i	region_contents_rc=rect2i_init();
+	DLIST_FOREACH(ClientWin, cw, windows) 
+		if (!rect2i_contains(region, cw_mini_centre(cw)))
+			continue;
+		Rect2i mini_rect = cw_mini_rect(cw);
+		rect2i_include_rect2i(&region_contents_rc, &mini_rect);
+	DLIST_NEXT
+	printf("region contents rect=");
+	rect2i_print(&region_contents_rc);
+	// [.2] rescale those to fill the region, preserving individual aspect
+	// this will give a slight spread in whatever axis has the most unused space
+	// todo: calculate a transformation 
+	printf("lerpi test %d %d %d \n", 
+		lerpi(100, 200, 1024,denom),
+		invlerpi(100,200, 125,denom), 
+		lerpi(100,200,invlerpi(100,200,125,denom),denom));
+
+	if (!rect2i_area(&region_contents_rc,denom)) {
+		printf("divide by zero,can't do this");
+		return;
+	}
+
+	DLIST_FOREACH(ClientWin, cw, windows)
+		Rect2i mini_rect = cw_mini_rect(cw);
+		int aspect=rect2i_aspect(&mini_rect,denom);
+		//rect2i_print(&mini_rect);
+		Rect2i new_rect;
+		vec2i_print(rect2i_invlerp(&region_contents_rc, mini_rect.min,denom));
+		Rect2i rect_frac;
+		rect_frac.min=rect2i_invlerp(&region_contents_rc, mini_rect.min,denom);
+		rect_frac.max=rect2i_invlerp(&region_contents_rc, mini_rect.max,denom);
+		//printf("fractional subrect=");		rect2i_print(&rect_frac);
+		new_rect.min = rect2i_lerp(region, rect_frac.min,denom);
+		new_rect.max = rect2i_lerp(region, rect_frac.max,denom);
+		//rect2i_print(&new_rect);printf("\n");
+
+		Vec2i new_centre=rect2i_centre(&new_rect);
+		Vec2i half_size=v2i_sub(new_rect.max,new_centre);
+		// correct the aspect ratio..
+		if (aspect>denom) {
+			half_size.y=(half_size.x*denom)/aspect;
+		} else {
+			half_size.x=(half_size.y*aspect)/denom;
+		}
+		if (preserve_win_aspect){
+			new_rect=rect2i_mk_at_centre(new_centre,half_size);
+			int new_aspect=rect2i_aspect(&new_rect,denom);
+		//printf("aspect before/after=%d %d",aspect,new_aspect);
+		}
+//		new_rect.min=v2i_sub(new_centre,half_size);
+//		new_rect.max=v2i_add(new_centre,half_size);
+		
+		cw_set_mini_rect(cw, &new_rect);
+	DLIST_NEXT
 }
 
 float layout_factor(const MainWin *mw,Vec2i size, unsigned int extra_border) {
@@ -270,9 +322,11 @@ void layout_run_scale_all(const MainWin *mw, dlist *windows, Vec2i total_size)
 void
 layout_run(MainWin *mw,LAYOUT_MODE mode, dlist *windows, Vec2i* total_size) 
 {
+	Rect2i main_rect=rect2i_mk(vec2i_mk(0,0), mw_size(mw));
 	if (mode==LAYOUT_DESKTOP){ 
 		layout_run_desktop(mw,windows,total_size);
 		layout_run_scale_all(mw, windows, *total_size);
+		//fill_within_region(windows,  &main_rect,false);
 	} else if (mode==LAYOUT_GRID) {
 		layout_run_grid(mw->distance, mw_size(mw),windows);
 		*total_size=mw_size(mw);

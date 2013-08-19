@@ -45,12 +45,13 @@ inline Vec2i v2i_avr(Vec2i a,Vec2i b) { Vec2i ret=v2i_mul(v2i_add(a,b),1,2); ret
 inline Vec2i v2i_mad(Vec2i a,Vec2i b,int f,int prec) { return v2i_add(a, v2i_mul(b,f,prec)); }
 inline Vec2i v2i_lerp(Vec2i a,Vec2i b,int f,int prec) { return v2i_add(a, v2i_mul(v2i_sub(b,a),f,prec)); }
 inline Vec2i v2i_invlerp(const Vec2i vmin,const Vec2i vmax, Vec2i v,int precision ) { Vec2i ret={invlerpi(vmin.x, vmax.x, v.x,precision), invlerpi(vmin.y, vmax.y, v.y,precision)}; return ret; }
-inline Vec2i rect2i_lerp(const Rect2i* r, Vec2i v, int precision) { Vec2i ret={lerpi(r->min.x,r->max.x, v.x,precision),lerpi(r->min.y,r->max.y, v.y,precision)}; return ret;}
+inline Vec2i rect2i_lerp(const Rect2i* r, Vec2i v, int precision) { Vec2i ret; ret.x=lerpi(r->min.x,r->max.x, v.x,precision); ret.y=lerpi(r->min.y,r->max.y, v.y,precision); return ret;}
 inline Vec2i rect2i_invlerp(const Rect2i* r, Vec2i v, int precision) { return v2i_invlerp(r->min,r->max, v, precision);}
 inline Vec2i v2i_min(Vec2i a,Vec2i b) { Vec2i ret={MIN(a.x,b.x),MIN(a.y,b.y)}; return ret;}
 inline Vec2i v2i_max(Vec2i a,Vec2i b) { Vec2i ret={MAX(a.x,b.x),MAX(a.y,b.y)}; return ret;}
 inline Rect2i rect2i_init(void){ Rect2i ret={{INT_MAX,INT_MAX},{-INT_MAX,-INT_MAX}}; return ret;}
 inline Rect2i rect2i_mk_at(Vec2i pos, Vec2i size){ Rect2i ret; ret.min=pos; ret.max=v2i_add(pos,size);  return ret;}
+inline Rect2i rect2i_mk_at_centre(Vec2i centre, Vec2i half_size){ Rect2i ret; ret.min=v2i_sub(centre,half_size); ret.max=v2i_add(centre,half_size);  return ret;}
 inline Rect2i rect2i_mk(Vec2i a, Vec2i b){ Rect2i ret; ret.min=a; ret.max=b;  return ret;}
 inline void rect2i_set_init(Rect2i* ret){  v2i_set(&ret->min,INT_MAX,INT_MAX);v2i_set(&ret->max,-INT_MAX,-INT_MAX); }
 inline void rect2i_include(Rect2i* r,Vec2i v){ r->min=v2i_min(r->min,v); r->max=v2i_max(r->max,v); }
@@ -58,9 +59,10 @@ inline void rect2i_include_rect2i(Rect2i* r,const Rect2i* src){ r->min=v2i_min(r
 inline Vec2i rect2i_size(const Rect2i* r) { return v2i_sub(r->max,r->min);}
 inline int rect2i_aspect(const Rect2i* r,int precision) { Vec2i sz=rect2i_size(r); return (sz.x*precision)/sz.y;}
 inline Rect2i rect2i_add(const Rect2i* a, Vec2i ofs) { Rect2i ret={v2i_add(a->min,ofs),v2i_add(a->max,ofs)}; return ret;}
-inline int rect2i_area( const Rect2i* r) { Vec2i sz=rect2i_size(r); return (sz.x*sz.y);}
+inline int rect2i_area( const Rect2i* r,int denom) { Vec2i sz=rect2i_size(r); return (sz.x*sz.y/denom);}
 inline Rect2i rect2i_intersect( const Rect2i* a,const Rect2i* b ) { Rect2i r; r.min=v2i_max(a->min,b->min); r.max=v2i_min(a->max,b->max); return r;}
 inline int rect2i_overlap( const Rect2i* a,const Rect2i* b) { Rect2i ri=rect2i_intersect(a,b);Vec2i sz= rect2i_size(&ri);if (sz.x>0 && sz.y>0) return sz.x*sz.y; else return 0;}
+inline bool rect2i_contains( const Rect2i* rc, const Vec2i v){ return v.x>=rc->min.x && v.x<rc->max.x && v.y>=rc->min.y && v.y<rc->max.y; }
 inline bool rect2i_valid(const Rect2i* a) { return a->max.x>=a->min.x && a->max.y >= a->min.y; }
 inline void vec2i_print(const Vec2i v) { printf("(%d %d)", v.x,v.y);}
 inline void rect2i_print(const Rect2i* a) { printf("("); vec2i_print(a->min); printf(" "); vec2i_print(a->max); printf(")");}
@@ -168,10 +170,13 @@ inline Vec2i cw_client_pos(const ClientWin* w)	{ return sw_pos(&w->client);}
 inline Vec2i cw_client_size(const ClientWin* w)	{ return sw_size(&w->client);}
 inline int cw_client_width(const ClientWin* w)	{ return sw_size(&w->client).x;}
 inline int cw_client_height(const ClientWin* w)	{ return sw_size(&w->client).y;}
-inline Vec2i cw_set_tmp_xy(ClientWin* w, int x, int y) { w->x = x; w->y=y;}
-inline Vec2i cw_set_tmp_pos(ClientWin* w, Vec2i pos) { w->x = pos.x; w->y=pos.y;}
+inline void cw_set_tmp_xy(ClientWin* w, int x, int y) { w->x = x; w->y=y;}
+inline void cw_set_tmp_pos(ClientWin* w, Vec2i pos) { w->x = pos.x; w->y=pos.y;}
 inline Vec2i cw_tmp_pos(ClientWin* w) { return vec2i_mk(w->x,w->y);}
 inline float cw_client_aspect(const ClientWin* w) { Vec2i delta=sw_size(&w->client); return MAX(1,delta.x)/(float)MAX(1,delta.y);}
 inline void cw_set_mini_size( ClientWin* w,Vec2i sz)	{  sw_set_size(&w->mini,sz);}
-
+inline Vec2i cw_mini_centre(const ClientWin* cw) { return v2i_mad(sw_pos(&cw->mini), sw_size(&cw->mini), 1,2); }
+inline Rect2i cw_mini_rect(const ClientWin* cw) { return sw_rect(&cw->mini); }
+inline Vec2i cw_client_centre(const ClientWin* cw) { return v2i_mad(sw_pos(&cw->client), sw_size(&cw->client), 1,2); }
+inline void cw_set_mini_rect(ClientWin* cw, const Rect2i* rc) { sw_set_rect(&cw->mini, rc);}
 #endif /* SKIPPY_CLIENT_H */
