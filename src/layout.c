@@ -209,7 +209,7 @@ void layout_run_grid(int separation, Vec2i size, dlist* windows) {
 		}
 		cw_set_mini_size(cw,mini_size);
 
-		cw_set_tmp_pos(cw, v2i_mad(rect2i_centre(&cell),mini_size,-1,2));
+		cw_set_tmp_pos(cw, v2i_sub(rect2i_centre(&cell),v2i_half(mini_size)));
 		cw->mini.x=cw->x; cw->mini.y=cw->y;
 		col++; 
 		if (col>=num_cols) {

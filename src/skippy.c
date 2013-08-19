@@ -332,8 +332,9 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xi
 		XFlush(ps->dpy);
 	}
 	
-	float anim_t=0.f;	// disabled. to enable, set to 0.0
-	float anim_time=0.2f;	// slow for debug
+	float anim_time=ps->o.animTime;	// slow for debug
+	float anim_t=(anim_time<=0.f)?anim_t=1.0:0.0f;
+
 	clients = do_layout(mw, clients, focus, leader,anim_t);
 	if (!mw->cod) {
 		printfef("(): No client windows found.");
@@ -826,6 +827,7 @@ int main(int argc, char *argv[]) {
 			config_get_bool_wrap(config, "tooltip", "followsMouse", &ps->o.tooltip_followsMouse);
 			config_get_int_wrap(config, "tooltip", "offsetX", &ps->o.tooltip_offsetX, INT_MIN, INT_MAX);
 			config_get_int_wrap(config, "tooltip", "offsetY", &ps->o.tooltip_offsetY, INT_MIN, INT_MAX);
+			config_get_float_wrap(config, "general", "animTime", &ps->o.animTime, 0.0f, 2.0f);
 			if (!parse_align(ps, config_get(config, "tooltip", "align", "left"), &ps->o.tooltip_align))
 				return RET_BADARG;
 			config_get_int_wrap(config, "tooltip", "tintOpacity", &ps->o.highlight_tintOpacity, 0, 256);

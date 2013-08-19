@@ -85,6 +85,14 @@ clientwin_lerp_client_to_mini(ClientWin* cw,float t);
 
 // accessors, less needed if code is refactored to use vec2i etc.
 // bloats the headers whilst the change is in progress, can be search-replaced when done
+//
+// abreviations:
+//
+//	sw_ SkippyWindow
+//
+// cw_ ClientWindow
+// mw_ MainWindow
+  
 #ifdef SW_POS_SIZE
 inline Vec2i sw_pos(const SkippyWindow* w)	{ return w->rect.pos; }
 inline Vec2i sw_size(const SkippyWindow* w)	{ return w->rect.size; }

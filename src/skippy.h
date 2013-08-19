@@ -136,6 +136,8 @@ typedef struct {
 	char *tooltip_textShadow;
 	char *tooltip_font;
 
+	float	animTime;
+
 	enum cliop bindings_miwMouse[MAX_MOUSE_BUTTONS];
 } options_t;
 
@@ -171,6 +173,7 @@ typedef struct {
 	.tooltip_text = NULL, \
 	.tooltip_textShadow = NULL, \
 	.tooltip_font = NULL, \
+	.animTime = 0.2f \
 }
 
 /// @brief X information structure.
@@ -255,6 +258,8 @@ allocchk_(void *ptr, const char *func_name) {
 	for(; iter; iter = iter->next) \
 		statement; \
 }
+
+#define LET(varname,expr) typeof(expr) varname = expr;
 
 /**
  * @brief Get current time, in milliseconds.
