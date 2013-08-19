@@ -2,6 +2,12 @@
 #define vecmath2d_h
 
 // 2d int maths  - types and inline helper functions/accessors
+//
+// type_op_(optional types, usually same as type if not mentioned)
+// common type vec2i has abreviation v2i_
+// type_set -- setter 
+// type_noun/adj -- getter 
+// type_verb/question -- calculate something
 
 typedef int VScalar;	// Scalar value used here. TODO: int? i32?  i64? :)
 typedef struct Vec2i {	// todo: refactor to use this
@@ -113,8 +119,8 @@ inline int rect2i_area( const Rect2i* r,VScalar denom) {
 inline PosSize rect2i_pos_size(const Rect2i* r) {
 	PosSize psz; psz.pos=r->min; psz.size=v2i_sub(r->max,r->min); return psz;
 }
-inline void rect2i_set(Rect2i* rc, const Vec2i* a, const Vec2i* b) { rc->min=*a; rc->max=*b;}
-inline void rect2i_set_pos_size(Rect2i* rc, const Vec2i* pos, const Vec2i* size) { rc->min=*pos;rc->max=v2i_add(*pos,*size);}
+inline void rect2i_set(Rect2i* rc, const Vec2i a, const Vec2i b) { rc->min=a; rc->max=b;}
+inline void rect2i_set_pos_size(Rect2i* rc, const Vec2i pos, const Vec2i size) { rc->min=pos;rc->max=v2i_add(pos,size);}
 inline VScalar rect2i_width(const Rect2i* r) { return rect2i_size(r).x;}
 inline VScalar rect2i_height(const Rect2i* r) { return rect2i_size(r).y;}
 inline Rect2i rect2i_intersect( const Rect2i* a,const Rect2i* b ) {
@@ -131,6 +137,10 @@ inline bool rect2i_overlap( const Rect2i* ra, const Rect2i* rb){
 	if (ra->max.x<=rb->min.x || ra->min.x>=rb->max.x) return false;
 	if (ra->max.y<=rb->min.y || ra->min.y>=rb->max.y) return false;
 	return 	true;
+}
+inline void rect2i_set_centre(Rect2i* rc, const Vec2i new_centre) {
+	Vec2i size=rect2i_size(rc);
+	rect2i_set_pos_size(rc, v2i_sub(new_centre, v2i_half(size)), size);
 }
 inline void rect2i_split_x(Rect2i* out0, Rect2i* out1,VScalar split, const Rect2i* rc ) {
 	out0->min=rc->min;

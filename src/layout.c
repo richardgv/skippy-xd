@@ -19,7 +19,32 @@
 
 #include "skippy.h"
 
-void layout_run_scale_all(const MainWin *mw, dlist *windows, Vec2i total_size);
+// TODO - layout which biases desktop sizes according to recent use.
+// or grid mode including desktops placed as individual windows similar to gnomeshell
+void layout_scale_all(const MainWin *mw, dlist *windows, Vec2i total_size);
+void layout_original(int separation, dlist *windows, Vec2i* total_size);
+void layout_desktop(MainWin *mw, dlist *windows, Vec2i* total_size);
+void layout_grid(int separation, Vec2i size, dlist* windows);
+
+void
+layout_run(MainWin *mw,LAYOUT_MODE mode, dlist *windows, Vec2i* total_size) 
+{
+	Rect2i main_rect=rect2i_mk(vec2i_mk(0,0), mw_size(mw));
+	if (mode==LAYOUT_DESKTOP){ 
+		layout_desktop(mw,windows,total_size);
+		layout_scale_all(mw, windows, *total_size);
+		//fill_within_region(windows,  &main_rect,false);
+	} else if (mode==LAYOUT_GRID) {
+		layout_grid(mw->distance, mw_size(mw),windows);
+		*total_size=mw_size(mw);
+	} else {
+		layout_original(mw->distance,windows,total_size);
+		layout_scale_all(mw, windows, *total_size);
+	}
+
+}
+
+
 
 void 
 layout_dump(const dlist* windows,Vec2i total_size) {
@@ -45,7 +70,7 @@ windows_get_rect2i(Rect2i* ret,const dlist* windows) {
 
 
 void
-layout_run_desktop(MainWin *mw, dlist *windows, Vec2i* total_size)
+layout_desktop(MainWin *mw, dlist *windows, Vec2i* total_size)
 {
 	// dumb grid layout; TODO: Find aspect ratios, use to calculate w/hoptimal
 	dlist* iter;
@@ -63,7 +88,7 @@ layout_run_desktop(MainWin *mw, dlist *windows, Vec2i* total_size)
 
 	*total_size=size_all;
 	//layout_dump(windows,total_width,total_height);
-	layout_run_scale_all(mw, windows, *total_size);
+	layout_scale_all(mw, windows, *total_size);
 
 
 }
@@ -71,7 +96,7 @@ layout_run_desktop(MainWin *mw, dlist *windows, Vec2i* total_size)
 // Skippy Original layout - Slot-together into rows adaptively
 //
 void
-layout_run_original(int separation, dlist *windows, Vec2i* total_size)
+layout_original(int separation, dlist *windows, Vec2i* total_size)
 {
 //	mw->distance=8;
 	int sum_w = 0, max_row_w = 0;
@@ -164,7 +189,7 @@ layout_run_original(int separation, dlist *windows, Vec2i* total_size)
 // simple grid layout
 
 
-void layout_run_grid(int separation, Vec2i size, dlist* windows) {
+void layout_grid(int separation, Vec2i size, dlist* windows) {
 	int num= dlist_len(windows);
 	if (!num) return;
 	int denom=1<<12;
@@ -267,22 +292,17 @@ void fill_within_region(dlist* windows, const Rect2i* region,bool preserve_win_a
 		new_rect.max = rect2i_lerp(region, rect_frac.max,denom);
 		//rect2i_print(&new_rect);printf("\n");
 
-		Vec2i new_centre=rect2i_centre(&new_rect);
-		Vec2i half_size=v2i_sub(new_rect.max,new_centre);
-		// correct the aspect ratio..
-		if (aspect>denom) {
-			half_size.y=(half_size.x*denom)/aspect;
-		} else {
-			half_size.x=(half_size.y*aspect)/denom;
-		}
 		if (preserve_win_aspect){
+			Vec2i new_centre=rect2i_centre(&new_rect);
+			Vec2i half_size=v2i_sub(new_rect.max,new_centre);
+			// correct the aspect ratio..
+			if (aspect>denom) {
+				half_size.y=(half_size.x*denom)/aspect;
+			} else {
+				half_size.x=(half_size.y*aspect)/denom;
+			}
 			new_rect=rect2i_mk_at_centre(new_centre,half_size);
-			int new_aspect=rect2i_aspect(&new_rect,denom);
-		//printf("aspect before/after=%d %d",aspect,new_aspect);
 		}
-//		new_rect.min=v2i_sub(new_centre,half_size);
-//		new_rect.max=v2i_add(new_centre,half_size);
-		
 		cw_set_mini_rect(cw, &new_rect);
 	DLIST_NEXT
 }
@@ -294,7 +314,7 @@ float layout_factor(const MainWin *mw,Vec2i size, unsigned int extra_border) {
 		factor = (float)(mw_height(mw) - extra_border) / size.y;
 	return factor;
 }
-void layout_run_scale_all(const MainWin *mw, dlist *windows, Vec2i total_size)
+void layout_scale_all(const MainWin *mw, dlist *windows, Vec2i total_size)
 {
 	dlist* iter;
 	
@@ -318,24 +338,4 @@ void layout_run_scale_all(const MainWin *mw, dlist *windows, Vec2i total_size)
 	}
 }
 
-// TODO - layout which biases desktop sizes according to recent use.
-// or grid mode including desktops placed as individual windows similar to gnomeshell
-
-void
-layout_run(MainWin *mw,LAYOUT_MODE mode, dlist *windows, Vec2i* total_size) 
-{
-	Rect2i main_rect=rect2i_mk(vec2i_mk(0,0), mw_size(mw));
-	if (mode==LAYOUT_DESKTOP){ 
-		layout_run_desktop(mw,windows,total_size);
-		layout_run_scale_all(mw, windows, *total_size);
-		//fill_within_region(windows,  &main_rect,false);
-	} else if (mode==LAYOUT_GRID) {
-		layout_run_grid(mw->distance, mw_size(mw),windows);
-		*total_size=mw_size(mw);
-	} else {
-		layout_run_original(mw->distance,windows,total_size);
-		layout_run_scale_all(mw, windows, *total_size);
-	}
-
-}
 
