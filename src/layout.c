@@ -245,23 +245,41 @@ void layout_grid(int separation, Vec2i size, dlist* windows) {
 	// get min,max aspect ratios. if the windows are all landscape or portrait it changes numx/numy
 	float min_aspect=100000.0f,max_aspect=0.f;
 	float sum_aspect=0.f;
-	
+	float total_area=0.f;
 	DLIST_FOREACH(ClientWin, cw,/*IN*/ windows )
 		float aspect=cw_client_aspect(cw);
 		min_aspect=MIN(min_aspect,aspect); max_aspect=MAX(max_aspect,aspect);	
-		sum_aspect+=aspect;
+		Vec2i wsize=cw_client_size(cw);
+		float area=wsize.x*wsize.y;
+		total_area += area;
+		sum_aspect+=aspect;//*area;
 	DLIST_NEXT
 	float win_aspect=(float)size.x/(float)size.y;
-	float av_aspect = sum_aspect/(float) num;
+	float av_aspect = sum_aspect/(float)num;// total_area;
 
-	//printf("rowum=%.3f %.3f %.3f\n",(num*win_aspect)/av_aspect, av_aspect,win_aspect);
-	int num_rows = MAX(1,sqrt((num/win_aspect)* av_aspect  ));
+	printf("row0=%.3f row1=%.3f row2=%.3f avasp%.3f main_asp%.3f\n",
+		sqrt((num*win_aspect)/av_aspect),
+		sqrt((num*av_aspect)/win_aspect),
+		sqrt(num)*(av_aspect/win_aspect),
+		av_aspect,
+		win_aspect);
+//	int num_rows = MAX(1,sqrt((num/win_aspect)*	 av_aspect  ));
+	//printf("aspect=");
+//	av_aspect=1.0f;
+	float d=sqrt(num*(av_aspect/win_aspect)) ;
+	int num_rows = MAX(1,d+0.5f);
 	int num_cols = (num+(num_rows-1))/num_rows;// todo: per row, for last one..
 	
 
-	//printf("%.3f num=%d rows=%d cols=%d \n",av_aspect, num,num_rows,num_cols);
+	printf("%.3f d=%.3f num=%d rows=%d cols=%d \n",av_aspect,d, num,num_rows,num_cols);
 
 	
+	printf("row0=%.3f row1=%.3f row2=%.3f avasp%.3f main_asp%.3f\n",
+		sqrt((num*win_aspect)/av_aspect),
+		sqrt((num*av_aspect)/win_aspect),
+		sqrt(num)*(av_aspect/win_aspect),
+		av_aspect,
+		win_aspect);
 
 	// TODO Sort horizontally. 	
 	// todo: pick major axis. widescreen monitor, its usually horiz, but we might be placing in subwindows.
