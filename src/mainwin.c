@@ -96,6 +96,8 @@ mainwin_create(session_t *ps) {
 	mw->key_l = XKeysymToKeycode(dpy, XK_l);
 	mw->key_enter = XKeysymToKeycode(dpy, XK_Return);
 	mw->key_space = XKeysymToKeycode(dpy, XK_space);
+	mw->key_page_up = XKeysymToKeycode(dpy, XK_Page_Up);
+	mw->key_page_down = XKeysymToKeycode(dpy, XK_Page_Down);
 	mw->key_escape = XKeysymToKeycode(dpy, XK_Escape);
 	mw->key_q = XKeysymToKeycode(dpy, XK_q);
 	
@@ -286,8 +288,7 @@ mainwin_map(MainWin *mw) {
 	XRaiseWindow(ps->dpy, mw->window);
 
 	// Might because of WM reparent, XSetInput() doesn't work here
-	XSetInputFocus(ps->dpy, mw->window, RevertToParent, CurrentTime);
-	XGrabKeyboard(ps->dpy, mw->window, True, GrabModeAsync, GrabModeAsync,
+	XSetInputFocus(ps->dpy, mw->window, RevertToParent, CurrentTime);	XGrabKeyboard(ps->dpy, mw->window, True, GrabModeAsync, GrabModeAsync,
 			CurrentTime);
 }
 

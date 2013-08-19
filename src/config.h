@@ -131,5 +131,44 @@ config_get_double_wrap(dlist *config, const char *section, const char *key,
 	*tgt = config_get_double(config, section, key, *tgt, min, max);
 }
 
+/**
+ * @brief Get a float value from configuration.
+ */
+static inline float
+config_get_float(dlist *config, const char *section, const char *key,
+		float def, float min, float max) {
+	const char *result = config_get(config, section, key, NULL);
+	if (!result)
+		return def;
+	char *endptr = NULL;
+	float fresult = strtof(result, &endptr);
+	if (!endptr || (*endptr && !isspace(*endptr))) {
+		printfef("(%s, %s, %f): Value \"%s\" is not a valid floating-point number.",
+			section, key, def, result);
+		return def;
+	}
+	if (fresult > max) {
+		printfef("(%s, %s, %f): Value \"%s\" larger than maximum value %f.",
+			section, key, def, result, max);
+		return max;
+	}
+	if (fresult < min) {
+		printfef("(%s, %s, %f): Value \"%s\" smaller than minimal value %f.",
+			section, key, def, result, min);
+		return min;
+	}
+	return fresult;
+}
+
+/**
+ * @brief Wrapper of config_get_float().
+ */
+static inline void
+config_get_float_wrap(dlist *config, const char *section, const char *key,
+		float *tgt, float min, float max) {
+	*tgt = config_get_float(config, section, key, *tgt, min, max);
+}
+
+
 #endif /* SKIPPY_CONFIG_H */
 

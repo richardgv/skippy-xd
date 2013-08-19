@@ -39,7 +39,9 @@ struct _MainWin
 	Picture background;
 	Pixmap bg_pixmap;
 	int x, y;
-	unsigned int width, height, distance;
+	unsigned int width, height;
+	//PosSize	rect;
+	unsigned int distance;
 	XRenderPictFormat *format;
 	XTransform transform;
 	
@@ -53,13 +55,27 @@ struct _MainWin
 	
 	KeyCode key_act, key_up, key_down, key_left, key_right,
 		key_h, key_j, key_k, key_l,
-		key_enter, key_space, key_q, key_escape;
+		key_enter, key_space, key_q, key_escape,key_page_up,key_page_down;
 	
 #ifdef CFG_XINERAMA
 	int xin_screens;
 	XineramaScreenInfo *xin_info, *xin_active;
 #endif /* CFG_XINERAMA */
 };
+#ifdef MW_POS_SIZE
+#define mw_pos(mw) ((mw)->rect.pos)
+#define mw_size(mw) ((mw)->rect.max)
+#define mw_max(mw) (vec2i_add(mw_pos(mw),mw_size(mw)))
+#else
+#define mw_pos(mw) (vec2i_mk((mw)->x,(mw)->y))
+#define mw_size(mw) (vec2i_mk((mw)->width,(mw)->height))
+#endif
+#define mw_min(mw) ((mw)->rect.pos)
+#define mw_max(mw) (v2i_add((mw)->rect.pos,(mw)->rect.size))
+#define mw_rect(mw) (rect2i_mk_at(mw_pos(mw),mw_size(mw)))
+#define mw_width(mw) (mw_size(mw).x)
+#define mw_height(mw) (mw_size(mw).y)
+
 typedef struct _MainWin MainWin;
 
 MainWin *mainwin_create(session_t *ps);
@@ -70,5 +86,8 @@ int mainwin_handle(MainWin *, XEvent *);
 void mainwin_update_background(MainWin *mw);
 void mainwin_update(MainWin *mw);
 void mainwin_transform(MainWin *mw, float f);
+inline  Vec2i mainwin_pos(const MainWin* mw) 	{ vec2i_mk( mw->x,mw->y);}
+inline  Vec2i mainwin_size(const MainWin* mw) 	{ vec2i_mk( mw->width,mw->height);}
+inline  Rect2i mainwin_rect(const MainWin* mw) 	{ rect2i_mk_at( mainwin_pos(mw), mainwin_size(mw) );}
 
 #endif /* SKIPPY_MAINWIN_H */

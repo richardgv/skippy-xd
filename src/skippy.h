@@ -112,6 +112,9 @@ typedef struct {
 	bool movePointerOnStart;
 
 	bool xinerama_showAll;
+	bool layout_desktop;
+	bool layout_grid;
+	bool layout_smart;
 
 	char *normal_tint;
 	int normal_tintOpacity;
@@ -133,6 +136,8 @@ typedef struct {
 	char *tooltip_textShadow;
 	char *tooltip_font;
 
+	float	animTime;
+
 	enum cliop bindings_miwMouse[MAX_MOUSE_BUTTONS];
 } options_t;
 
@@ -142,7 +147,7 @@ typedef struct {
 	.runAsDaemon = false, \
 	.synchronize = false, \
 \
-	.distance = 50, \
+	.distance = 8, \
 	.useNetWMFullscreen = true, \
 	.ignoreSkipTaskbar = false, \
 	.updateFreq = 10.0, \
@@ -153,9 +158,9 @@ typedef struct {
 	.xinerama_showAll = false, \
 	.normal_tint = NULL, \
 	.normal_tintOpacity = 0, \
-	.normal_opacity = 200, \
+	.normal_opacity = 248, \
 	.highlight_tint = NULL, \
-	.highlight_tintOpacity = 64, \
+	.highlight_tintOpacity = 32, \
 	.highlight_opacity = 255, \
 	.tooltip_show = true, \
 	.tooltip_followsMouse = true, \
@@ -168,6 +173,7 @@ typedef struct {
 	.tooltip_text = NULL, \
 	.tooltip_textShadow = NULL, \
 	.tooltip_font = NULL, \
+	.animTime = 0.f \
 }
 
 /// @brief X information structure.
@@ -252,6 +258,18 @@ allocchk_(void *ptr, const char *func_name) {
 	for(; iter; iter = iter->next) \
 		statement; \
 }
+
+#ifndef TYPEOF
+#ifdef __cplusplus
+	#define TYPEOF __decltype
+#else 
+	#define TYPEOF typeof
+#endif
+#endif
+#define LET(varname,expr) typeof(expr) varname = expr;
+#define MALLOCS(TYPE,COUNT) ((TYPE*)malloc(sizeof(TYPE)*COUNT))
+#define REALLOCS(ptr,COUNT) ((TYPEOF(ptr)realloc(ptr,sizeof(*ptr)*COUNT))
+#define FREE(PTR) {if (PTR) {free((void*)(PTR)); PTR=0;}}
 
 /**
  * @brief Get current time, in milliseconds.
@@ -435,6 +453,7 @@ ev_key_str(XKeyEvent *ev) {
 	printfef("(): KeyRelease %u (%s) not binded to anything.", \
 			(ev)->xkey.keycode, ev_key_str(&(ev)->xkey))
 
+#include "vecmath2d.h"
 #include "wm.h"
 #include "clientwin.h"
 #include "mainwin.h"
@@ -444,6 +463,8 @@ ev_key_str(XKeyEvent *ev) {
 #include "tooltip.h"
 
 extern session_t *ps_g;
+
+#define logd //
 
 #define ACTIVATE_WINDOW_PICKER 1
 #define EXIT_RUNNING_DAEMON 2

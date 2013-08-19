@@ -498,15 +498,17 @@ wm_validate_window(Display *dpy, Window win)
 		                  0L, 8192L, False, XA_ATOM, &real_type, &real_format,
 		                  &items_read, &items_left, &data);
 		
-		if(status != Success)
+		if(status != Success) {
 			return 0;
+		}
 		
 		atoms = (Atom *)data;
 		
 		for(i = 0; result && i < items_read; i++) {
 			if(atoms[i] == _NET_WM_STATE_HIDDEN)
 				result = 0;
-			else if(! IGNORE_SKIP_TASKBAR && atoms[i] == _NET_WM_STATE_SKIP_TASKBAR)
+			else 
+			if(! IGNORE_SKIP_TASKBAR && atoms[i] == _NET_WM_STATE_SKIP_TASKBAR)
 				result = 0;
 			else if(atoms[i] == _NET_WM_STATE_SHADED)
 				result = 0;
@@ -515,8 +517,9 @@ wm_validate_window(Display *dpy, Window win)
 		}
 		XFree(data);
 		
-		if(! result)
+		if(! result) {
 			return 0;
+		}
 		
 		status = XGetWindowProperty(dpy, win, _NET_WM_WINDOW_TYPE,
 		                            0L, 1L, False, XA_ATOM, &real_type, &real_format,
@@ -526,8 +529,9 @@ wm_validate_window(Display *dpy, Window win)
 		
 		atoms = (Atom *)data;
 		
-		if(items_read && (atoms[0] == _NET_WM_WINDOW_TYPE_DESKTOP || atoms[0] == _NET_WM_WINDOW_TYPE_DOCK))
+		if(items_read && (atoms[0] == _NET_WM_WINDOW_TYPE_DESKTOP || atoms[0] == _NET_WM_WINDOW_TYPE_DOCK)) {
 			result = 0;
+		}
 		
 		XFree(data);
 		
@@ -542,16 +546,19 @@ wm_validate_window(Display *dpy, Window win)
 		{
 			if(status == Success)
 				XFree(data);
+			printf("status\n");
 			return 0;
 		}
 		attr = (((CARD32*)data)[0]) & (WIN_STATE_MINIMIZED |
 		                             WIN_STATE_SHADED |
 		                             WIN_STATE_HIDDEN);
-		if(attr)
+		if(attr) {
 			result = 0;
+		}
 		XFree(data);
-		if(! result)
+		if(! result){
 			return 0;
+		}
 		
 		if(! IGNORE_SKIP_TASKBAR)
 		{
@@ -565,8 +572,9 @@ wm_validate_window(Display *dpy, Window win)
 				return 1; /* If there's no _WIN_HINTS, assume it's 0, thus valid */
 			}
 			attr = ((CARD32*)data)[0];
-			if(attr & WIN_HINTS_SKIP_TASKBAR)
+			if(attr & WIN_HINTS_SKIP_TASKBAR) {
 				result = 0;
+			}
 			XFree(data);
 		}
 		

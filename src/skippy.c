@@ -114,20 +114,35 @@ update_clients(MainWin *mw, dlist *clients, Bool *touched)
 				*touched = True;
 		}
 	}
+
+	logd("update clients: %d active\n ", dlist_len(clients));
 	
 	dlist_free(stack);
 	
 	return clients;
 }
 
+static LAYOUT_MODE
+get_layout_mode(const session_t* ps) {
+	// TODO: some of these modes will be combined flags.
+	if (ps->o.layout_desktop) { 
+		return LAYOUT_DESKTOP;
+	}
+	else if (ps->o.layout_grid) {
+		return LAYOUT_GRID;
+
+	} else {
+		return LAYOUT_ORIGINAL;
+	}
+}
+
 static dlist *
-do_layout(MainWin *mw, dlist *clients, Window focus, Window leader)
+do_layout(MainWin *mw, dlist *clients, Window focus, Window leader,float t)
 {
 	session_t * const ps = mw->ps;
 
 	CARD32 desktop = wm_get_current_desktop(ps->dpy);
 	unsigned int width, height;
-	float factor;
 	int xoff, yoff;
 	dlist *iter, *tmp;
 	
@@ -138,29 +153,37 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader)
 		dlist_free(mw->cod);
 	
 	tmp = dlist_first(dlist_find_all(clients, (dlist_match_func)clientwin_validate_func, &desktop));
+	logd("clients:%d,valid:%d\n",dlist_len(clients),dlist_len(tmp));
 	if(leader != None)
 	{
 		mw->cod = dlist_first(dlist_find_all(tmp, clientwin_check_group_leader_func, (void*)&leader));
 		dlist_free(tmp);
 	} else
 		mw->cod = tmp;
-	
 	if(! mw->cod)
 		return clients;
 	
 	dlist_sort(mw->cod, clientwin_sort_func, 0);
 	
 	/* Move the mini windows around */
-	layout_run(mw, mw->cod, &width, &height);
-	factor = (float)(mw->width - 100) / width;
-	if(factor * height > mw->height - 100)
-		factor = (float)(mw->height - 100) / height;
+	LAYOUT_MODE mode=get_layout_mode(ps);
+	Vec2i total_size;
+	layout_run(mw, mode, mw->cod, &total_size);
+	int extra_border=mw->distance;
+//	float factor=layout_factor(mw,width,height,mw->distance);
+	for(iter = mw->cod; iter; iter = iter->next)
+		clientwin_lerp_client_to_mini((ClientWin*)iter->data,t);
+
+
+	float factor = (float)(mw->width - extra_border) / total_size.x;
+	if(factor * height > mw->height - extra_border)
+		factor = (float)(mw->height - extra_border) / total_size.y;
 	
-	xoff = (mw->width - (float)width * factor) / 2;
-	yoff = (mw->height - (float)height * factor) / 2;
+	xoff = (mw->width - (float)total_size.x * factor) / 2;
+	yoff = (mw->height - (float)total_size.y * factor) / 2;
 	mainwin_transform(mw, factor);
 	for(iter = mw->cod; iter; iter = iter->next)
-		clientwin_move((ClientWin*)iter->data, factor, xoff, yoff);
+		clientwin_create_scaled_image((ClientWin*)iter->data /*, factor, xoff, yoff*/);
 	
 	/* Get the currently focused window and select which mini-window to focus */
 	iter = dlist_find(mw->cod, clientwin_cmp_func, (void *)focus);
@@ -174,9 +197,16 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader)
 		clientwin_map((ClientWin*)iter->data);
 	if (ps->o.movePointerOnStart)
 		XWarpPointer(mw->ps->dpy, None, mw->focus->mini.window, 0, 0, 0, 0,
-				mw->focus->mini.width / 2, mw->focus->mini.height / 2);
+				sw_width(&mw->focus->mini) / 2, sw_height(&mw->focus->mini) / 2);
 	
 	return clients;
+}
+
+void mw_animate(MainWin* mw) {
+	dlist* iter;
+	for (iter=mw->cod;iter;iter=iter->next){
+		ClientWin* cw=(ClientWin*) iter->data;
+	}
 }
 
 static inline const char *
@@ -278,6 +308,7 @@ ev_dump(session_t *ps, const MainWin *mw, const XEvent *ev) {
 	printfd("Event %-13.13s wid %#010lx %s", name, wid, wextra);
 }
 
+int	g_redo_layout=0;	// todo, poast message back?!
 static dlist *
 skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xin)
 {
@@ -301,7 +332,10 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xi
 		XFlush(ps->dpy);
 	}
 	
-	clients = do_layout(mw, clients, focus, leader);
+	float anim_time=ps->o.animTime;	// slow for debug
+	float anim_t=(anim_time<=0.f)?anim_t=1.0:0.0f;
+
+	clients = do_layout(mw, clients, focus, leader,anim_t);
 	if (!mw->cod) {
 		printfef("(): No client windows found.");
 		return clients;
@@ -314,6 +348,7 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xi
 	
 	int last_rendered = time_in_millis();
 	while (!die) {
+		//printf("polling\n7");
 		int i, now, timeout;
 		struct pollfd r_fd;
 
@@ -330,11 +365,22 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xi
 		now = time_in_millis();
 		if(now >= last_rendered + mw->poll_time)
 		{
+
 			REDUCE(if( ((ClientWin*)iter->data)->damaged ) clientwin_repair(iter->data), mw->cod);
-			last_rendered = now;
+			//last_rendered = now;
 		}
 
+		if (g_redo_layout) { g_redo_layout=0; anim_t=0.f;}
 		i = XPending(ps->dpy);
+		if (!i && ((anim_t<1.0f) || (last_rendered<now))) {
+			bool move=(anim_t<1.0);
+			anim_t=MIN(1.0f,(anim_t+((now-last_rendered)/(1000*anim_time))));
+			mw_animate(mw);
+			if (move) {
+				do_layout(mw,clients,focus,leader,anim_t);
+			}
+			last_rendered = now;
+		}
 		for (int j = 0; j < i && !die; ++j) {
 			XNextEvent(ps->dpy, &ev);
 #ifdef DEBUG_EVENTS
@@ -530,6 +576,8 @@ void show_help()
 			"\t--activate-window-picker  - tells the daemon to show the window picker.\n"
 			"\t--help                    - show this message.\n"
 			"\t-S                        - Synchronize X operation (debugging).\n"
+			"\t-a                        - show windows from all desktops.\n"
+			"\t-d                        - 'expo' style Desktop layout .\n"
 			, stdout);
 }
 
@@ -646,13 +694,17 @@ parse_args(session_t *ps, int argc, char **argv, bool first_pass) {
 		OPT_DM_START,
 		OPT_DM_STOP,
 	};
-	static const char * opts_short = "hS";
+	static const char * opts_short = "hSagds";
 	static const struct option opts_long[] = {
-		{ "help",					no_argument,	NULL, 'h' },
-		{ "config",					required_argument, NULL, OPT_CONFIG },
-		{ "activate-window-picker", no_argument,	NULL, OPT_ACTV_PICKER },
-		{ "start-daemon",			no_argument,	NULL, OPT_DM_START },
-		{ "stop-daemon",			no_argument,	NULL, OPT_DM_STOP },
+		{ "help",					no_argument,	NULL, 'h'},
+		{ "config",					required_argument, NULL, OPT_CONFIG},
+		{ "activate-window-picker", no_argument,	NULL, OPT_ACTV_PICKER},
+		{ "start-daemon",			no_argument,	NULL, OPT_DM_START},
+		{ "stop-daemon",			no_argument,	NULL, OPT_DM_STOP},
+		{ "all desktops",			no_argument,	NULL, 'a'},
+//		{ "keep layout",			no_argument,	NULL, 'k' },
+//		{ "grid layout",			no_argument,	NULL, 'g' },
+//		{ "smart layout",			no_argument,	NULL, 's' },
 		{ NULL, no_argument, NULL, 0 }
 	};
 
@@ -683,6 +735,10 @@ parse_args(session_t *ps, int argc, char **argv, bool first_pass) {
 			case OPT_CONFIG: break;
 #define T_CASEBOOL(idx, option) case idx: ps->o.option = true; break
 			T_CASEBOOL('S', synchronize);
+			T_CASEBOOL('a',	xinerama_showAll);
+			T_CASEBOOL('d',	layout_desktop);
+			T_CASEBOOL('s',	layout_smart);
+			T_CASEBOOL('g',	layout_grid);
 			case OPT_ACTV_PICKER:
 				ps->o.mode = PROGMODE_ACTV_PICKER;
 				break;
@@ -771,6 +827,7 @@ int main(int argc, char *argv[]) {
 			config_get_bool_wrap(config, "tooltip", "followsMouse", &ps->o.tooltip_followsMouse);
 			config_get_int_wrap(config, "tooltip", "offsetX", &ps->o.tooltip_offsetX, INT_MIN, INT_MAX);
 			config_get_int_wrap(config, "tooltip", "offsetY", &ps->o.tooltip_offsetY, INT_MIN, INT_MAX);
+			config_get_float_wrap(config, "general", "animTime", &ps->o.animTime, 0.0f, 2.0f);
 			if (!parse_align(ps, config_get(config, "tooltip", "align", "left"), &ps->o.tooltip_align))
 				return RET_BADARG;
 			config_get_int_wrap(config, "tooltip", "tintOpacity", &ps->o.highlight_tintOpacity, 0, 256);
