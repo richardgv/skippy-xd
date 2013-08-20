@@ -35,9 +35,9 @@ layout_run(MainWin *mw, dlist *windows, unsigned int *total_width, unsigned int 
 	for(iter = windows; iter; iter = iter->next)
 	{
 		ClientWin *cw = (ClientWin *)iter->data;
-		sum_w += cw->client.width;
-		max_w = MAX(max_w, cw->client.width);
-		max_h = MAX(max_h, cw->client.height);
+		sum_w += cw->src.width;
+		max_w = MAX(max_w, cw->src.width);
+		max_h = MAX(max_h, cw->src.height);
 	}
 	
 	for(iter = windows; iter; iter = iter->next)
@@ -48,8 +48,8 @@ layout_run(MainWin *mw, dlist *windows, unsigned int *total_width, unsigned int 
 		{
 			dlist *slot = (dlist *)slot_iter->data;
 			int slot_h = -mw->distance;
-			REDUCE(slot_h = slot_h + ((ClientWin*)iter->data)->client.height + mw->distance, slot);
-			if(slot_h + mw->distance + cw->client.height < max_h)
+			REDUCE(slot_h = slot_h + ((ClientWin*)iter->data)->src.height + mw->distance, slot);
+			if(slot_h + mw->distance + cw->src.height < max_h)
 			{
 				slot_iter->data = dlist_add(slot, cw);
 				break;
@@ -64,14 +64,14 @@ layout_run(MainWin *mw, dlist *windows, unsigned int *total_width, unsigned int 
 	{
 		dlist *slot = (dlist *)slot_iter->data;
 		int slot_w = 0;
-		REDUCE(slot_w = MAX(slot_w, ((ClientWin*)iter->data)->client.width), slot);
+		REDUCE(slot_w = MAX(slot_w, ((ClientWin*)iter->data)->src.width), slot);
 		y = row_y;
 		for(iter = dlist_first(slot); iter; iter = iter->next)
 		{
 			ClientWin *cw = (ClientWin *)iter->data;
-			cw->x = x + (slot_w - cw->client.width) / 2;
+			cw->x = x + (slot_w - cw->src.width) / 2;
 			cw->y = y;
-			y += cw->client.height + mw->distance;
+			y += cw->src.height + mw->distance;
 			rows->data = dlist_add((dlist *)rows->data, cw);
 		}
 		row_h = MAX(row_h, y - row_y);
@@ -92,15 +92,20 @@ layout_run(MainWin *mw, dlist *windows, unsigned int *total_width, unsigned int 
 	*total_width -= mw->distance;
 	*total_height -= mw->distance;
 	
-	for(iter = dlist_first(rows); iter; iter = iter->next)
-	{
-		dlist *row = (dlist *)iter->data;
+	foreach_dlist (rows) {
+		dlist *row = (dlist *) iter->data;
 		int row_w = 0, xoff;
-		REDUCE(row_w = MAX(row_w, ((ClientWin*)iter->data)->x + ((ClientWin*)iter->data)->client.width), row);
+		foreach_dlist (row) {
+			ClientWin *cw = (ClientWin *) iter->data;
+			row_w = MAX(row_w, cw->x + cw->src.width);
+		}
 		xoff = (*total_width - row_w) / 2;
-		REDUCE(((ClientWin*)iter->data)->x += xoff, row);
+		foreach_dlist (row) {
+			ClientWin *cw = (ClientWin *) iter->data;
+			cw->x += xoff;
+		}
 		dlist_free(row);
 	}
-	
+
 	dlist_free(rows);
 }

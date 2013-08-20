@@ -25,6 +25,7 @@ Atom
 	ESETROOT_PMAP_ID,
 
 	// ICCWM atoms
+	WM_STATE,
 	WM_PROTOCOLS,
 	WM_DELETE_WINDOW,
 
@@ -72,9 +73,6 @@ static Atom
 	_WIN_STATE,
 	_WIN_HINTS;
 
-#define WM_PERSONALITY_NETWM 0
-#define WM_PERSONALITY_GNOME 1
-
 /* From WindowMaker's gnome.c */
 #define WIN_HINTS_SKIP_FOCUS      (1<<0) /*"alt-tab" skips this win*/
 #define WIN_HINTS_SKIP_WINLIST    (1<<1) /*do not show in window list*/
@@ -95,11 +93,6 @@ static Atom
 #define WIN_STATE_HID_TRANSIENT   (1<<7) /*owner of transient is hidden*/
 #define WIN_STATE_FIXED_POSITION  (1<<8) /*window is fixed in position even*/
 #define WIN_STATE_ARRANGE_IGNORE  (1<<9) /*ignore for auto arranging*/
-
-
-static int WM_PERSONALITY = WM_PERSONALITY_NETWM,
-           NETWM_HAS_FULLSCREEN = 0,
-           IGNORE_SKIP_TASKBAR = 0;
 
 /**
  * @brief Wrapper of XInternAtom().
@@ -122,6 +115,7 @@ wm_get_atoms(session_t *ps) {
 	T_GETATOM(_XROOTPMAP_ID);
 	T_GETATOM(ESETROOT_PMAP_ID);
 	
+	T_GETATOM(WM_STATE),
 	T_GETATOM(WM_PROTOCOLS),
 	T_GETATOM(WM_DELETE_WINDOW),
 
@@ -159,182 +153,233 @@ wm_get_atoms(session_t *ps) {
 #undef T_GETATOM
 }
 
-char
-wm_check_netwm(Display *dpy)
-{
-	Window wm_check;
-	unsigned char *data, *data2;
+bool
+wm_check_netwm(session_t *ps) {
+	Display *dpy = ps->dpy;
+
+	Window wm_check = None;
+	unsigned char *data = NULL;
+
+	int real_format = 0;
+	Atom real_type = None;
+	unsigned long items_read = 0, items_left = 0;
+
+	bool success = (Success == XGetWindowProperty(dpy, ps->root,
+				_NET_SUPPORTING_WM_CHECK,
+				0L, 1L, False, XA_WINDOW, &real_type, &real_format,
+				&items_read, &items_left, &data)
+			&& items_read && data && 32 == real_format);
+	if (success)
+		wm_check = *((long *)data);
+	spxfree(&data);
+	if (!success) return false;
 	
-	int status, real_format;
-	Atom real_type;
-	unsigned long items_read, items_left, i;
+	success = (Success == XGetWindowProperty(dpy, wm_check,
+				_NET_SUPPORTING_WM_CHECK,
+				0L, 1L, False, XA_WINDOW, &real_type, &real_format,
+				&items_read, &items_left, &data)
+			&& items_read && data && 32 == real_format
+			&& wm_check == *((long *)data));
+	spxfree(&data);
+	if (!success) return false;
 	
-	char req = 0;
-	
-	status = XGetWindowProperty(dpy, DefaultRootWindow(dpy), _NET_SUPPORTING_WM_CHECK,
-	                  0L, 1L, False, XA_WINDOW, &real_type, &real_format,
-	                  &items_read, &items_left, &data);
-	if(status != Success || ! items_read) {
-		if(status == Success)
-			XFree(data);
-		return 0;
-	}
-	
-	wm_check = ((Window*)data)[0];
-	XFree(data);
-	
-	status = XGetWindowProperty(dpy, wm_check, _NET_SUPPORTING_WM_CHECK,
-	                  0L, 1L, False, XA_WINDOW, &real_type, &real_format,
-	                  &items_read, &items_left, &data);
-	
-	if(status != Success && ! items_read) {
-		if(status == Success)
-			XFree(data);
-		return 0;
-	}
-	
-	if(wm_check != ((Window*)data)[0]) {
-		XFree(data);
-		return 0;
-	}
-	
-	XFree(data);
-	
-	status = XGetWindowProperty(dpy, DefaultRootWindow(dpy), _NET_SUPPORTED,
+	success = (Success == XGetWindowProperty(dpy, ps->root, _NET_SUPPORTED,
 	                  0L, 8192L, False, XA_ATOM, &real_type, &real_format,
-	                  &items_read, &items_left, &data2);
-	
-	if(status != Success || ! items_read) {
-		if(status == Success)
-			XFree(data2);
-		return 0;
-	}
-	
-	for(i = 0; i < items_read; i++) {
-		if(((Atom*)data2)[i] == _NET_NUMBER_OF_DESKTOPS)
+	                  &items_read, &items_left, &data)
+			&& items_read && data && 32 == real_format);
+	if (!success)
+		items_read = 0;
+
+	long *ldata = (long *) data;
+	int req = 0;
+	for (int i = 0; i < items_read; i++) {
+		if (_NET_NUMBER_OF_DESKTOPS == ldata[i])
 			req |= 1;
-		else if(((Atom*)data2)[i] == _NET_CURRENT_DESKTOP)
+		else if (_NET_CURRENT_DESKTOP == ldata[i])
 			req |= 2;
-		else if(((Atom*)data2)[i] == _NET_WM_STATE)
+		else if (_NET_WM_STATE == ldata[i])
 			req |= 4;
-		else if(((Atom*)data2)[i] == _NET_CLIENT_LIST)
+		else if (_NET_CLIENT_LIST == ldata[i])
 			req |= 8;
-		else if(((Atom*)data2)[i] == _NET_CLIENT_LIST_STACKING)
-			req |= 16;
-		else if(((Atom*)data2)[i] == _NET_WM_STATE_FULLSCREEN)
-			NETWM_HAS_FULLSCREEN = 1;
+		else if (_NET_CLIENT_LIST_STACKING == ldata[i]) {
+			req |= 8;
+			_NET_CLIENT_LIST = _NET_CLIENT_LIST_STACKING;
+		}
+		else if (_NET_WM_STATE_FULLSCREEN == ldata[i])
+			ps->has_ewmh_fullscreen = true;
 	}
-	XFree(data2);
-	if(req & 16) {
-		req |= 8;
-		_NET_CLIENT_LIST = _NET_CLIENT_LIST_STACKING;
-	} 
-	
+
+	spxfree(&data);
+
 	return ((req & 15) == 15);
 }
 
-char
-wm_check_gnome(Display *dpy)
-{
-	Window wm_check;
-	unsigned char *data, *data2;
+bool
+wm_check_gnome(session_t *ps) {
+	Display *dpy = ps->dpy;
+	unsigned char *data = NULL;
 	
-	int status, real_format;
-	Atom real_type;
-	unsigned long items_read, items_left, i;
+	Window wm_check = None;
+	int real_format = 0;
+	Atom real_type = None;
+	unsigned long items_read = 0, items_left = 0;
 	
-	char req = 0;
+	// Make sure _WIN_SUPPORTING_WM_CHECK is present on root window
+	bool success = (Success ==
+			XGetWindowProperty(dpy, ps->root, _WIN_SUPPORTING_WM_CHECK,
+				0L, 1L, False, XA_CARDINAL, &real_type, &real_format,
+				&items_read, &items_left, &data)
+			&& items_read && data && 32 == real_format);
 	
-	WM_PERSONALITY = WM_PERSONALITY_GNOME;
-	
-	status = XGetWindowProperty(dpy, DefaultRootWindow(dpy), _WIN_SUPPORTING_WM_CHECK,
-	                  0L, 1L, False, XA_CARDINAL, &real_type, &real_format,
-	                  &items_read, &items_left, &data);
-	if(status != Success || ! items_read) {
-		if(status == Success)
-			XFree(data);
-		return 0;
-	}
-	
-	wm_check = ((Window*)data)[0];
-	XFree(data);
-	
-	status = XGetWindowProperty(dpy, wm_check, _WIN_SUPPORTING_WM_CHECK,
-	                  0L, 1L, False, XA_CARDINAL, &real_type, &real_format,
-	                  &items_read, &items_left, &data);
-	
-	if(status != Success && ! items_read) {
-		if(status == Success)
-			XFree(data);
-		return 0;
-	}
-	
-	if(wm_check != ((Window*)data)[0]) {
-		XFree(data);
-		return 0;
-	}
-	
-	XFree(data);
-	
-	status = XGetWindowProperty(dpy, DefaultRootWindow(dpy), _WIN_PROTOCOLS,
-	                  0L, 8192L, False, XA_ATOM, &real_type, &real_format,
-	                  &items_read, &items_left, &data2);
-	
-	if(status != Success || ! items_read) {
-		if(status == Success)
-			XFree(data2);
-		return 0;
-	}
-	
-	for(i = 0; i < items_read; i++) {
-		if(((Atom*)data2)[i] == _WIN_WORKSPACE)
+	if (success)
+		wm_check = ((long *)data)[0];
+	spxfree(&data);
+	if (!success)
+		return success;
+
+	/*
+	// Make sure _WIN_SUPPORTING_WM_CHECK is present on the WM check window
+	// as well
+	success = (Success == XGetWindowProperty(dpy, wm_check, _WIN_SUPPORTING_WM_CHECK,
+				0L, 1L, False, XA_CARDINAL, &real_type, &real_format,
+				&items_read, &items_left, &data) && items_real
+			&& wm_check == *((long *) data));
+	spxfree(&data);
+	if (!success)
+		return success;
+	*/
+
+	// Check supported protocols
+	success = (Success == XGetWindowProperty(dpy, ps->root, _WIN_PROTOCOLS,
+				0L, 8192L, False, XA_ATOM, &real_type, &real_format,
+				&items_read, &items_left, &data)
+			&& items_read && data && 32 == real_format);
+	if (!success)
+		items_read = 0;
+
+	long *ldata = (long *) data;
+	int req = 0;
+	for (int i = 0; i < items_read; i++) {
+		if (_WIN_WORKSPACE == ldata[i])
 			req |= 1;
-		else if(((Atom*)data2)[i] == _WIN_WORKSPACE_COUNT)
+		else if (_WIN_WORKSPACE_COUNT == ldata[i])
 			req |= 2;
-		else if(((Atom*)data2)[i] == _WIN_STATE)
+		else if (_WIN_STATE == ldata[i])
 			req |= 4;
-		else if(((Atom*)data2)[i] == _WIN_CLIENT_LIST)
+		else if (_WIN_CLIENT_LIST == ldata[i])
 			req |= 8;
 	}
-	XFree(data2);
-	
+	spxfree(&data);
+
 	return ((req & 15) == 15);
 }
 
-char
-wm_check(Display *dpy)
-{
-	return wm_check_netwm(dpy) || wm_check_gnome(dpy);
+/**
+ * @brief Find the client window under a specific frame window.
+ *
+ * Using a depth-first search.
+ */
+static Window
+wm_find_client(session_t *ps, Window wid) {
+	dlist *stack = dlist_add(NULL, (void *) wid);
+	Window result = None;
+	while (stack) {
+		dlist *stack2 = NULL;
+		foreach_dlist (stack) {
+			Window cur = (Window) iter->data;
+			if (wid_has_prop(ps, cur, WM_STATE)) {
+				result = cur;
+				break;
+			}
+			Window *children = NULL;
+			unsigned nchildren = 0;
+			Window rroot = None, rparent = None;
+			if (XQueryTree(ps->dpy, cur, &rroot, &rparent,
+						&children, &nchildren) && nchildren && children)
+				for (int i = 0; i < nchildren; ++i)
+					stack2 = dlist_add(stack2, (void *) children[i]);
+			sxfree(children);
+		}
+		dlist_free(stack);
+		if (result) {
+			free(stack2);
+			break;
+		}
+		else {
+			stack = stack2;
+		}
+	}
+
+	return result;
+}
+
+static inline dlist *
+wm_get_stack_fromprop(session_t *ps, Atom a) {
+	dlist *l = NULL;
+	unsigned char *data = NULL;
+	int real_format = 0;
+	Atom real_type = None;
+	unsigned long items_read = 0, items_left = 0;
+	int status = XGetWindowProperty(ps->dpy, ps->root, a,
+			0L, 8192L, False, XA_WINDOW, &real_type, &real_format,
+			&items_read, &items_left, &data);
+	if (Success == status && 32 == real_format && data)
+		for (int i = 0; i < items_read; i++) {
+			l = dlist_add(l, (void *) ((long *) data)[i]);
+		}
+
+	sxfree(data);
+	return l;
 }
 
 dlist *
-wm_get_stack(Display *dpy)
-{
-	dlist *l = 0;
-	unsigned char *data;
-	int status, real_format;
-	Atom real_type;
-	unsigned long items_read, items_left, i;
-	
-	if (WM_PERSONALITY == WM_PERSONALITY_NETWM)
-		status = XGetWindowProperty(dpy, DefaultRootWindow(dpy), _NET_CLIENT_LIST,
-		                  0L, 8192L, False, XA_WINDOW, &real_type, &real_format,
-		                  &items_read, &items_left, &data);
-	else
-		status = XGetWindowProperty(dpy, DefaultRootWindow(dpy), _WIN_CLIENT_LIST,
-		                  0L, 8192L, False, XA_CARDINAL, &real_type, &real_format,
-		                  &items_read, &items_left, &data);
-	
-	if(status != Success)
-		return 0;
-	
-	for(i = 0; i < items_read; i++)
-	{
-		l = dlist_add(l, (void *)((long *)data)[i]);
+wm_get_stack(session_t *ps) {
+	dlist *l = NULL;
+
+	if (!(ps->o.acceptOvRedir || ps->o.acceptWMWin)) {
+		// EWMH
+		l = wm_get_stack_fromprop(ps, _NET_CLIENT_LIST);
+		if (l) {
+			printfdf("(): Retrieved window stack from _NET_CLIENT_LIST.");
+			return l;
+		}
+
+		// GNOME WM
+		l = wm_get_stack_fromprop(ps, _WIN_CLIENT_LIST);
+		if (l) {
+			printfdf("(): Retrieved window stack from _WIN_CLIENT_LIST.");
+			return l;
+		}
 	}
-	
-	XFree(data);
-	
+
+	// Stupid method
+	{
+		Window *children = NULL;
+		unsigned nchildren = 0;
+		Window rroot = None, rparent = None;
+		if (XQueryTree(ps->dpy, ps->root, &rroot, &rparent,
+					&children, &nchildren) && nchildren && children) {
+			// Fluxbox sets override-redirect on its frame windows,
+			// so we can't skip override-redirect windows.
+			for (int i = 0; i < nchildren; ++i) {
+				Window wid = children[i];
+				Window client = wm_find_client(ps, wid);
+				if (!client && (ps->o.acceptOvRedir || ps->o.acceptWMWin)) {
+					XWindowAttributes attr = { };
+					if (XGetWindowAttributes(ps->dpy, wid, &attr)
+						&& ((attr.override_redirect && ps->o.acceptOvRedir)
+								|| (!attr.override_redirect && ps->o.acceptWMWin))) {
+						client = wid;
+					}
+				}
+				if (client)
+					l = dlist_add(l, (void *) client);
+			}
+		}
+		sxfree(children);
+		printfdf("(): Retrieved window stack by querying all children.");
+	}
+
 	return l;
 }
 
@@ -366,25 +411,21 @@ wm_get_root_pmap(Display *dpy)
 	return rootpmap;
 }
 
-CARD32
-wm_get_current_desktop(Display *dpy)
-{
-	CARD32 desktop = 0;
-	unsigned char *data;
-	int status, real_format;
-	Atom real_type;
-	unsigned long items_read, items_left;
-	
-	status = XGetWindowProperty(dpy, DefaultRootWindow(dpy),
-	                  (WM_PERSONALITY == WM_PERSONALITY_NETWM) ?  _NET_CURRENT_DESKTOP : _WIN_WORKSPACE,
-	                  0L, 1L, False, XA_CARDINAL, &real_type, &real_format,
-	                  &items_read, &items_left, &data);
-	if(status != Success)
-		return 0;
-	if(items_read)
-		desktop = ((CARD32*)data)[0];
-	XFree(data);
-	
+long
+wm_get_current_desktop(session_t *ps) {
+	winprop_t prop = { };
+	long desktop = 0;
+
+	prop = wid_get_prop(ps, ps->root, _NET_CURRENT_DESKTOP,
+			1, XA_CARDINAL, 0);
+	desktop = winprop_get_int(&prop);
+	free_winprop(&prop);
+	if (!desktop) {
+		prop = wid_get_prop(ps, ps->root, _WIN_WORKSPACE, 1, XA_CARDINAL, 0);
+		desktop = winprop_get_int(&prop);
+		free_winprop(&prop);
+	}
+
 	return desktop;
 }
 
@@ -445,36 +486,27 @@ wm_get_group_leader(Display *dpy, Window window)
 }
 
 void
-wm_use_netwm_fullscreen(Bool b)
-{
-	NETWM_HAS_FULLSCREEN = b ? NETWM_HAS_FULLSCREEN : False;
-}
-
-void
-wm_ignore_skip_taskbar(Bool b)
-{
-	IGNORE_SKIP_TASKBAR = b;
-}
-
-void
-wm_set_fullscreen(Display *dpy, Window window, int x, int y, unsigned int width, unsigned int height)
-{
-	if(WM_PERSONALITY == WM_PERSONALITY_NETWM && NETWM_HAS_FULLSCREEN)
-	{
-		Atom props[6];
-		CARD32 desktop = (CARD32)-1;
+wm_set_fullscreen(session_t *ps, Window window,
+		int x, int y, unsigned width, unsigned height) {
+	Display *dpy = ps->dpy;
+	if (ps->o.useNetWMFullscreen && ps->has_ewmh_fullscreen) {
+		Atom props[] = {
+			_NET_WM_STATE_FULLSCREEN,
+			_NET_WM_STATE_SKIP_TASKBAR,
+			_NET_WM_STATE_SKIP_PAGER,
+			_NET_WM_STATE_ABOVE,
+			_NET_WM_STATE_STICKY,
+			0,
+		};
+		long desktop = -1L;
 		
-		props[0] = _NET_WM_STATE_FULLSCREEN;
-		props[1] = _NET_WM_STATE_SKIP_TASKBAR;
-		props[2] = _NET_WM_STATE_SKIP_PAGER;
-		props[3] = _NET_WM_STATE_ABOVE;
-		props[4] = _NET_WM_STATE_STICKY;
-		props[5] = 0;
-		XChangeProperty(dpy, window, _NET_WM_STATE, XA_ATOM, 32, PropModeReplace, (unsigned char*)props, 5);
-		XChangeProperty(dpy, window, _NET_WM_DESKTOP, XA_CARDINAL, 32, PropModeReplace, (unsigned char*)&desktop, 1);
+		XChangeProperty(dpy, window, _NET_WM_STATE, XA_ATOM, 32,
+				PropModeReplace, (unsigned char *) props,
+				sizeof(props) / sizeof(props[0]) - 1);
+		XChangeProperty(dpy, window, _NET_WM_DESKTOP, XA_CARDINAL, 32,
+				PropModeReplace, (unsigned char *) &desktop, 1);
 	}
-	else
-	{
+	else {
 		XSetWindowAttributes wattr;
 		wattr.override_redirect = True;
 		XChangeWindowAttributes(dpy, window, CWOverrideRedirect, &wattr);
@@ -482,140 +514,84 @@ wm_set_fullscreen(Display *dpy, Window window, int x, int y, unsigned int width,
 	}
 }
 
-int
-wm_validate_window(Display *dpy, Window win)
-{
-	unsigned char *data;
-	Atom *atoms;
-	int status, real_format;
-	Atom real_type;
-	unsigned long items_read, items_left, i;
-	int result = 1;
-	
-	if(WM_PERSONALITY == WM_PERSONALITY_NETWM)
-	{
-		status = XGetWindowProperty(dpy, win, _NET_WM_STATE,
-		                  0L, 8192L, False, XA_ATOM, &real_type, &real_format,
-		                  &items_read, &items_left, &data);
-		
-		if(status != Success)
-			return 0;
-		
-		atoms = (Atom *)data;
-		
-		for(i = 0; result && i < items_read; i++) {
-			if(atoms[i] == _NET_WM_STATE_HIDDEN)
-				result = 0;
-			else if(! IGNORE_SKIP_TASKBAR && atoms[i] == _NET_WM_STATE_SKIP_TASKBAR)
-				result = 0;
-			else if(atoms[i] == _NET_WM_STATE_SHADED)
-				result = 0;
-			if(! result)
-				break;
+bool
+wm_validate_window(session_t *ps, Window wid) {
+	winprop_t prop = { };
+	bool result = true;
+
+	// Check _NET_WM_WINDOW_TYPE
+	prop = wid_get_prop(ps, wid, _NET_WM_WINDOW_TYPE, 1, XA_ATOM, 32);
+	long v = winprop_get_int(&prop);
+	if ((_NET_WM_WINDOW_TYPE_DESKTOP == v
+				|| _NET_WM_WINDOW_TYPE_DOCK == v))
+		result = false;
+	free_winprop(&prop);
+
+	if (!result) return result;
+
+	if (WMPSN_EWMH == ps->wmpsn) {
+		// Check _NET_WM_STATE
+		prop = wid_get_prop(ps, wid, _NET_WM_STATE, 8192, XA_ATOM, 32);
+		for (int i = 0; result && i < prop.nitems; i++) {
+			long v = prop.data32[i];
+			if (_NET_WM_STATE_HIDDEN == v)
+				result = false;
+			else if (ps->o.ignoreSkipTaskbar
+					&& _NET_WM_STATE_SKIP_TASKBAR == v)
+				result = false;
+			else if (_NET_WM_STATE_SHADED == v)
+				result = false;
 		}
-		XFree(data);
-		
-		if(! result)
-			return 0;
-		
-		status = XGetWindowProperty(dpy, win, _NET_WM_WINDOW_TYPE,
-		                            0L, 1L, False, XA_ATOM, &real_type, &real_format,
-		                            &items_read, &items_left, &data);
-		if(status != Success)
-			return 1;
-		
-		atoms = (Atom *)data;
-		
-		if(items_read && (atoms[0] == _NET_WM_WINDOW_TYPE_DESKTOP || atoms[0] == _NET_WM_WINDOW_TYPE_DOCK))
-			result = 0;
-		
-		XFree(data);
-		
-		return result;
-	} else {
-		CARD32 attr;
-		
-		status = XGetWindowProperty(dpy, win, _WIN_STATE,
-		                  0L, 1L, False, XA_CARDINAL, &real_type, &real_format,
-		                  &items_read, &items_left, &data);
-		if(status != Success || ! items_read)
-		{
-			if(status == Success)
-				XFree(data);
-			return 0;
-		}
-		attr = (((CARD32*)data)[0]) & (WIN_STATE_MINIMIZED |
-		                             WIN_STATE_SHADED |
-		                             WIN_STATE_HIDDEN);
-		if(attr)
-			result = 0;
-		XFree(data);
-		if(! result)
-			return 0;
-		
-		if(! IGNORE_SKIP_TASKBAR)
-		{
-			status = XGetWindowProperty(dpy, win, _WIN_HINTS,
-			                  0L, 1L, False, XA_CARDINAL, &real_type, &real_format,
-			                  &items_read, &items_left, &data);
-			if(status != Success || ! items_read)
-			{
-				if(status == Success)
-					XFree(data);
-				return 1; /* If there's no _WIN_HINTS, assume it's 0, thus valid */
-			}
-			attr = ((CARD32*)data)[0];
-			if(attr & WIN_HINTS_SKIP_TASKBAR)
-				result = 0;
-			XFree(data);
-		}
-		
-		return result;
+		free_winprop(&prop);
+
 	}
+	else if (WMPSN_GNOME == ps->wmpsn) {
+		// Check _WIN_STATE
+		prop = wid_get_prop(ps, wid, _WIN_STATE, 1, XA_CARDINAL, 0);
+		if (winprop_get_int(&prop)
+				& (WIN_STATE_MINIMIZED | WIN_STATE_SHADED | WIN_STATE_HIDDEN))
+			result = false;
+		free_winprop(&prop);
+
+		if (result && ps->o.ignoreSkipTaskbar) {
+			prop = wid_get_prop(ps, wid, _WIN_HINTS, 1, XA_CARDINAL, 0);
+			if (winprop_get_int(&prop) & WIN_HINTS_SKIP_TASKBAR)
+				result = false;
+			free_winprop(&prop);
+		}
+	}
+
+	return result;
 }
 
-CARD32
-wm_get_window_desktop(Display *dpy, Window win)
-{
-	int status, real_format;
-	Atom real_type;
-	unsigned long items_read, items_left;
-	unsigned char *data;
-	CARD32 desktop = 0;
-	
-	if(WM_PERSONALITY == WM_PERSONALITY_GNOME)
-	{
-		status = XGetWindowProperty(dpy, win, _WIN_STATE,
-		                  0L, 1L, False, XA_CARDINAL, &real_type, &real_format,
-		                  &items_read, &items_left, &data);
-		if(status == Success)
-		{
-			if(items_read)
-				desktop = (((CARD32*)data)[0] & WIN_STATE_STICKY) ? (CARD32)-1 : 0;
-			
-			XFree(data);
-			
-			if(desktop)
-				return desktop;
-		}
+long
+wm_get_window_desktop(session_t *ps, Window wid) {
+	long desktop = LONG_MIN;
+	winprop_t prop = { };
+
+	// Check for sticky window
+	if (WMPSN_GNOME == ps->wmpsn) {
+		prop = wid_get_prop(ps, wid, _WIN_STATE, 1, XA_CARDINAL, 0);
+		if (WIN_STATE_STICKY & winprop_get_int(&prop))
+			desktop = -1;
+		free_winprop(&prop);
+		if (LONG_MIN != desktop)
+			return desktop;
 	}
-	
-	status = XGetWindowProperty(dpy, win,
-	                  (WM_PERSONALITY == WM_PERSONALITY_NETWM) ? _NET_WM_DESKTOP : _WIN_WORKSPACE,
-	                  0L, 1L, False, XA_CARDINAL, &real_type, &real_format,
-	                  &items_read, &items_left, &data);
-	
-	if(status != Success)
-		return wm_get_current_desktop(dpy);
-	
-	if(items_read)
-		desktop = ((CARD32*)data)[0];
-	else
-		desktop = wm_get_current_desktop(dpy);
-	
-	XFree(data);
-	
-	return desktop;
+
+	prop = wid_get_prop(ps, wid, _NET_WM_DESKTOP, 1, XA_CARDINAL, 0);
+	if (prop.nitems)
+		desktop = winprop_get_int(&prop);
+	free_winprop(&prop);
+	if (LONG_MIN != desktop) return desktop;
+
+	prop = wid_get_prop(ps, wid, _WIN_WORKSPACE, 1, XA_CARDINAL, 0);
+	if (prop.nitems)
+		desktop = winprop_get_int(&prop);
+	free_winprop(&prop);
+	if (LONG_MIN != desktop) return desktop;
+
+	return wm_get_current_desktop(ps);
 }
 
 /* Get focused window and traverse towards the root window until a window with WM_STATE is found */
@@ -772,7 +748,7 @@ wm_send_clientmsg(session_t *ps, Window twid, Window wid, Atom msg_type,
  * @param wid window ID
  * @return window ID of the frame window
  */
-static Window
+Window
 wm_find_frame(session_t *ps, Window wid) {
   // We traverse through its ancestors to find out the frame
   for (Window cwid = wid; cwid && cwid != ps->root; ) {
@@ -787,5 +763,51 @@ wm_find_frame(session_t *ps, Window wid) {
   }
 
   return wid;
+}
+
+/**
+ * Get a specific attribute of a window.
+ *
+ * Returns a blank structure if the returned type and format does not
+ * match the requested type and format.
+ *
+ * @param ps current session
+ * @param w window
+ * @param atom atom of attribute to fetch
+ * @param length length to read
+ * @param rtype atom of the requested type
+ * @param rformat requested format
+ * @return a <code>winprop_t</code> structure containing the attribute
+ *    and number of items. A blank one on failure.
+ */
+winprop_t
+wid_get_prop_adv(const session_t *ps, Window w, Atom atom, long offset,
+    long length, Atom rtype, int rformat) {
+  Atom type = None;
+  int format = 0;
+  unsigned long nitems = 0, after = 0;
+  unsigned char *data = NULL;
+
+  if (Success == XGetWindowProperty(ps->dpy, w, atom, offset, length,
+        False, rtype, &type, &format, &nitems, &after, &data)
+      && nitems && (AnyPropertyType == type || type == rtype)
+      && (!rformat || format == rformat)
+      && (8 == format || 16 == format || 32 == format)) {
+      return (winprop_t) {
+        .data8 = data,
+        .nitems = nitems,
+        .type = type,
+        .format = format,
+      };
+  }
+
+  sxfree(data);
+
+  return (winprop_t) {
+    .data8 = NULL,
+    .nitems = 0,
+    .type = AnyPropertyType,
+    .format = 0
+  };
 }
 

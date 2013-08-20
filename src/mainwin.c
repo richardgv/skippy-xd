@@ -194,7 +194,6 @@ mainwin_update_background(MainWin *mw) {
 	session_t *ps = mw->ps;
 
 	Pixmap root = wm_get_root_pmap(ps->dpy);
-	XRenderColor black = { 0, 0, 0, 65535};
 	XRenderPictureAttributes pa;
 	
 	if(mw->bg_pixmap)
@@ -206,10 +205,14 @@ mainwin_update_background(MainWin *mw) {
 	pa.repeat = True;
 	mw->background = XRenderCreatePicture(ps->dpy, mw->bg_pixmap, mw->format, CPRepeat, &pa);
 	
-	if(root == None)
+	if (ps->o.background) {
+		XRenderComposite(ps->dpy, PictOpSrc, ps->o.background->pict, None, mw->background, mw->x, mw->y, 0, 0, 0, 0, mw->width, mw->height);
+	}
+	else if (!root) {
+		static const XRenderColor black = { 0, 0, 0, 0xffff};
 		XRenderFillRectangle(ps->dpy, PictOpSrc, mw->background, &black, 0, 0, mw->width, mw->height);
-	else
-	{
+	}
+	else {
 		Picture from = XRenderCreatePicture(ps->dpy, root, XRenderFindVisualFormat(ps->dpy, DefaultVisual(ps->dpy, ps->screen)), 0, 0);
 		XRenderComposite(ps->dpy, PictOpSrc, from, None, mw->background, mw->x, mw->y, 0, 0, 0, 0, mw->width, mw->height);
 		XRenderFreePicture(ps->dpy, from);
@@ -280,15 +283,19 @@ void
 mainwin_map(MainWin *mw) {
 	session_t *ps = mw->ps;
 
-	wm_set_fullscreen(ps->dpy, mw->window, mw->x, mw->y, mw->width, mw->height);
+	wm_set_fullscreen(ps, mw->window, mw->x, mw->y, mw->width, mw->height);
 	mw->pressed = 0;
 	XMapWindow(ps->dpy, mw->window);
 	XRaiseWindow(ps->dpy, mw->window);
 
-	// Might because of WM reparent, XSetInput() doesn't work here
+	// Might because of WM reparent, XSetInputFocus() doesn't work here
 	XSetInputFocus(ps->dpy, mw->window, RevertToParent, CurrentTime);
-	XGrabKeyboard(ps->dpy, mw->window, True, GrabModeAsync, GrabModeAsync,
-			CurrentTime);
+	{
+		int ret = XGrabKeyboard(ps->dpy, mw->window, True, GrabModeAsync,
+				GrabModeAsync, CurrentTime);
+		if (Success != ret)
+			printfef("(): Failed to grab keyboard (%d), troubles ahead.", ret);
+	}
 }
 
 void

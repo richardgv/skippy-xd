@@ -23,6 +23,14 @@
 # - the 'shadowText' option can be a color or 'none', in which case the
 #   drop-shadow effect is disabled
 #
+# - Picture specification:
+#   [WIDTHxHEIGHT] [orig|scale|scalek|tile] [left|mid|right] [left|mid|right]
+#   [COLOR|#FFFFFFFF] [PATH]
+#
+#   Examples:
+#   background = 500x400 tile right mid #FF0000 /home/richard/screenshots/256.png
+#   background = orig mid mid #FF000080
+#
 # - Bindings in [bindings] section can bind to "no" (do nothing), "focus"
 #   (focus to window), "iconify", "shade-ewmh" (toggle window shade state),
 #   "close-iccwm" (close window with ICCWM method), "close-ewmh" (close
@@ -38,6 +46,8 @@ lazyTrans = false
 pipePath = /tmp/skippy-xd-fifo
 movePointerOnStart = true
 useNameWindowPixmap = false
+includeFrame = true
+background =
 
 [xinerama]
 showAll = false

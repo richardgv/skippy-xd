@@ -3,12 +3,31 @@ BINDIR ?= ${PREFIX}/bin
 
 CC ?= gcc
 
+SRCS_RAW = skippy wm dlist mainwin clientwin layout focus config tooltip img
 PACKAGES = x11 xft xrender xcomposite xdamage xfixes
 
 # === Options ===
 ifeq "${CFG_NO_XINERAMA}" ""
 	CPPFLAGS += -DCFG_XINERAMA
 	PACKAGES += xext xinerama
+endif
+
+ifeq "${CFG_NO_PNG}" ""
+	CPPFLAGS += -DCFG_LIBPNG
+	SRCS_RAW += img-png
+	PACKAGES += libpng zlib
+endif
+
+ifeq "${CFG_NO_JPEG}" ""
+	CPPFLAGS += -DCFG_JPEG
+	SRCS_RAW += img-jpeg
+	LIBS += -ljpeg
+endif
+
+ifeq "${CFG_NO_GIF}" ""
+	CPPFLAGS += -DCFG_GIFLIB
+	SRCS_RAW += img-gif
+	LIBS += -lgif
 endif
 
 ifeq "$(CFG_DEV)" ""
@@ -24,7 +43,7 @@ endif
 CFLAGS += -std=c99 -Wall
 LDFLAGS ?= -Wl,-O1 -Wl,--as-needed
 INCS = $(shell pkg-config --cflags $(PACKAGES))
-LIBS = -lm $(shell pkg-config --libs $(PACKAGES))
+LIBS += -lm $(shell pkg-config --libs $(PACKAGES))
 
 # === Version string ===
 SKIPPYXD_VERSION ?= git-$(shell git describe --always --dirty)-$(shell git log -1 --date=short --pretty=format:%cd)
@@ -33,7 +52,6 @@ CPPFLAGS += -DSKIPPYXD_VERSION="\"${SKIPPYXD_VERSION}\""
 # === Recipes ===
 EXESUFFIX =
 BINS = skippy-xd${EXESUFFIX}
-SRCS_RAW = skippy wm dlist mainwin clientwin layout focus config tooltip
 SRCS = $(foreach name,$(SRCS_RAW),src/$(name).c)
 HDRS = $(foreach name,$(SRCS_RAW),src/$(name).h)
 OBJS = $(foreach name,$(SRCS_RAW),$(name).o)

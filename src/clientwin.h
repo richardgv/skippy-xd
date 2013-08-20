@@ -23,7 +23,7 @@
 typedef struct {
 	Window window;
 	int x, y;
-	unsigned int width, height;
+	int width, height;
 	XRenderPictFormat *format;
 } SkippyWindow;
 
@@ -32,8 +32,9 @@ typedef struct {
 struct _MainWin;
 typedef struct {
 	struct _MainWin *mainwin;
-	
-	SkippyWindow client;
+
+	Window wid_client;
+	SkippyWindow src;
 	bool redirected;
 	Pixmap cpixmap;
 	SkippyWindow mini;
@@ -53,7 +54,7 @@ typedef struct {
 } ClientWin;
 
 #define CLIENTWT_INIT { \
-	.client = SKIPPYWINT_INIT, \
+	.src = SKIPPYWINT_INIT, \
 	.mini = SKIPPYWINT_INIT, \
 	.mainwin = NULL \
 }

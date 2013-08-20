@@ -40,19 +40,50 @@ extern Atom
 	_NET_WM_STATE,
 	_NET_WM_STATE_SHADED;
 
+/// Structure representing Window property value.
+typedef struct {
+  // All pointers have the same length, right?
+  union {
+    unsigned char *data8;
+    short *data16;
+    long *data32;
+  };
+  unsigned long nitems;
+  Atom type;
+  int format;
+} winprop_t;
+
 void wm_get_atoms(session_t *ps);
-char wm_check(Display *dpy);
-void wm_use_netwm_fullscreen(Bool b);
-dlist *wm_get_stack(Display *dpy);
+
+bool wm_check_netwm(session_t *ps);
+bool wm_check_gnome(session_t *ps);
+static inline bool
+wm_check(session_t *ps) {
+	if (wm_check_netwm(ps)) {
+		ps->wmpsn = WMPSN_EWMH;
+		printfdf("(): Your WM looks EWMH compliant.");
+		return true;
+	}
+	if (wm_check_gnome(ps)) {
+		ps->wmpsn = WMPSN_GNOME;
+		printfdf("(): Your WM looks GNOME compliant.");
+		return true;
+	}
+	printfef("(): Your WM is neither EWMH nor GNOME WM compliant. "
+			"Troubles ahead.");
+	return false;
+}
+
+dlist *wm_get_stack(session_t *ps);
 Pixmap wm_get_root_pmap(Display *dpy);
-CARD32 wm_get_current_desktop(Display *dpy);
+long wm_get_current_desktop(session_t *ps);
 FcChar8 *wm_get_window_title(session_t *ps, Window wid, int *length_return);
 Window wm_get_group_leader(Display *dpy, Window window);
-void wm_set_fullscreen(Display *dpy, Window window, int x, int y, unsigned int width, unsigned int height);
-int wm_validate_window(Display *dpy, Window win);
-CARD32 wm_get_window_desktop(Display *dpy, Window win);
+void wm_set_fullscreen(session_t *ps, Window window,
+		int x, int y, unsigned width, unsigned height);
+bool wm_validate_window(session_t *ps, Window wid);
+long wm_get_window_desktop(session_t *ps, Window wid);
 Window wm_get_focused(Display *dpy);
-void wm_ignore_skip_taskbar(Bool b);
 
 char *wm_wid_get_prop_rstr(session_t *ps, Window wid, Atom prop);
 char *wm_wid_get_prop_utf8(session_t *ps, Window wid, Atom prop);
@@ -95,6 +126,82 @@ wm_shade_window_ewmh(session_t *ps, Window wid) {
 	long data[] = { 2, _NET_WM_STATE_SHADED };
 	wm_send_clientmsg_ewmh_root(ps, wid, _NET_WM_STATE,
 			sizeof(data) / sizeof(data[0]), data);
+}
+
+Window wm_find_frame(session_t *ps, Window wid);
+
+/**
+ * Determine if a window has a specific property.
+ *
+ * @param ps current session
+ * @param w window to check
+ * @param atom atom of property to check
+ * @return 1 if it has the attribute, 0 otherwise
+ */
+static inline bool
+wid_has_prop(const session_t *ps, Window w, Atom atom) {
+  Atom type = None;
+  int format;
+  unsigned long nitems, after;
+  unsigned char *data;
+
+  if (Success == XGetWindowProperty(ps->dpy, w, atom, 0, 0, False,
+        AnyPropertyType, &type, &format, &nitems, &after, &data)) {
+    sxfree(data);
+    if (type) return true;
+  }
+
+  return false;
+}
+
+winprop_t
+wid_get_prop_adv(const session_t *ps, Window w, Atom atom, long offset,
+    long length, Atom rtype, int rformat);
+
+/**
+ * Wrapper of wid_get_prop_adv().
+ */
+static inline winprop_t
+wid_get_prop(const session_t *ps, Window wid, Atom atom, long length,
+    Atom rtype, int rformat) {
+  return wid_get_prop_adv(ps, wid, atom, 0L, length, rtype, rformat);
+}
+
+/**
+ * Get the numeric property value from a win_prop_t.
+ */
+static inline long
+winprop_get_int(const winprop_t *pprop) {
+  long tgt = 0;
+
+  if (!pprop->nitems)
+    return 0;
+
+  switch (pprop->format) {
+    case 8:   tgt = *(pprop->data8);    break;
+    case 16:  tgt = *(pprop->data16);   break;
+    case 32:  tgt = *(pprop->data32);   break;
+    default:  assert(0);
+              break;
+  }
+
+  return tgt;
+}
+
+bool
+wid_get_text_prop(session_t *ps, Window wid, Atom prop,
+    char ***pstrlst, int *pnstr);
+
+/**
+ * Free a <code>winprop_t</code>.
+ *
+ * @param pprop pointer to the <code>winprop_t</code> to free.
+ */
+static inline void
+free_winprop(winprop_t *pprop) {
+  // Empty the whole structure to avoid possible issues
+  spxfree(&pprop->data8);
+  pprop->nitems = 0;
 }
 
 #endif /* SKIPPY_WM_H */

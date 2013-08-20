@@ -59,10 +59,47 @@
 #include <time.h>
 #include <regex.h>
 #include <string.h>
+#include <inttypes.h>
+#include <ctype.h>
 
 #include "dlist.h"
 
 #define MAX_MOUSE_BUTTONS 4
+
+/**
+ * @brief Dump raw bytes in HEX format.
+ *
+ * @param data pointer to raw data
+ * @param len length of data
+ */
+static inline void
+hexdump(const char *data, int len) {
+  static const int BYTE_PER_LN = 16;
+
+  if (len <= 0)
+    return;
+
+  // Print header
+  printf("%10s:", "Offset");
+  for (int i = 0; i < BYTE_PER_LN; ++i)
+    printf(" %2d", i);
+  putchar('\n');
+
+  // Dump content
+  for (int offset = 0; offset < len; ++offset) {
+    if (!(offset % BYTE_PER_LN))
+      printf("0x%08x:", offset);
+
+    printf(" %02hhx", data[offset]);
+
+    if ((BYTE_PER_LN - 1) == offset % BYTE_PER_LN)
+      putchar('\n');
+  }
+  if (len % BYTE_PER_LN)
+    putchar('\n');
+
+  fflush(stdout);
+}
 
 /// @brief Possible return values.
 enum {
@@ -95,6 +132,48 @@ enum align {
 	ALIGN_RIGHT,
 };
 
+enum buttons {
+	BUTN_CLOSE,
+	BUTN_MINIMIZE,
+	BUTN_SHADE,
+	NUM_BUTN,
+};
+
+enum pict_posp_mode {
+	PICTPOSP_ORIG,
+	PICTPOSP_SCALE,
+	PICTPOSP_SCALEK,
+	PICTPOSP_TILE,
+};
+
+typedef enum {
+	WMPSN_NONE,
+	WMPSN_EWMH,
+	WMPSN_GNOME,
+} wmpsn_t;
+
+typedef struct {
+	char *path;
+	enum pict_posp_mode mode;
+	int twidth;
+	int theight;
+	enum align alg;
+	enum align valg;
+	XRenderColor c;
+} pictspec_t;
+
+#define PICTSPECT_INIT { \
+	.path = NULL, \
+}
+
+typedef struct {
+	Pixmap pxmap;
+	Picture pict;
+	int height;
+	int width;
+	int depth;
+} pictw_t;
+
 /// @brief Option structure.
 typedef struct {
 	char *config_path;
@@ -105,11 +184,16 @@ typedef struct {
 	int distance;
 	bool useNetWMFullscreen;
 	bool ignoreSkipTaskbar;
+	bool acceptOvRedir;
+	bool acceptWMWin;
 	double updateFreq;
 	bool lazyTrans;
 	bool useNameWindowPixmap;
+	bool includeFrame;
 	char *pipePath;
 	bool movePointerOnStart;
+	char *buttonImgs[NUM_BUTN];
+	pictw_t *background;
 
 	bool xinerama_showAll;
 
@@ -145,11 +229,16 @@ typedef struct {
 	.distance = 50, \
 	.useNetWMFullscreen = true, \
 	.ignoreSkipTaskbar = false, \
+	.acceptOvRedir = false, \
+	.acceptWMWin = false, \
 	.updateFreq = 10.0, \
 	.lazyTrans = false, \
 	.useNameWindowPixmap = false, \
+	.includeFrame = false, \
 	.pipePath = NULL, \
 	.movePointerOnStart = true, \
+	.buttonImgs = { NULL }, \
+	.background = NULL, \
 	.xinerama_showAll = false, \
 	.normal_tint = NULL, \
 	.normal_tintOpacity = 0, \
@@ -204,6 +293,10 @@ typedef struct {
 	xinfo_t xinfo;
 	/// @brief Time the program was started, in milliseconds.
 	struct timeval time_start;
+	/// @brief WM personality.
+	wmpsn_t wmpsn;
+	/// @brief Whether we have EWMH fullscreen support.
+	bool has_ewmh_fullscreen;
 } session_t;
 
 #define SESSIONT_INIT { \
@@ -216,20 +309,29 @@ typedef struct {
 #define printfd(format, ...) \
   (fprintf(stdout, format "\n", ## __VA_ARGS__), fflush(stdout))
 
+/// @brief Print out a debug message with function name.
+#define printfdf(format, ...) \
+  (fprintf(stdout, "%s" format "\n", __func__, ## __VA_ARGS__), fflush(stdout))
+
 /// @brief Print out an error message.
 #define printfe(format, ...) \
   (fprintf(stderr, format "\n", ## __VA_ARGS__), fflush(stderr))
 
 /// @brief Print out an error message with function name.
 #define printfef(format, ...) \
-  printfe("%s" format,  __func__, ## __VA_ARGS__)
+  printfe("%s" format, __func__, ## __VA_ARGS__)
+
+/// @brief Wrapper for gcc branch prediction builtin, for likely branch.
+#define likely(x)    __builtin_expect(!!(x), 1)
+/// @brief Wrapper for gcc branch prediction builtin, for unlikely branch.
+#define unlikely(x)  __builtin_expect(!!(x), 0)
 
 /**
  * @brief Quit with RETV_BADALLOC if the passed-in pointer is empty.
  */
 static inline void *
 allocchk_(void *ptr, const char *func_name) {
-  if (!ptr) {
+  if (unlikely(!ptr)) {
     printfe("%s(): Failed to allocate memory.", func_name);
 	exit(RET_BADALLOC);
   }
@@ -244,14 +346,18 @@ allocchk_(void *ptr, const char *func_name) {
 /// Use #s here to prevent macro expansion
 #define CASESTRRET(s)   case s: return #s
 
+/// @brief Return number of elements in a constant array.
+#define CARR_LEN(a) sizeof(a) / sizeof(a[0])
+
 #define MAX(a,b) (((a) > (b)) ? (a) : (b))
 #define MIN(a,b) (((a) > (b)) ? (b) : (a))
+#define foreach_dlist(l) \
+	for (dlist *iter = dlist_first(l); iter; iter = iter->next)
 #define REDUCE(statement, l) \
-{ \
-	dlist *iter = dlist_first(l); \
-	for(; iter; iter = iter->next) \
-		statement; \
-}
+	do { \
+		foreach_dlist(l) \
+			statement; \
+	} while (0)
 
 /**
  * @brief Get current time, in milliseconds.
@@ -350,6 +456,18 @@ mstrdup(const char *src) {
 }
 
 /**
+ * @brief Copy a number of characters to a newly allocated string.
+ */
+static inline char *
+mstrncpy(const char *src, unsigned len) {
+	char *str = allocchk(malloc(sizeof(char) * (len + 1)));
+	strncpy(str, src, len);
+	str[len] = '\0';
+
+	return str;
+}
+
+/**
  * @brief Copy and place a string to somewhere.
  */
 static inline void
@@ -359,14 +477,42 @@ strplace(char **dst, const char *src) {
 }
 
 /**
- * @brief Destroy a <code>Picture</code>.
+ * @brief Check if a character symbolizes end of a word.
  */
-static inline void
-free_picture(session_t *ps, Picture *p) {
-	if (*p) {
-		XRenderFreePicture(ps->dpy, *p);
-		*p = None;
-	}
+static inline bool
+isspace0(char c) {
+	return !c || isspace(c);
+}
+
+/**
+ * @brief Check if a string ends with something, ignore case.
+ */
+static inline bool
+str_endwith(const char *haystick, const char *needle) {
+	int haystick_len = strlen(haystick);
+	int needle_len = strlen(needle);
+	return haystick_len >= needle_len
+		&& !strcasecmp(haystick + haystick_len - needle_len, needle);
+}
+
+/**
+ * @brief Check if a string starts with some words, ignore case.
+ */
+static inline bool
+str_startswithword(const char *haystick, const char *needle) {
+	const int needle_len = strlen(needle);
+	return !strncmp(haystick, needle, needle_len)
+		&& isspace0(haystick[needle_len]);
+}
+
+/**
+ * @brief Check if a string starts with some words, ignore case.
+ */
+static inline bool
+str_startswithwordi(const char *haystick, const char *needle) {
+	const int needle_len = strlen(needle);
+	return !strncasecmp(haystick, needle, needle_len)
+		&& isspace0(haystick[needle_len]);
 }
 
 /**
@@ -376,6 +522,17 @@ static inline void
 free_pixmap(session_t *ps, Pixmap *p) {
 	if (*p) {
 		XFreePixmap(ps->dpy, *p);
+		*p = None;
+	}
+}
+
+/**
+ * @brief Destroy a <code>Picture</code>.
+ */
+static inline void
+free_picture(session_t *ps, Picture *p) {
+	if (*p) {
+		XRenderFreePicture(ps->dpy, *p);
 		*p = None;
 	}
 }
@@ -403,6 +560,14 @@ free_region(session_t *ps, XserverRegion *p) {
 	}
 }
 
+/**
+ * @brief Destroy a <code>pictspec_t</code>.
+ */
+static inline void
+free_pictspec(session_t *ps, pictspec_t *p) {
+	free(p->path);
+}
+
 static inline unsigned short
 alphaconv(int alpha) {
 	return MIN(alpha * 256, 65535);
@@ -417,6 +582,15 @@ static inline void
 sxfree(void *data) {
   if (data)
     XFree(data);
+}
+
+/**
+ * @brief Wrapper to sxfree() to turn the pointer NULL as well.
+ */
+static inline void
+spxfree(void *data) {
+	sxfree(*(void **) data);
+	*(void **) data = NULL;
 }
 
 /**
@@ -442,6 +616,18 @@ ev_key_str(XKeyEvent *ev) {
 #include "focus.h"
 #include "config.h"
 #include "tooltip.h"
+#include "img.h"
+#ifdef CFG_LIBPNG
+// FreeType uses setjmp.h and libpng-1.2 feels crazy about this...
+#define PNG_SKIP_SETJMP_CHECK 1
+#include "img-png.h"
+#endif
+#ifdef CFG_JPEG
+#include "img-jpeg.h"
+#endif
+#ifdef CFG_GIFLIB
+#include "img-gif.h"
+#endif
 
 extern session_t *ps_g;
 
