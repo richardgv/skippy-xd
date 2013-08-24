@@ -859,9 +859,11 @@ parse_args(session_t *ps, int argc, char **argv, bool first_pass) {
 	if (first_pass) {
 		while ((o = getopt_long(argc, argv, opts_short, opts_long, NULL)) >= 0) {
 			switch (o) {
+#define T_CASEBOOL(idx, option) case idx: ps->o.option = true; break
 				case OPT_CONFIG:
 					ps->o.config_path = mstrdup(optarg);
 					break;
+				T_CASEBOOL('S', synchronize);
 				case '?':
 				case 'h':
 					show_help();
@@ -876,9 +878,8 @@ parse_args(session_t *ps, int argc, char **argv, bool first_pass) {
 
 	while ((o = getopt_long(argc, argv, opts_short, opts_long, NULL)) >= 0) {
 		switch (o) {
+			case 'S': break;
 			case OPT_CONFIG: break;
-#define T_CASEBOOL(idx, option) case idx: ps->o.option = true; break
-			T_CASEBOOL('S', synchronize);
 			case OPT_ACTV_PICKER:
 				ps->o.mode = PROGMODE_ACTV_PICKER;
 				break;

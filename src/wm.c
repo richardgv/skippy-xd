@@ -314,13 +314,13 @@ wm_find_client(session_t *ps, Window wid) {
 }
 
 static inline dlist *
-wm_get_stack_fromprop(session_t *ps, Atom a) {
+wm_get_stack_fromprop(session_t *ps, Window root, Atom a) {
 	dlist *l = NULL;
 	unsigned char *data = NULL;
 	int real_format = 0;
 	Atom real_type = None;
 	unsigned long items_read = 0, items_left = 0;
-	int status = XGetWindowProperty(ps->dpy, ps->root, a,
+	int status = XGetWindowProperty(ps->dpy, root, a,
 			0L, 8192L, False, XA_WINDOW, &real_type, &real_format,
 			&items_read, &items_left, &data);
 	if (Success == status && 32 == real_format && data)
@@ -332,20 +332,20 @@ wm_get_stack_fromprop(session_t *ps, Atom a) {
 	return l;
 }
 
-dlist *
-wm_get_stack(session_t *ps) {
+static inline dlist *
+wm_get_stack_sub(session_t *ps, Window root) {
 	dlist *l = NULL;
 
 	if (!(ps->o.acceptOvRedir || ps->o.acceptWMWin)) {
 		// EWMH
-		l = wm_get_stack_fromprop(ps, _NET_CLIENT_LIST);
+		l = wm_get_stack_fromprop(ps, root, _NET_CLIENT_LIST);
 		if (l) {
 			printfdf("(): Retrieved window stack from _NET_CLIENT_LIST.");
 			return l;
 		}
 
 		// GNOME WM
-		l = wm_get_stack_fromprop(ps, _WIN_CLIENT_LIST);
+		l = wm_get_stack_fromprop(ps, root, _WIN_CLIENT_LIST);
 		if (l) {
 			printfdf("(): Retrieved window stack from _WIN_CLIENT_LIST.");
 			return l;
@@ -357,7 +357,7 @@ wm_get_stack(session_t *ps) {
 		Window *children = NULL;
 		unsigned nchildren = 0;
 		Window rroot = None, rparent = None;
-		if (XQueryTree(ps->dpy, ps->root, &rroot, &rparent,
+		if (XQueryTree(ps->dpy, root, &rroot, &rparent,
 					&children, &nchildren) && nchildren && children) {
 			// Fluxbox sets override-redirect on its frame windows,
 			// so we can't skip override-redirect windows.
@@ -381,6 +381,17 @@ wm_get_stack(session_t *ps) {
 	}
 
 	return l;
+}
+
+dlist *
+wm_get_stack(session_t *ps) {
+	if (ps->o.includeAllScreens) {
+		dlist *l = NULL;
+		for (int i = 0; i < ScreenCount(ps->dpy); ++i)
+			l = dlist_join(l, wm_get_stack_sub(ps, RootWindow(ps->dpy, i)));
+		return l;
+	}
+	else return wm_get_stack_sub(ps, ps->root);
 }
 
 Pixmap

@@ -160,6 +160,19 @@ dlist_dup(dlist *l)
 }
 
 dlist *
+dlist_join(dlist *l, dlist *l2) {
+	if (!l) return l2;
+	if (!l2) return l;
+
+	dlist *last = dlist_last(l);
+	dlist *first2 = dlist_first(l2);
+	last->next = first2;
+	first2->prev = last;
+
+	return l;
+}
+
+dlist *
 dlist_find_all(dlist *l, dlist_match_func match, void *data)
 {
 	dlist *n = 0;

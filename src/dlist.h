@@ -71,6 +71,8 @@ void dlist_reverse(dlist *);
 /* duplicate the list (not the data), returns new end */
 dlist *dlist_dup(dlist *);
 
+dlist * dlist_join(dlist *l, dlist *l2);
+
 /* find all matching elements (returns new list or 0) */
 typedef int (*dlist_match_func)(dlist*, void *);
 dlist *dlist_find_all(dlist *, dlist_match_func, void *);

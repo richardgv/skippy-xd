@@ -192,6 +192,7 @@ typedef struct {
 	bool includeFrame;
 	char *pipePath;
 	bool movePointerOnStart;
+	bool includeAllScreens;
 	char *buttonImgs[NUM_BUTN];
 	pictw_t *background;
 
@@ -237,6 +238,7 @@ typedef struct {
 	.includeFrame = false, \
 	.pipePath = NULL, \
 	.movePointerOnStart = true, \
+	.includeAllScreens = false, \
 	.buttonImgs = { NULL }, \
 	.background = NULL, \
 	.xinerama_showAll = false, \
@@ -320,6 +322,9 @@ typedef struct {
 /// @brief Print out an error message with function name.
 #define printfef(format, ...) \
   printfe("%s" format, __func__, ## __VA_ARGS__)
+
+/// @brief Return a value if it's true.
+#define retif(x) do { if (x) return (x); } while (0)
 
 /// @brief Wrapper for gcc branch prediction builtin, for likely branch.
 #define likely(x)    __builtin_expect(!!(x), 1)
