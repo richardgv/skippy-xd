@@ -337,7 +337,10 @@ clientwin_unmap(ClientWin *cw)
 
 static void
 childwin_focus(ClientWin *cw) {
-	XWarpPointer(cw->mainwin->ps->dpy, None, cw->wid_client, 0, 0, 0, 0, cw->src.width / 2, cw->src.height / 2);
+	session_t * const ps = cw->mainwin->ps;
+
+	if (ps->o.movePointerOnRaise)
+		XWarpPointer(cw->mainwin->ps->dpy, None, cw->wid_client, 0, 0, 0, 0, cw->src.width / 2, cw->src.height / 2);
 	XRaiseWindow(cw->mainwin->ps->dpy, cw->wid_client);
 	XSetInputFocus(cw->mainwin->ps->dpy, cw->wid_client, RevertToParent, CurrentTime);
 }
