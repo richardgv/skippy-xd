@@ -28,6 +28,7 @@ dir_focus(ClientWin *cw, match_func match, dist_func func)
 	float diff = 0.0;
 	ClientWin *candidate = NULL;
 	dlist *iter, *candidates;
+	session_t * const ps = cw->mainwin->ps;
 	
 	candidates = dlist_first(dlist_find_all(cw->mainwin->cod, (dlist_match_func)match, &cw->mini));
 	if(! candidates)
@@ -44,7 +45,8 @@ dir_focus(ClientWin *cw, match_func match, dist_func func)
 		}
 	}
 	
-	XWarpPointer(candidate->mainwin->ps->dpy, None, candidate->mini.window, 0, 0, 0, 0, candidate->mini.width / 2, candidate->mini.height / 2);
+	if (ps->o.movePointerOnSelect)
+		XWarpPointer(candidate->mainwin->ps->dpy, None, candidate->mini.window, 0, 0, 0, 0, candidate->mini.width / 2, candidate->mini.height / 2);
 	XSetInputFocus(candidate->mainwin->ps->dpy, candidate->mini.window, RevertToParent, CurrentTime);
 	dlist_free(candidates);
 }

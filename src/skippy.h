@@ -192,6 +192,8 @@ typedef struct {
 	bool includeFrame;
 	char *pipePath;
 	bool movePointerOnStart;
+	bool movePointerOnSelect;
+	bool movePointerOnRaise;
 	bool includeAllScreens;
 	char *buttonImgs[NUM_BUTN];
 	pictw_t *background;
@@ -238,6 +240,8 @@ typedef struct {
 	.includeFrame = false, \
 	.pipePath = NULL, \
 	.movePointerOnStart = true, \
+	.movePointerOnSelect = true, \
+	.movePointerOnRaise = true, \
 	.includeAllScreens = false, \
 	.buttonImgs = { NULL }, \
 	.background = NULL, \

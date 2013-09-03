@@ -983,6 +983,8 @@ int main(int argc, char *argv[]) {
 			config_get_bool_wrap(config, "general", "useNameWindowPixmap", &ps->o.useNameWindowPixmap);
 			config_get_bool_wrap(config, "general", "includeFrame", &ps->o.includeFrame);
 			config_get_bool_wrap(config, "general", "movePointerOnStart", &ps->o.movePointerOnStart);
+			config_get_bool_wrap(config, "general", "movePointerOnSelect", &ps->o.movePointerOnSelect);
+			config_get_bool_wrap(config, "general", "movePointerOnRaise", &ps->o.movePointerOnRaise);
 			config_get_bool_wrap(config, "xinerama", "showAll", &ps->o.xinerama_showAll);
 			config_get_int_wrap(config, "normal", "tintOpacity", &ps->o.normal_tintOpacity, 0, 256);
 			config_get_int_wrap(config, "normal", "opacity", &ps->o.normal_opacity, 0, 256);
