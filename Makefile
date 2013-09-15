@@ -1,4 +1,4 @@
-PREFIX ?= /usr/local
+PREFIX ?= /usr
 BINDIR ?= ${PREFIX}/bin
 
 CC ?= gcc
@@ -65,14 +65,15 @@ skippy-xd${EXESUFFIX}: ${OBJS}
 	${CC} ${LDFLAGS} -o skippy-xd${EXESUFFIX} ${OBJS} ${LIBS}
 
 clean:
-	rm -f ${BINS}
+	rm -f ${BINS} ${OBJS} src/.clang_complete
 
 install: ${BINS} skippy-xd.rc-default
-	install -d "${DESTDIR}${BINDIR}" "${DESTDIR}/etc/xdg/"
+	install -d "${DESTDIR}${BINDIR}/" "${DESTDIR}/etc/xdg/"
 	install -m 755 ${BINS} "${DESTDIR}${BINDIR}/"
 	install -m 644 skippy-xd.rc-default "${DESTDIR}/etc/xdg/skippy-xd.rc"
 
 uninstall:
+	# Should configuration file be removed?
 	rm -f $(foreach bin,$(BINS),"${DESTDIR}${BINDIR}/$(bin)")
 
 src/.clang_complete: Makefile
