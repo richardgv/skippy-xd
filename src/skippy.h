@@ -121,7 +121,7 @@ enum cliop {
 	CLIENTOP_FOCUS,
 	CLIENTOP_ICONIFY,
 	CLIENTOP_SHADE_EWMH,
-	CLIENTOP_CLOSE_ICCWM,
+	CLIENTOP_CLOSE_ICCCM,
 	CLIENTOP_CLOSE_EWMH,
 	CLIENTOP_DESTROY,
 };
@@ -285,6 +285,8 @@ typedef struct {
 	.xinerama_exist = false, \
 }
 
+typedef struct _clientwin_t ClientWin;
+
 /// @brief Session global info structure.
 typedef struct {
 	/// @brief Program options.
@@ -303,6 +305,8 @@ typedef struct {
 	wmpsn_t wmpsn;
 	/// @brief Whether we have EWMH fullscreen support.
 	bool has_ewmh_fullscreen;
+	/// @brief The client window to eventually focus.
+	ClientWin *client_to_focus;
 } session_t;
 
 #define SESSIONT_INIT { \

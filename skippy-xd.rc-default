@@ -33,7 +33,7 @@
 #
 # - Bindings in [bindings] section can bind to "no" (do nothing), "focus"
 #   (focus to window), "iconify", "shade-ewmh" (toggle window shade state),
-#   "close-iccwm" (close window with ICCWM method), "close-ewmh" (close
+#   "close-icccm" (close window with ICCCM method), "close-ewmh" (close
 #   window with EWMH method), or "destroy" (forcefully destroy the window).
 #
 

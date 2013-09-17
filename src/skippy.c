@@ -38,7 +38,7 @@ parse_cliop(session_t *ps, const char *str, enum cliop *dest) {
 		[	CLIENTOP_FOCUS				] = "focus",
 		[	CLIENTOP_ICONIFY			] = "iconify",
 		[	CLIENTOP_SHADE_EWMH		] = "shade-ewmh",
-		[	CLIENTOP_CLOSE_ICCWM	] = "close-iccwm",
+		[	CLIENTOP_CLOSE_ICCCM	] = "close-icccm",
 		[	CLIENTOP_CLOSE_EWMH		] = "close-ewmh",
 		[	CLIENTOP_DESTROY			] = "destroy",
 	};
@@ -350,6 +350,8 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader) {
 		iter = mw->cod;
 	mw->focus = (ClientWin*)iter->data;
 	mw->focus->focused = 1;
+	// Unfortunately it does not work...
+	XSetInputFocus(ps->dpy, mw->focus->mini.window, RevertToParent, CurrentTime);
 	
 	/* Map the client windows */
 	for(iter = mw->cod; iter; iter = iter->next)
@@ -602,18 +604,31 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xi
 		XFlush(ps->dpy);
 	}
 
-	/* Unmap the main window and clean up */
+	// Unmap the main window and all clients, to make sure focus doesn't fall out
+	// when we start setting focus on client window
 	mainwin_unmap(mw);
-	XFlush(ps->dpy);
-	
-	REDUCE(clientwin_unmap((ClientWin*)iter->data), mw->cod);
-	XFlush(ps->dpy);
+	foreach_dlist(mw->cod) { clientwin_unmap((ClientWin *) iter->data); }
+	XSync(ps->dpy, False);
+
+	// Focus the client window only after the main window get unmapped and
+	// keyboard gets ungrabbed.
+	if (ps->client_to_focus) {
+		childwin_focus(ps->client_to_focus);
+		ps->client_to_focus = NULL;
+		refocus = false;
+	}
+
+	// Cleanup
 	dlist_free(mw->cod);
 	mw->cod = 0;
-	
-	if (refocus)
-		XSetInputFocus(ps->dpy, focus, RevertToPointerRoot, CurrentTime);
-	
+
+	if (refocus) {
+		// No idea why. Plain XSetInputFocus() no longer works after ungrabbing.
+		wm_activate_window(ps, focus);
+	}
+
+	XFlush(ps->dpy);
+
 	return clients;
 }
 

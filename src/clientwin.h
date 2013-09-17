@@ -30,7 +30,7 @@ typedef struct {
 #define SKIPPYWINT_INIT { .window = None }
 
 struct _MainWin;
-typedef struct {
+struct _clientwin_t {
 	struct _MainWin *mainwin;
 
 	Window wid_client;
@@ -51,7 +51,7 @@ typedef struct {
 	
 	/* These are virtual positions set by the layout routine */
 	int x, y;
-} ClientWin;
+};
 
 #define CLIENTWT_INIT { \
 	.src = SKIPPYWINT_INIT, \
@@ -73,5 +73,6 @@ int clientwin_check_group_leader_func(dlist *l, void *data);
 void clientwin_render(ClientWin *);
 void clientwin_schedule_repair(ClientWin *cw, XRectangle *area);
 void clientwin_repair(ClientWin *cw);
+void childwin_focus(ClientWin *cw);
 
 #endif /* SKIPPY_CLIENT_H */

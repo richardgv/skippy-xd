@@ -335,14 +335,15 @@ clientwin_unmap(ClientWin *cw)
 	cw->focused = 0;
 }
 
-static void
+void
 childwin_focus(ClientWin *cw) {
 	session_t * const ps = cw->mainwin->ps;
 
 	if (ps->o.movePointerOnRaise)
 		XWarpPointer(cw->mainwin->ps->dpy, None, cw->wid_client, 0, 0, 0, 0, cw->src.width / 2, cw->src.height / 2);
 	XRaiseWindow(cw->mainwin->ps->dpy, cw->wid_client);
-	XSetInputFocus(cw->mainwin->ps->dpy, cw->wid_client, RevertToParent, CurrentTime);
+	wm_activate_window(ps, cw->wid_client);
+	XFlush(ps->dpy);
 }
 
 int
@@ -380,7 +381,7 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 				focus_right(cw);
 			else if (ev->xkey.keycode == cw->mainwin->key_enter
 					|| ev->xkey.keycode == cw->mainwin->key_space) {
-				childwin_focus(cw);
+				ps->client_to_focus = cw;
 				return 1;
 			}
 			else
@@ -434,7 +435,7 @@ clientwin_action(ClientWin *cw, enum cliop action) {
 		case CLIENTOP_NO:
 			break;
 		case CLIENTOP_FOCUS:
-			childwin_focus(cw);
+			ps->client_to_focus = cw;
 			return 1;
 		case CLIENTOP_ICONIFY:
 			XIconifyWindow(ps->dpy, wid, ps->screen);
@@ -442,8 +443,8 @@ clientwin_action(ClientWin *cw, enum cliop action) {
 		case CLIENTOP_SHADE_EWMH:
 			wm_shade_window_ewmh(ps, wid);
 			break;
-		case CLIENTOP_CLOSE_ICCWM:
-			wm_close_window_iccwm(ps, wid);
+		case CLIENTOP_CLOSE_ICCCM:
+			wm_close_window_icccm(ps, wid);
 			break;
 		case CLIENTOP_CLOSE_EWMH:
 			wm_close_window_ewmh(ps, wid);
