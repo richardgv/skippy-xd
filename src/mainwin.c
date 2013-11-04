@@ -291,12 +291,12 @@ mainwin_map(MainWin *mw) {
 	// Might because of WM reparent, XSetInputFocus() doesn't work here
 	// Focus is already on mini window?
 	XSetInputFocus(ps->dpy, mw->window, RevertToParent, CurrentTime);
-	{
+	/* {
 		int ret = XGrabKeyboard(ps->dpy, mw->window, True, GrabModeAsync,
 				GrabModeAsync, CurrentTime);
 		if (Success != ret)
 			printfef("(): Failed to grab keyboard (%d), troubles ahead.", ret);
-	}
+	} */
 }
 
 void
@@ -366,38 +366,32 @@ int
 mainwin_handle(MainWin *mw, XEvent *ev) {
 	session_t *ps = mw->ps;
 
-	switch(ev->type)
-	{
-	case KeyPress:
-		mw->pressed_key = true;
-		break;
-	case KeyRelease:
-		if (mw->pressed_key)
-			report_key_unbinded(ev);
-		else
-			report_key_ignored(ev);
-		break;
-	case ButtonPress:
-		mw->pressed_mouse = true;
-		break;
-	case ButtonRelease:
-		if (mw->pressed_mouse) {
-			printfef("(): Detected mouse button release on main window, "
-					"exiting.");
-			return 1;
-		}
-		else
-			printfef("(): ButtonRelease %u ignored.", ev->xbutton.button);
-		break;
-	case VisibilityNotify:
-		if(ev->xvisibility.state && mw->focus)
-		{
-			XSetInputFocus(ps->dpy, mw->focus->mini.window, RevertToParent, CurrentTime);
-			mw->focus = 0;
-		}
-		break;
-	default:
-		;
+	switch(ev->type) {
+		case EnterNotify:
+			XSetInputFocus(ps->dpy, mw->window, RevertToParent, CurrentTime);
+			break;
+		case KeyPress:
+			mw->pressed_key = true;
+			break;
+		case KeyRelease:
+			if (mw->pressed_key)
+				report_key_unbinded(ev);
+			else
+				report_key_ignored(ev);
+			break;
+		case ButtonPress:
+			mw->pressed_mouse = true;
+			break;
+		case ButtonRelease:
+			if (mw->pressed_mouse) {
+				printfef("(): Detected mouse button release on main window, "
+						"exiting.");
+				return 1;
+			}
+			else
+				printfef("(): ButtonRelease %u ignored.", ev->xbutton.button);
+			break;
 	}
+
 	return 0;
 }

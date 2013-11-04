@@ -20,6 +20,51 @@
 #ifndef SKIPPY_FOCUS_H
 #define SKIPPY_FOCUS_H
 
+void
+focus_miniw(session_t *ps, ClientWin *cw);
+
+/**
+ * @brief Focus the mini window of next client window in list.
+ */
+static inline void
+focus_miniw_next(session_t *ps, ClientWin *cw) {
+	dlist *e = dlist_find_data(cw->mainwin->cod, cw);
+	if (!e) {
+		printfef("(%#010lx): Client window not found in list.", cw->src.window);
+		return;
+	}
+	if (e->next)
+		focus_miniw(ps, e->next->data);
+	else
+		focus_miniw(ps, dlist_first(e)->data);
+}
+
+/**
+ * @brief Focus the mini window of previous client window in list.
+ */
+static inline void
+focus_miniw_prev(session_t *ps, ClientWin *cw) {
+	dlist *cwlist = dlist_first(cw->mainwin->cod);
+	dlist *tgt = NULL;
+
+	if (cw == cwlist->data)
+		tgt = dlist_last(cwlist);
+	else
+		foreach_dlist (cwlist) {
+			if (iter->next && cw == iter->next->data) {
+				tgt = iter;
+				break;
+			}
+		}
+
+	if (!tgt) {
+		printfef("(%#010lx): Client window not found in list.", cw->src.window);
+		return;
+	}
+
+	focus_miniw(ps, (ClientWin *) tgt->data);
+}
+
 void focus_up(ClientWin *cw);
 void focus_down(ClientWin *cw);
 void focus_left(ClientWin *cw);

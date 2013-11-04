@@ -174,6 +174,15 @@ typedef struct {
 	int depth;
 } pictw_t;
 
+typedef struct {
+	unsigned int key;
+	enum {
+		KEYMOD_CTRL = 1 << 0,
+		KEYMOD_SHIFT = 1 << 1,
+		KEYMOD_META = 1 << 2,
+	} mod;
+} keydef_t;
+
 /// @brief Option structure.
 typedef struct {
 	char *config_path;
@@ -194,6 +203,7 @@ typedef struct {
 	bool movePointerOnStart;
 	bool movePointerOnSelect;
 	bool movePointerOnRaise;
+	bool allowUpscale;
 	bool includeAllScreens;
 	char *buttonImgs[NUM_BUTN];
 	pictw_t *background;
@@ -242,6 +252,7 @@ typedef struct {
 	.movePointerOnStart = true, \
 	.movePointerOnSelect = true, \
 	.movePointerOnRaise = true, \
+	.allowUpscale = true, \
 	.includeAllScreens = false, \
 	.buttonImgs = { NULL }, \
 	.background = NULL, \
@@ -364,8 +375,10 @@ allocchk_(void *ptr, const char *func_name) {
 
 #define MAX(a,b) (((a) > (b)) ? (a) : (b))
 #define MIN(a,b) (((a) > (b)) ? (b) : (a))
-#define foreach_dlist(l) \
-	for (dlist *iter = dlist_first(l); iter; iter = iter->next)
+
+#define foreach_dlist_vn(itervar, l) \
+	for (dlist *(itervar) = dlist_first(l); (itervar); (itervar) = (itervar)->next)
+#define foreach_dlist(l) foreach_dlist_vn(iter, l)
 #define REDUCE(statement, l) \
 	do { \
 		foreach_dlist(l) \
@@ -604,6 +617,20 @@ static inline void
 spxfree(void *data) {
 	sxfree(*(void **) data);
 	*(void **) data = NULL;
+}
+
+/**
+ * @brief Checks if a key event matches particular key and modifier
+ * combination.
+ */
+static inline bool
+ev_iskey(XKeyEvent *ev, const keydef_t *k) {
+	unsigned int mask = 0;
+	if (KEYMOD_CTRL & k->mod) mask |= ControlMask;
+	if (KEYMOD_SHIFT & k->mod) mask |= ShiftMask;
+	if (KEYMOD_META & k->mod) mask |= Mod1Mask;
+	return k->key == ev->keycode
+		&& (ev->state & (ControlMask | ShiftMask | Mod1Mask)) == mask;
 }
 
 /**

@@ -88,6 +88,7 @@ Window wm_get_focused(Display *dpy);
 
 char *wm_wid_get_prop_rstr(session_t *ps, Window wid, Atom prop);
 char *wm_wid_get_prop_utf8(session_t *ps, Window wid, Atom prop);
+bool wm_wid_set_prop_utf8(session_t *ps, Window wid, Atom prop, char *text);
 void wm_wid_set_info(session_t *ps, Window wid, const char *name,
 		Atom window_type);
 void wm_send_clientmsg(session_t *ps, Window twid, Window wid, Atom msg_type,

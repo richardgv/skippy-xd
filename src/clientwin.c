@@ -200,7 +200,8 @@ clientwin_destroy(ClientWin *cw, bool destroyed) {
 static void
 clientwin_repaint(ClientWin *cw, XRectangle *rect)
 {
-	XRenderColor *tint = cw->focused ? &cw->mainwin->highlightTint : &cw->mainwin->normalTint;
+	XRenderColor *tint = (cw->focused ? &cw->mainwin->highlightTint
+			: &cw->mainwin->normalTint);
 	int s_x = (double)rect->x * cw->factor,
 	    s_y = (double)rect->y * cw->factor,
 	    s_w = (double)rect->width * cw->factor,
@@ -309,30 +310,17 @@ clientwin_map(ClientWin *cw) {
 }
 
 void
-clientwin_unmap(ClientWin *cw)
-{
-	if(cw->damage)
-	{
-		XDamageDestroy(cw->mainwin->ps->dpy, cw->damage);
-		cw->damage = None;
-	}
-	
-	if(cw->destination)
-	{
-		XRenderFreePicture(cw->mainwin->ps->dpy, cw->destination);
-		cw->destination = None;
-	}
-	
-	if(cw->pixmap)
-	{
-		XFreePixmap(cw->mainwin->ps->dpy, cw->pixmap);
-		cw->pixmap = None;
-	}
-	
-	XUnmapWindow(cw->mainwin->ps->dpy, cw->mini.window);
-	XSetWindowBackgroundPixmap(cw->mainwin->ps->dpy, cw->mini.window, None);
-	
-	cw->focused = 0;
+clientwin_unmap(ClientWin *cw) {
+	session_t *ps = cw->mainwin->ps;
+
+	free_damage(ps, &cw->damage);
+	free_picture(ps, &cw->destination);
+	free_pixmap(ps, &cw->pixmap);
+
+	XUnmapWindow(ps->dpy, cw->mini.window);
+	XSetWindowBackgroundPixmap(ps->dpy, cw->mini.window, None);
+
+	cw->focused = false;
 }
 
 void
@@ -340,8 +328,9 @@ childwin_focus(ClientWin *cw) {
 	session_t * const ps = cw->mainwin->ps;
 
 	if (ps->o.movePointerOnRaise)
-		XWarpPointer(cw->mainwin->ps->dpy, None, cw->wid_client, 0, 0, 0, 0, cw->src.width / 2, cw->src.height / 2);
-	XRaiseWindow(cw->mainwin->ps->dpy, cw->wid_client);
+		XWarpPointer(ps->dpy, None, cw->wid_client,
+				0, 0, 0, 0, cw->src.width / 2, cw->src.height / 2);
+	XRaiseWindow(ps->dpy, cw->wid_client);
 	wm_activate_window(ps, cw->wid_client);
 	XFlush(ps->dpy);
 }
@@ -366,23 +355,39 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 		else
 			printfef("(): ButtonRelease %u ignored.", button);
 	} else if (ev->type == KeyRelease) {
+		XKeyEvent * const evk = &ev->xkey;
 		if (cw->mainwin->pressed_key) {
-			if (ev->xkey.keycode == cw->mainwin->key_up ||
-					ev->xkey.keycode == cw->mainwin->key_k)
+			const keydef_t KEY_NEXT = {
+				.key = XKeysymToKeycode(ps->dpy, XK_Tab),
+				.mod = KEYMOD_CTRL,
+			};
+			const keydef_t KEY_PREV = {
+				.key = XKeysymToKeycode(ps->dpy, XK_Tab),
+				.mod = KEYMOD_CTRL | KEYMOD_SHIFT,
+			};
+
+			if (evk->keycode == cw->mainwin->key_up ||
+					evk->keycode == cw->mainwin->key_k)
 				focus_up(cw);
-			else if (ev->xkey.keycode == cw->mainwin->key_down ||
-					ev->xkey.keycode == cw->mainwin->key_j)
+			else if (evk->keycode == cw->mainwin->key_down ||
+					evk->keycode == cw->mainwin->key_j)
 				focus_down(cw);
-			else if (ev->xkey.keycode == cw->mainwin->key_left ||
-					ev->xkey.keycode == cw->mainwin->key_h)
+			else if (evk->keycode == cw->mainwin->key_left ||
+					evk->keycode == cw->mainwin->key_h)
 				focus_left(cw);
-			else if (ev->xkey.keycode == cw->mainwin->key_right ||
-					ev->xkey.keycode == cw->mainwin->key_l)
+			else if (evk->keycode == cw->mainwin->key_right ||
+					evk->keycode == cw->mainwin->key_l)
 				focus_right(cw);
-			else if (ev->xkey.keycode == cw->mainwin->key_enter
-					|| ev->xkey.keycode == cw->mainwin->key_space) {
+			else if (evk->keycode == cw->mainwin->key_enter
+					|| evk->keycode == cw->mainwin->key_space) {
 				ps->client_to_focus = cw;
 				return 1;
+			}
+			else if (ev_iskey(evk, &KEY_NEXT)) {
+				focus_miniw_next(ps, cw);
+			}
+			else if (ev_iskey(evk, &KEY_PREV)) {
+				focus_miniw_prev(ps, cw);
 			}
 			else
 				report_key_unbinded(ev);
@@ -398,12 +403,12 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 	else if (KeyPress == ev->type) {
 		cw->mainwin->pressed_key = true;
 	}
-	else if(ev->type == FocusIn) {
-		cw->focused = 1;
+	else if (ev->type == FocusIn) {
+		cw->focused = true;
 		clientwin_render(cw);
 		XFlush(ps->dpy);
-	} else if(ev->type == FocusOut) {
-		cw->focused = 0;
+	} else if (ev->type == FocusOut) {
+		cw->focused = false;
 		clientwin_render(cw);
 		XFlush(ps->dpy);
 	} else if(ev->type == EnterNotify) {

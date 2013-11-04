@@ -25,7 +25,6 @@ Atom
 	ESETROOT_PMAP_ID,
 
 	// ICCWM atoms
-	WM_STATE,
 	WM_PROTOCOLS,
 	WM_DELETE_WINDOW,
 
@@ -116,7 +115,6 @@ wm_get_atoms(session_t *ps) {
 	T_GETATOM(_XROOTPMAP_ID);
 	T_GETATOM(ESETROOT_PMAP_ID);
 	
-	T_GETATOM(WM_STATE),
 	T_GETATOM(WM_PROTOCOLS),
 	T_GETATOM(WM_DELETE_WINDOW),
 
@@ -289,7 +287,7 @@ wm_find_client(session_t *ps, Window wid) {
 		dlist *stack2 = NULL;
 		foreach_dlist (stack) {
 			Window cur = (Window) iter->data;
-			if (wid_has_prop(ps, cur, WM_STATE)) {
+			if (wid_has_prop(ps, cur, XA_WM_STATE)) {
 				result = cur;
 				break;
 			}
@@ -534,10 +532,12 @@ wm_validate_window(session_t *ps, Window wid) {
 
 	// Check _NET_WM_WINDOW_TYPE
 	prop = wid_get_prop(ps, wid, _NET_WM_WINDOW_TYPE, 1, XA_ATOM, 32);
-	long v = winprop_get_int(&prop);
-	if ((_NET_WM_WINDOW_TYPE_DESKTOP == v
-				|| _NET_WM_WINDOW_TYPE_DOCK == v))
-		result = false;
+	{
+		long v = winprop_get_int(&prop);
+		if ((_NET_WM_WINDOW_TYPE_DESKTOP == v
+					|| _NET_WM_WINDOW_TYPE_DOCK == v))
+			result = false;
+	}
 	free_winprop(&prop);
 
 	if (!result) return result;

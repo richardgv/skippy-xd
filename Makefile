@@ -34,7 +34,7 @@ ifeq "$(CFG_DEV)" ""
 	CFLAGS ?= -DNDEBUG -O2 -D_FORTIFY_SOURCE=2
 else
 	CC = clang
-	CFLAGS += -ggdb # -Weverything -Wno-gnu -Wno-disabled-macro-expansion -Wno-padded
+	CFLAGS += -ggdb -Wshadow -Weverything -Wno-unused-parameter -Wno-conversion -Wno-sign-conversion -Wno-gnu -Wno-disabled-macro-expansion -Wno-padded -Wno-c11-extensions -Wno-sign-compare -Wno-vla -Wno-cast-align
 	export LD_ALTEXEC = /usr/bin/ld.gold
 	# Xinerama debugging
 	CPPFLAGS += -DDEBUG_XINERAMA

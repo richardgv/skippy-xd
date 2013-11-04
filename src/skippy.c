@@ -126,8 +126,8 @@ parse_color(session_t *ps, const char *s, XRenderColor *pc) {
 		const char *name;
 		XRenderColor c;
 	} PREDEF_COLORS[] = {
-		{ "black", { 0x0000, 0x0000, 0x0000 } },
-		{ "red", { 0xffff, 0x0000, 0x0000 } },
+		{ "black", { 0x0000, 0x0000, 0x0000, 0xFFFF } },
+		{ "red", { 0xffff, 0x0000, 0x0000, 0xFFFF } },
 	};
 
 	// Predefined color names
@@ -300,10 +300,7 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader) {
 	session_t * const ps = mw->ps;
 
 	long desktop = wm_get_current_desktop(ps);
-	unsigned int width, height;
 	float factor;
-	int xoff, yoff;
-	dlist *iter, *tmp;
 	
 	/* Update the client table, pick the ones we want and sort them */
 	clients = update_clients(mw, clients, 0);
@@ -315,17 +312,22 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader) {
 	dlist_free(mw->cod);
 	mw->cod = NULL;
 
-	tmp = dlist_first(dlist_find_all(clients,
-				(dlist_match_func) clientwin_validate_func, &desktop));
-	if (!tmp) {
-		printfef("(): No client window on current desktop found.");
-		return clients;
+	{
+		dlist *tmp = dlist_first(dlist_find_all(clients,
+					(dlist_match_func) clientwin_validate_func, &desktop));
+		if (!tmp) {
+			printfef("(): No client window on current desktop found.");
+			return clients;
+		}
+
+		if (leader) {
+			mw->cod = dlist_first(dlist_find_all(tmp, clientwin_check_group_leader_func, (void*)&leader));
+			dlist_free(tmp);
+		}
+		else {
+			mw->cod = tmp;
+		}
 	}
-	if (leader) {
-		mw->cod = dlist_first(dlist_find_all(tmp, clientwin_check_group_leader_func, (void*)&leader));
-		dlist_free(tmp);
-	} else
-		mw->cod = tmp;
 	
 	if (!mw->cod)
 		return clients;
@@ -333,33 +335,41 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader) {
 	dlist_sort(mw->cod, clientwin_sort_func, 0);
 	
 	/* Move the mini windows around */
-	layout_run(mw, mw->cod, &width, &height);
-	factor = (float)(mw->width - 100) / width;
-	if(factor * height > mw->height - 100)
-		factor = (float)(mw->height - 100) / height;
+	{
+		unsigned int width = 0, height = 0;
+		layout_run(mw, mw->cod, &width, &height);
+		factor = (float) (mw->width - 100) / width;
+		if (factor * height > mw->height - 100)
+			factor = (float) (mw->height - 100) / height;
+		if (!ps->o.allowUpscale)
+			factor = MIN(factor, 1.0f);
+
+		int xoff = (mw->width - (float) width * factor) / 2;
+		int yoff = (mw->height - (float) height * factor) / 2;
+		mainwin_transform(mw, factor);
+		foreach_dlist (mw->cod) {
+			clientwin_move((ClientWin *) iter->data, factor, xoff, yoff);
+		}
+	}
 	
-	xoff = (mw->width - (float)width * factor) / 2;
-	yoff = (mw->height - (float)height * factor) / 2;
-	mainwin_transform(mw, factor);
-	for(iter = mw->cod; iter; iter = iter->next)
-		clientwin_move((ClientWin*)iter->data, factor, xoff, yoff);
-	
-	/* Get the currently focused window and select which mini-window to focus */
-	iter = dlist_find(mw->cod, clientwin_cmp_func, (void *) focus);
-	if(! iter)
-		iter = mw->cod;
-	mw->focus = (ClientWin*)iter->data;
-	mw->focus->focused = 1;
-	// Unfortunately it does not work...
-	XSetInputFocus(ps->dpy, mw->focus->mini.window, RevertToParent, CurrentTime);
-	
-	/* Map the client windows */
-	for(iter = mw->cod; iter; iter = iter->next)
+	// Get the currently focused window and select which mini-window to focus
+	{
+		dlist *iter = dlist_find(mw->cod, clientwin_cmp_func, (void *) focus);
+		if (!iter)
+			iter = mw->cod;
+		mw->focus = (ClientWin *) iter->data;
+		mw->focus->focused = 1;
+	}
+
+	// Map the client windows
+	foreach_dlist (mw->cod) {
 		clientwin_map((ClientWin*)iter->data);
-	if (ps->o.movePointerOnStart)
-		XWarpPointer(mw->ps->dpy, None, mw->focus->mini.window, 0, 0, 0, 0,
-				mw->focus->mini.width / 2, mw->focus->mini.height / 2);
-	
+	}
+
+	// Unfortunately it does not work...
+	// XSetInputFocus(ps->dpy, mw->focus->mini.window, RevertToParent, CurrentTime);
+	focus_miniw(ps, mw->focus);
+
 	return clients;
 }
 
@@ -464,7 +474,7 @@ ev_dump(session_t *ps, const MainWin *mw, const XEvent *ev) {
 }
 
 static dlist *
-skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xin)
+skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, bool all_xin)
 {
 	session_t * const ps = mw->ps;
 	XEvent ev;
@@ -632,8 +642,8 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, Bool all_xi
 	return clients;
 }
 
-void send_command_to_daemon_via_fifo(int command, const char* pipePath)
-{
+static void
+send_command_to_daemon_via_fifo(int command, const char* pipePath) {
 	FILE *fp;
 	if (access(pipePath, W_OK) != 0)
 	{
@@ -649,12 +659,14 @@ void send_command_to_daemon_via_fifo(int command, const char* pipePath)
 	fclose(fp);
 }
 
-void activate_window_picker(const char* pipePath) {
+static void
+activate_window_picker(const char* pipePath) {
 	printf("activating window picker...\n");
 	send_command_to_daemon_via_fifo(ACTIVATE_WINDOW_PICKER, pipePath);
 }
 
-void exit_daemon(const char* pipePath) {
+static void
+exit_daemon(const char* pipePath) {
 	printf("exiting daemon...\n");
 	send_command_to_daemon_via_fifo(EXIT_RUNNING_DAEMON, pipePath);
 }
@@ -728,7 +740,8 @@ xerror(Display *dpy, XErrorEvent *ev) {
 #define SKIPPYXD_VERSION "unknown"
 #endif
 
-void show_help() {
+static void
+show_help() {
 	fputs("skippy-xd (" SKIPPYXD_VERSION ")\n"
 			"Usage: skippy-xd [command]\n\n"
 			"The available commands are:\n"
@@ -917,7 +930,6 @@ int main(int argc, char *argv[]) {
 	dlist *clients = NULL;
 	Display *dpy = NULL;
 	MainWin *mw = NULL;
-	Bool invertShift = False;
 	Window leader, focused;
 	int result;
 	int flush_file = 0;
@@ -997,6 +1009,7 @@ int main(int argc, char *argv[]) {
 			config_get_bool_wrap(config, "general", "lazyTrans", &ps->o.lazyTrans);
 			config_get_bool_wrap(config, "general", "useNameWindowPixmap", &ps->o.useNameWindowPixmap);
 			config_get_bool_wrap(config, "general", "includeFrame", &ps->o.includeFrame);
+			config_get_bool_wrap(config, "general", "allowUpscale", &ps->o.allowUpscale);
 			config_get_bool_wrap(config, "general", "movePointerOnStart", &ps->o.movePointerOnStart);
 			config_get_bool_wrap(config, "general", "movePointerOnSelect", &ps->o.movePointerOnSelect);
 			config_get_bool_wrap(config, "general", "movePointerOnRaise", &ps->o.movePointerOnRaise);
@@ -1071,8 +1084,6 @@ int main(int argc, char *argv[]) {
 		goto main_end;
 	}
 	
-	invertShift = !ps->o.xinerama_showAll;
-	
 	XSelectInput(ps->dpy, ps->root, PropertyChangeMask);
 
 	if (ps->o.runAsDaemon) {
@@ -1124,7 +1135,8 @@ int main(int argc, char *argv[]) {
 			{
 				case ACTIVATE_WINDOW_PICKER:
 					leader = None, focused = wm_get_focused(ps->dpy);
-					clients = skippy_run(mw, clients, focused, leader, !invertShift);
+					clients = skippy_run(mw, clients, focused, leader,
+							ps->o.xinerama_showAll);
 					break;
 				
 				case EXIT_RUNNING_DAEMON:
@@ -1151,7 +1163,7 @@ int main(int argc, char *argv[]) {
 	{
 		printf("running once then quitting...\n");
 		leader = None, focused = wm_get_focused(ps->dpy);
-		clients = skippy_run(mw, clients, focused, leader, !invertShift);
+		clients = skippy_run(mw, clients, focused, leader, ps->o.xinerama_showAll);
 	}
 	
 	dlist_free_with_func(clients, (dlist_free_func)clientwin_destroy);

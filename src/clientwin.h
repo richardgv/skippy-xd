@@ -44,7 +44,7 @@ struct _clientwin_t {
 	Damage damage;
 	float factor;
 	
-	int focused;
+	bool focused;
 	
 	bool damaged;
 	/* XserverRegion repair; */

@@ -49,6 +49,7 @@ movePointerOnSelect = true
 movePointerOnRaise = true
 useNameWindowPixmap = false
 includeFrame = true
+allowUpscale = true
 background =
 
 [xinerama]

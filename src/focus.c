@@ -22,32 +22,44 @@
 typedef float (*dist_func)(SkippyWindow *, SkippyWindow *);
 typedef int (*match_func)(dlist *, SkippyWindow *);
 
+/**
+ * @brief Focus the mini window of a client window.
+ */
+void
+focus_miniw(session_t *ps, ClientWin *cw) {
+	// printfdf("(%#010lx): %#010lx", cw->src.window, cw->mini.window);
+
+	if (unlikely(!cw))
+		return;
+	assert(cw->mini.window);
+	if (ps->o.movePointerOnSelect)
+		XWarpPointer(ps->dpy, None, cw->mini.window, 0, 0, 0, 0, cw->mini.width / 2, cw->mini.height / 2);
+	XSetInputFocus(ps->dpy, cw->mini.window, RevertToParent, CurrentTime);
+	XFlush(ps->dpy);
+}
+
+/**
+ * @brief Focus the mini window of a client window.
+ */
 static void
-dir_focus(ClientWin *cw, match_func match, dist_func func)
-{
+focus_miniw_dir(ClientWin *cw, match_func match, dist_func func) {
 	float diff = 0.0;
 	ClientWin *candidate = NULL;
-	dlist *iter, *candidates;
 	session_t * const ps = cw->mainwin->ps;
-	
-	candidates = dlist_first(dlist_find_all(cw->mainwin->cod, (dlist_match_func)match, &cw->mini));
-	if(! candidates)
-		return;
-	
-	for(iter = dlist_first(candidates); iter; iter = iter->next)
-	{
-		ClientWin *win = (ClientWin *)iter->data;
+
+	dlist *candidates = dlist_first(dlist_find_all(cw->mainwin->cod, (dlist_match_func) match, &cw->mini));
+	if (!candidates) return;
+
+	foreach_dlist (candidates) {
+		ClientWin *win = (ClientWin *) iter->data;
 		float distance = func(&cw->mini, &win->mini);
-		if(! candidate || distance < diff)
-		{
+		if (!candidate || distance < diff) {
 			candidate = win;
 			diff = distance;
 		}
 	}
-	
-	if (ps->o.movePointerOnSelect)
-		XWarpPointer(candidate->mainwin->ps->dpy, None, candidate->mini.window, 0, 0, 0, 0, candidate->mini.width / 2, candidate->mini.height / 2);
-	XSetInputFocus(candidate->mainwin->ps->dpy, candidate->mini.window, RevertToParent, CurrentTime);
+
+	focus_miniw(ps, candidate);
 	dlist_free(candidates);
 }
 
@@ -64,7 +76,7 @@ static int name(dlist *l, SkippyWindow *b) \
 { SkippyWindow *a = &((ClientWin*)l->data)->mini; return expr; }
 
 #define FOCUSFUNC(name, qual, dist) \
-void name(ClientWin *cw) { dir_focus(cw, qual, dist); }
+void name(ClientWin *cw) { focus_miniw_dir(cw, qual, dist); }
 
 DISTFUNC(dist_top_bottom, HALF_H(a) - HALF_H(b), a->y - b->y - (int)b->height)
 DISTFUNC(dist_bottom_top, HALF_H(a) - HALF_H(b), b->y - a->y - (int)a->height)
