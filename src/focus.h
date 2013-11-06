@@ -20,8 +20,24 @@
 #ifndef SKIPPY_FOCUS_H
 #define SKIPPY_FOCUS_H
 
-void
-focus_miniw(session_t *ps, ClientWin *cw);
+/**
+ * @brief Focus the mini window of a client window.
+ */
+static inline void
+focus_miniw_adv(session_t *ps, ClientWin *cw, bool move_ptr) {
+	if (unlikely(!cw))
+		return;
+	assert(cw->mini.window);
+	if (move_ptr)
+		XWarpPointer(ps->dpy, None, cw->mini.window, 0, 0, 0, 0, cw->mini.width / 2, cw->mini.height / 2);
+	XSetInputFocus(ps->dpy, cw->mini.window, RevertToParent, CurrentTime);
+	XFlush(ps->dpy);
+}
+
+static inline void
+focus_miniw(session_t *ps, ClientWin *cw) {
+	focus_miniw_adv(ps, cw, ps->o.movePointerOnSelect);
+}
 
 /**
  * @brief Focus the mini window of next client window in list.

@@ -367,8 +367,7 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader) {
 	}
 
 	// Unfortunately it does not work...
-	// XSetInputFocus(ps->dpy, mw->focus->mini.window, RevertToParent, CurrentTime);
-	focus_miniw(ps, mw->focus);
+	focus_miniw_adv(ps, mw->focus, ps->o.movePointerOnStart);
 
 	return clients;
 }

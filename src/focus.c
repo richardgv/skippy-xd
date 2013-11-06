@@ -25,22 +25,6 @@ typedef int (*match_func)(dlist *, SkippyWindow *);
 /**
  * @brief Focus the mini window of a client window.
  */
-void
-focus_miniw(session_t *ps, ClientWin *cw) {
-	// printfdf("(%#010lx): %#010lx", cw->src.window, cw->mini.window);
-
-	if (unlikely(!cw))
-		return;
-	assert(cw->mini.window);
-	if (ps->o.movePointerOnSelect)
-		XWarpPointer(ps->dpy, None, cw->mini.window, 0, 0, 0, 0, cw->mini.width / 2, cw->mini.height / 2);
-	XSetInputFocus(ps->dpy, cw->mini.window, RevertToParent, CurrentTime);
-	XFlush(ps->dpy);
-}
-
-/**
- * @brief Focus the mini window of a client window.
- */
 static void
 focus_miniw_dir(ClientWin *cw, match_func match, dist_func func) {
 	float diff = 0.0;
