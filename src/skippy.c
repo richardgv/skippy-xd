@@ -524,13 +524,18 @@ ev_dump(session_t *ps, const MainWin *mw, const XEvent *ev) {
 	printfd("Event %-13.13s wid %#010lx %s", name, wid, wextra);
 }
 
+static bool pending_damage;
+static int last_rendered;
+static bool skippy_active;
+static bool refocus;
+
 static dlist *
 skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, bool all_xin) {
 	session_t * const ps = mw->ps;
-	XEvent ev;
-	int die = 0;
-	bool refocus = false;
 	
+	skippy_active = true;
+	refocus = false;
+
 	/* Update the main window's geometry (and Xinerama info if applicable) */
 	mainwin_update(mw);
 #ifdef CFG_XINERAMA
@@ -554,124 +559,127 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, bool all_xi
 	if (!ps->o.lazyTrans)
 		mainwin_map(mw);
 	XFlush(ps->dpy);
+
+	pending_damage = false;
+	last_rendered = time_in_millis();
+
+	return clients;
+}
 	
-	bool pending_damage = false;
-	int last_rendered = time_in_millis();
-	while (!die) {
-		// Poll for events
-		{
-			int timeout = -1;
-			struct pollfd r_fd = {
-				.fd = ConnectionNumber(ps->dpy),
-				.events = POLLIN,
-			};
-			if (mw->poll_time > 0 && pending_damage)
-				timeout = MAX(0,
-						mw->poll_time + last_rendered - time_in_millis());
-			poll(&r_fd, 1, timeout);
-		}
+static dlist *
+skippy_handle_xevents(MainWin *mw, dlist *clients, bool all_xin)
+{
+	session_t * const ps = mw->ps;
+	XEvent ev;
 
-		// Process events
-		while (XEventsQueued(ps->dpy, QueuedAfterReading)) {
-			XNextEvent(ps->dpy, &ev);
+	// Process events
+	while (XEventsQueued(ps->dpy, QueuedAfterReading)) {
+		XNextEvent(ps->dpy, &ev);
 #ifdef DEBUG_EVENTS
-			ev_dump(ps, mw, &ev);
+		ev_dump(ps, mw, &ev);
 #endif
-			const Window wid = ev_window(ps, &ev);
+		const Window wid = ev_window(ps, &ev);
 
-			if (MotionNotify == ev.type) {
-				if (mw->tooltip && ps->o.tooltip_followsMouse)
-					tooltip_move(mw->tooltip,
-							ev.xmotion.x_root, ev.xmotion.y_root);
-			}
-			else if (ev.type == DestroyNotify || ev.type == UnmapNotify) {
-				dlist *iter = (wid ? dlist_find(clients, clientwin_cmp_func, (void *) wid): NULL);
-				if (iter) {
-					ClientWin *cw = (ClientWin *) iter->data;
-					if (DestroyNotify != ev.type)
-						cw->mode = clientwin_get_disp_mode(ps, cw);
-					if (DestroyNotify == ev.type || !cw->mode) {
-						clients = dlist_first(dlist_remove(iter));
-						iter = dlist_find(mw->cod, clientwin_cmp_func, (void *) wid);
-						if (iter)
-							mw->cod = dlist_first(dlist_remove(iter));
-						clientwin_destroy(cw, true);
-						if (!mw->cod) {
-							printfef("(): Last client window destroyed/unmapped, "
-									"exiting.");
-							die = 1;
-						}
-					}
-					else {
-						free_pixmap(ps, &cw->cpixmap);
-						free_picture(ps, &cw->origin);
-						free_damage(ps, &cw->damage);
-						clientwin_update2(cw);
-						clientwin_render(cw);
+		if (MotionNotify == ev.type) {
+			if (mw->tooltip && ps->o.tooltip_followsMouse)
+				tooltip_move(mw->tooltip,
+						ev.xmotion.x_root, ev.xmotion.y_root);
+		}
+		else if (ev.type == DestroyNotify || ev.type == UnmapNotify) {
+			dlist *iter = (wid ? dlist_find(clients, clientwin_cmp_func, (void *) wid): NULL);
+			if (iter) {
+				ClientWin *cw = (ClientWin *) iter->data;
+				if (DestroyNotify != ev.type)
+					cw->mode = clientwin_get_disp_mode(ps, cw);
+				if (DestroyNotify == ev.type || !cw->mode) {
+					clients = dlist_first(dlist_remove(iter));
+					iter = dlist_find(mw->cod, clientwin_cmp_func, (void *) wid);
+					if (iter)
+						mw->cod = dlist_first(dlist_remove(iter));
+					clientwin_destroy(cw, true);
+					if (!mw->cod) {
+						printfef("(): Last client window destroyed/unmapped, "
+								"exiting.");
+						skippy_active = 0;
 					}
 				}
-			}
-			else if (ps->xinfo.damage_ev_base + XDamageNotify == ev.type) {
-				// XDamageNotifyEvent *d_ev = (XDamageNotifyEvent *) &ev;
-				dlist *iter = dlist_find(mw->cod, clientwin_cmp_func,
-						(void *) wid);
-				pending_damage = true;
-				if (iter) {
-					if (!mw->poll_time)
-						clientwin_repair((ClientWin *)iter->data);
-					else
-						((ClientWin *)iter->data)->damaged = true;
+				else {
+					free_pixmap(ps, &cw->cpixmap);
+					free_picture(ps, &cw->origin);
+					free_damage(ps, &cw->damage);
+					clientwin_update2(cw);
+					clientwin_render(cw);
 				}
-
 			}
-			else if (KeyRelease == ev.type && (mw->key_q == ev.xkey.keycode
-						|| mw->key_escape == ev.xkey.keycode)) {
-				if (mw->pressed_key) {
-					die = 1;
-					if (mw->key_escape == ev.xkey.keycode)
-						refocus = true;
-				}
+		}
+		else if (ps->xinfo.damage_ev_base + XDamageNotify == ev.type) {
+			// XDamageNotifyEvent *d_ev = (XDamageNotifyEvent *) &ev;
+			dlist *iter = dlist_find(mw->cod, clientwin_cmp_func,
+					(void *) wid);
+			pending_damage = true;
+			if (iter) {
+				if (!mw->poll_time)
+					clientwin_repair((ClientWin *)iter->data);
 				else
-					report_key_ignored(&ev);
+					((ClientWin *)iter->data)->damaged = true;
 			}
-			else if (wid == mw->window)
-				die = mainwin_handle(mw, &ev);
-			else if (PropertyNotify == ev.type) {
-				if (!ps->o.background &&
-						(ESETROOT_PMAP_ID == ev.xproperty.atom
-						 || _XROOTPMAP_ID == ev.xproperty.atom)) {
-					mainwin_update_background(mw);
-					REDUCE(clientwin_render((ClientWin *)iter->data), mw->cod);
-				}
+		}
+		else if (KeyRelease == ev.type && (mw->key_q == ev.xkey.keycode
+					|| mw->key_escape == ev.xkey.keycode)) {
+			if (mw->pressed_key) {
+				skippy_active = 0;
+				if (mw->key_escape == ev.xkey.keycode)
+					refocus = true;
 			}
-			else if (mw->tooltip && wid == mw->tooltip->window)
-				tooltip_handle(mw->tooltip, &ev);
-			else if (wid) {
-				for (dlist *iter = mw->cod; iter; iter = iter->next) {
-					ClientWin *cw = (ClientWin *) iter->data;
-					if (cw->mini.window == wid) {
-						die = clientwin_handle(cw, &ev);
-						break;
-					}
+			else
+				report_key_ignored(&ev);
+		}
+		else if (wid == mw->window)
+			skippy_active = !mainwin_handle(mw, &ev);
+		else if (PropertyNotify == ev.type) {
+			if (!ps->o.background &&
+					(ESETROOT_PMAP_ID == ev.xproperty.atom
+					 || _XROOTPMAP_ID == ev.xproperty.atom)) {
+				mainwin_update_background(mw);
+				REDUCE(clientwin_render((ClientWin *)iter->data), mw->cod);
+			}
+		}
+		else if (mw->tooltip && wid == mw->tooltip->window)
+			tooltip_handle(mw->tooltip, &ev);
+		else if (wid) {
+			for (dlist *iter = mw->cod; iter; iter = iter->next) {
+				ClientWin *cw = (ClientWin *) iter->data;
+				if (cw->mini.window == wid) {
+					skippy_active = !clientwin_handle(cw, &ev);
+					break;
 				}
 			}
 		}
-
-		// Do delayed painting if it's active
-		if (mw->poll_time && pending_damage && !die) {
-			long now = time_in_millis();
-			if (now >= last_rendered + mw->poll_time) {
-				pending_damage = false;
-				foreach_dlist(mw->cod) {
-					if (((ClientWin *) iter->data)->damaged)
-						clientwin_repair(iter->data);
-				}
-				last_rendered = now;
-			}
-		}
-
-		XFlush(ps->dpy);
 	}
+
+	// Do delayed painting if it's active
+	if (mw->poll_time && pending_damage && skippy_active) {
+		long now = time_in_millis();
+		if (now >= last_rendered + mw->poll_time) {
+			pending_damage = false;
+			foreach_dlist(mw->cod) {
+				if (((ClientWin *) iter->data)->damaged)
+					clientwin_repair(iter->data);
+			}
+			last_rendered = now;
+		}
+	}
+
+	XFlush(ps->dpy);
+
+	return clients;
+}
+
+
+void
+skippy_end(MainWin *mw, Window focus)
+{
+	session_t * const ps = mw->ps;
 
 	// Unmap the main window and all clients, to make sure focus doesn't fall out
 	// when we start setting focus on client window
@@ -697,8 +705,6 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, bool all_xi
 	}
 
 	XFlush(ps->dpy);
-
-	return clients;
 }
 
 static void
@@ -982,6 +988,44 @@ parse_args(session_t *ps, int argc, char **argv, bool first_pass) {
 	}
 }
 	
+static int exitDaemon = 0;
+static Window focused;
+
+static dlist *
+handle_command_pipe (int pipe_fd, session_t *ps, MainWin *mw, dlist *clients, bool all_xin)
+{
+	Window leader;
+	char piped_input;
+	int res;
+
+	res = read (pipe_fd, &piped_input, 1);
+	if (res < 0) {
+		exitDaemon = 1;
+		return clients;
+	}
+
+	switch (piped_input)
+	{
+		case ACTIVATE_WINDOW_PICKER:
+			leader = None, focused = wm_get_focused(ps->dpy);
+			clients = skippy_run(mw, clients, focused, leader,
+					ps->o.xinerama_showAll);
+			break;
+
+		case EXIT_RUNNING_DAEMON:
+			printf("Exit command received, killing daemon cleanly...\n");
+			exitDaemon = 1;
+
+		default:
+			printf("unknown code received: %d\n", piped_input);
+			printf("Ignoring...\n");
+			break;
+	}
+
+	return clients;
+}
+
+
 int main(int argc, char *argv[]) {
 	session_t *ps = NULL;
 	int ret = RET_SUCCESS;
@@ -989,12 +1033,8 @@ int main(int argc, char *argv[]) {
 	dlist *clients = NULL;
 	Display *dpy = NULL;
 	MainWin *mw = NULL;
-	Window leader, focused;
 	int result;
 	int flush_file = 0;
-	FILE *fp;
-	int piped_input;
-	int exitDaemon = 0;
 	
 	/* Set program locale */
 	setlocale (LC_ALL, "");
@@ -1174,6 +1214,9 @@ int main(int argc, char *argv[]) {
 	XSelectInput(ps->dpy, ps->root, PropertyChangeMask);
 
 	if (ps->o.runAsDaemon) {
+		int pipe_fd;
+		struct pollfd poll_fds[2];
+
 		printf("Running as daemon...\n");
 
 		if (access(pipePath, R_OK) == 0)
@@ -1190,64 +1233,85 @@ int main(int argc, char *argv[]) {
 			exit(2);
 		}
 		
+		pipe_fd = open(pipePath, O_RDONLY | O_NONBLOCK);
+		if (pipe_fd < 0) {
+			printfef("(): Failed to open() pipe \"%s\".", pipePath);
+			ret = RET_UNKNOWN;
+			goto main_end;
+		}
+
 		// Flush the file in non-blocking mode
 		if (flush_file) {
 			char *buf[BUF_LEN];
-			int fd = open(pipePath, O_RDONLY | O_NONBLOCK);
+			while (read(pipe_fd, buf, sizeof(buf)) > 0)
+				continue;
 
-			if (fd < 0) {
-				printfef("(): Failed to open() pipe \"%s\".", pipePath);
+			printf("Finished flushing pipe...\n");
+		}
+
+		poll_fds[1].fd = ConnectionNumber(ps->dpy);
+		poll_fds[1].events = POLLIN;
+
+		poll_fds[0].fd = pipe_fd;
+		poll_fds[0].events = POLLIN;
+
+		while (!exitDaemon)
+		{
+		    // Poll for events
+			int timeout = -1;
+			int res;
+			int fd_count;
+
+			if (mw->poll_time > 0 && pending_damage)
+				timeout = MAX(0,
+						mw->poll_time + last_rendered - time_in_millis());
+
+			poll_fds[0].revents = 0;
+			poll_fds[1].revents = 0;
+
+			if (skippy_active) {
+				fd_count = 2;
+			} else {
+				fd_count = 1;
+			}
+
+			res = poll(poll_fds, fd_count, timeout);
+			if (res < 0) {
+				perror ("Poll error");
 				ret = RET_UNKNOWN;
 				goto main_end;
 			}
 
-			while (read(fd, buf, sizeof(buf)) > 0)
-				continue;
-
-			close(fd);
-
-			printf("Finished flushing pipe...\n");
-		}
-		
-		if (!(fp = fopen(pipePath, "r"))) {
-			printfef("Failed to open pipe \"%s\".\n", pipePath);
-			ret = RET_UNKNOWN;
-			goto main_end;
-		}
-		
-		while (!exitDaemon)
-		{
-			piped_input = fgetc(fp);
-			switch (piped_input)
-			{
-				case ACTIVATE_WINDOW_PICKER:
-					leader = None, focused = wm_get_focused(ps->dpy);
-					clients = skippy_run(mw, clients, focused, leader,
+			if (skippy_active) {
+				if (poll_fds[1].revents & POLLIN) {
+					clients = skippy_handle_xevents (mw, clients,
 							ps->o.xinerama_showAll);
-					break;
-				
-				case EXIT_RUNNING_DAEMON:
-					printf("Exit command received, killing daemon cleanly...\n");
-					remove(pipePath);
-					exitDaemon = 1;
-				
-				case EOF:
-					#ifdef DEBUG_XINERAMA
-					printf("EOF reached.\n");
-					#endif
-					fclose(fp);
-					fp = fopen(pipePath, "r");
-					break;
-				
-				default:
-					printf("unknown code received: %d\n", piped_input);
-					printf("Ignoring...\n");
-					break;
+				}
+				if (!skippy_active) {
+					skippy_end (mw, focused);
+				}
+			}
+			if (poll_fds[0].revents) {
+				if (poll_fds[0].revents & POLLHUP) {
+					pipe_fd = open(pipePath, O_RDONLY | O_NONBLOCK);
+					if (pipe_fd < 0) {
+						perror ("Could not reopen command pipe");
+						ret = RET_UNKNOWN;
+						goto main_end;
+					}
+					poll_fds[0].fd = pipe_fd;
+				}
+				if (poll_fds[0].revents & POLLIN) {
+					clients = handle_command_pipe (pipe_fd, ps, mw, clients,
+							ps->o.xinerama_showAll);
+				}
 			}
 		}
+		remove(pipePath);
 	}
 	else
 	{
+		Window leader;
 		printf("running once then quitting...\n");
 		leader = None, focused = wm_get_focused(ps->dpy);
 		clients = skippy_run(mw, clients, focused, leader, ps->o.xinerama_showAll);
