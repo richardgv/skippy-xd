@@ -19,6 +19,7 @@
 
 #include "skippy.h"
 #include <string.h>
+#include <regex.h>
 
 typedef struct
 {

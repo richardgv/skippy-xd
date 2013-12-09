@@ -34,6 +34,7 @@ layout_run(MainWin *mw, dlist *windows,
 	// Get total window width and max window width/height
 	foreach_dlist (windows) {
 		ClientWin *cw = (ClientWin *) iter->data;
+		if (!cw->mode) continue;
 		sum_w += cw->src.width;
 		max_w = MAX(max_w, cw->src.width);
 		max_h = MAX(max_h, cw->src.height);
@@ -42,6 +43,7 @@ layout_run(MainWin *mw, dlist *windows,
 	// Vertical layout
 	foreach_dlist (windows) {
 		ClientWin *cw = (ClientWin*) iter->data;
+		if (!cw->mode) continue;
 		dlist *slot_iter = dlist_first(slots);
 		for (; slot_iter; slot_iter = slot_iter->next) {
 			dlist *slot = (dlist *) slot_iter->data;

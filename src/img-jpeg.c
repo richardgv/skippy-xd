@@ -64,8 +64,9 @@ sjpg_read(session_t *ps, const char *path) {
 		goto sjpg_read_end;
 	}
 	need_abort = false;
-	if (unlikely(!(pictw = simg_data_to_pictw(ps, width, height, depth,
-						data, 0)))) {
+	pictw = simg_data_to_pictw(ps, width, height, depth, data, 0);
+	free(data);
+	if (unlikely(!pictw)) {
 		printfef("(\"%s\"): Failed to create Picture.", path);
 		goto sjpg_read_end;
 	}

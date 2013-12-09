@@ -157,8 +157,10 @@ spng_read(session_t *ps, const char *path) {
 		if (need_premultiply)
 			for (int row = 0; row < height; row++)
 				simg_data32_premultiply(row_pointers[row], width);
-		if (unlikely(!(pictw = simg_data_to_pictw(ps, width, height, depth,
-							row_pointers[0], rowbytes)))) {
+		pictw = simg_data_to_pictw(ps, width, height, depth,
+				row_pointers[0], rowbytes);
+		png_free(png_ptr, row_pointers[0]);
+		if (unlikely(!pictw)) {
 			printfef("(\"%s\"): Failed to create Picture.", path);
 			goto spng_read_end;
 		}

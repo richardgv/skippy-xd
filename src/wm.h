@@ -39,7 +39,11 @@ extern Atom
 	_NET_CLOSE_WINDOW,
 	_NET_WM_STATE,
 	_NET_WM_STATE_SHADED,
-	_NET_ACTIVE_WINDOW;
+	_NET_ACTIVE_WINDOW,
+	_NET_WM_ICON,
+
+	// Other atoms
+	KWM_WIN_ICON;
 
 /// Structure representing Window property value.
 typedef struct {

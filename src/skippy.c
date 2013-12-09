@@ -85,10 +85,12 @@ parse_align_full(session_t *ps, const char *str, enum align *dest) {
 static int
 parse_pict_posp_mode(session_t *ps, const char *str, enum pict_posp_mode *dest) {
 	static const char * const STRS_PICTPOSP[] = {
-		[ PICTPOSP_ORIG		] = "orig",
-		[ PICTPOSP_SCALE	] = "scale",
-		[ PICTPOSP_SCALEK	] = "scalek",
-		[ PICTPOSP_TILE	 	] = "tile",
+		[ PICTPOSP_ORIG			] = "orig",
+		[ PICTPOSP_SCALE		] = "scale",
+		[ PICTPOSP_SCALEK		] = "scalek",
+		[ PICTPOSP_SCALEE		] = "scalee",
+		[ PICTPOSP_SCALEEK	] = "scaleek",
+		[ PICTPOSP_TILE	 		] = "tile",
 	};
 	for (int i = 0; i < CARR_LEN(STRS_PICTPOSP); ++i)
 		if (str_startswithword(str, STRS_PICTPOSP[i])) {
@@ -246,52 +248,98 @@ parse_pictspec_end:
 	return true;
 }
 
+static client_disp_mode_t *
+parse_client_disp_mode(session_t *ps, const char *s) {
+	static const struct {
+		client_disp_mode_t mode;
+		const char *name;
+	} ENTRIES[] = {
+		{ CLIDISP_NONE, "none" },
+		{ CLIDISP_FILLED, "filled" },
+		{ CLIDISP_ICON, "icon" },
+		{ CLIDISP_THUMBNAIL, "thumbnail" },
+	};
+	static const int ALLOC_STEP = 3;
+	int capacity = 0;
+	client_disp_mode_t *ret = NULL;
+
+	int i = 0;
+	for (; s; ++i) {
+		char *word = NULL;
+		s = str_get_word(s, &word);
+		if (!word)
+			break;
+		if (capacity <= i + 1) {
+			capacity += ALLOC_STEP;
+			ret = srealloc(ret, capacity, client_disp_mode_t);
+		}
+		{
+			bool found = false;
+			for (int j = 0; j < CARR_LEN(ENTRIES); ++j)
+				if (!strcmp(word, ENTRIES[j].name)) {
+					found = true;
+					ret[i] = ENTRIES[j].mode;
+				}
+			if (!found) {
+				printfef("(\"%s\"): Invalid mode \"%s\" ignored.", s, word);
+				--i;
+			}
+		}
+		free(word);
+	}
+
+	if (!i) {
+		free(ret);
+	}
+	else {
+		ret[i] = CLIDISP_NONE;
+	}
+
+	return ret;
+}
+
 static dlist *
-update_clients(MainWin *mw, dlist *clients, Bool *touched)
-{
-	dlist *stack, *iter;
-	
-	stack = dlist_first(wm_get_stack(mw->ps));
-	iter = clients = dlist_first(clients);
-	
-	if(touched)
+update_clients(MainWin *mw, dlist *clients, Bool *touched) {
+	dlist *stack = dlist_first(wm_get_stack(mw->ps));
+	clients = dlist_first(clients);
+
+	if (touched)
 		*touched = False;
 	
-	/* Terminate clients that are no longer managed */
-	while (iter) {
-		ClientWin *cw = (ClientWin *)iter->data;
-		if (!dlist_find_data(stack, (void *) cw->src.window)) {
+	// Terminate clients that are no longer managed
+	for (dlist *iter = clients; iter; ) {
+		ClientWin *cw = (ClientWin *) iter->data;
+		if (dlist_find_data(stack, (void *) cw->src.window)
+				&& clientwin_update(cw)) {
+			iter = iter->next;
+		}
+		else {
 			dlist *tmp = iter->next;
-			clientwin_destroy((ClientWin *)iter->data, True);
+			clientwin_destroy((ClientWin *) iter->data, True);
 			clients = dlist_remove(iter);
 			iter = tmp;
-			if(touched)
+			if (touched)
 				*touched = True;
-			continue;
 		}
-		clientwin_update(cw);
-		iter = iter->next;
 	}
 	XFlush(mw->ps->dpy);
-	
-	/* Add new clients */
-	for(iter = dlist_first(stack); iter; iter = iter->next)
-	{
+
+	// Add new clients
+	foreach_dlist (stack) {
 		ClientWin *cw = (ClientWin *)
 			dlist_find(clients, clientwin_cmp_func, iter->data);
-		if(! cw && (Window)iter->data != mw->window)
-		{
+		if (!cw && ((Window) iter->data) != mw->window) {
 			cw = clientwin_create(mw, (Window)iter->data);
 			if (!cw) continue;
 			clients = dlist_add(clients, cw);
 			clientwin_update(cw);
-			if(touched)
+			if (touched)
 				*touched = True;
 		}
 	}
-	
+
 	dlist_free(stack);
-	
+
 	return clients;
 }
 
@@ -351,7 +399,11 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader) {
 			clientwin_move((ClientWin *) iter->data, factor, xoff, yoff);
 		}
 	}
-	
+
+	foreach_dlist(mw->cod) {
+		clientwin_update2((ClientWin *) iter->data);
+	}
+
 	// Get the currently focused window and select which mini-window to focus
 	{
 		dlist *iter = dlist_find(mw->cod, clientwin_cmp_func, (void *) focus);
@@ -473,8 +525,7 @@ ev_dump(session_t *ps, const MainWin *mw, const XEvent *ev) {
 }
 
 static dlist *
-skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, bool all_xin)
-{
+skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, bool all_xin) {
 	session_t * const ps = mw->ps;
 	XEvent ev;
 	int die = 0;
@@ -483,10 +534,8 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, bool all_xi
 	/* Update the main window's geometry (and Xinerama info if applicable) */
 	mainwin_update(mw);
 #ifdef CFG_XINERAMA
-	if(all_xin)
-	{
+	if (all_xin)
 		mw->xin_active = 0;
-	}
 #endif /* CFG_XINERAMA */
 	
 	/* Map the main window and run our event loop */
@@ -538,16 +587,27 @@ skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, bool all_xi
 			else if (ev.type == DestroyNotify || ev.type == UnmapNotify) {
 				dlist *iter = (wid ? dlist_find(clients, clientwin_cmp_func, (void *) wid): NULL);
 				if (iter) {
-					ClientWin *cw = (ClientWin *)iter->data;
-					clients = dlist_first(dlist_remove(iter));
-					iter = dlist_find(mw->cod, clientwin_cmp_func, (void *) wid);
-					if(iter)
-						mw->cod = dlist_first(dlist_remove(iter));
-					clientwin_destroy(cw, true);
-					if (!mw->cod) {
-						printfef("(): Last client window destroyed/unmapped, "
-								"exiting.");
-						die = 1;
+					ClientWin *cw = (ClientWin *) iter->data;
+					if (DestroyNotify != ev.type)
+						cw->mode = clientwin_get_disp_mode(ps, cw);
+					if (DestroyNotify == ev.type || !cw->mode) {
+						clients = dlist_first(dlist_remove(iter));
+						iter = dlist_find(mw->cod, clientwin_cmp_func, (void *) wid);
+						if (iter)
+							mw->cod = dlist_first(dlist_remove(iter));
+						clientwin_destroy(cw, true);
+						if (!mw->cod) {
+							printfef("(): Last client window destroyed/unmapped, "
+									"exiting.");
+							die = 1;
+						}
+					}
+					else {
+						free_pixmap(ps, &cw->cpixmap);
+						free_picture(ps, &cw->origin);
+						free_damage(ps, &cw->damage);
+						clientwin_update2(cw);
+						clientwin_render(cw);
 					}
 				}
 			}
@@ -981,6 +1041,9 @@ int main(int argc, char *argv[]) {
 				printfef("(): WARNING: No configuration file found.");
 		}
 
+		char *lc_numeric_old = mstrdup(setlocale(LC_NUMERIC, NULL));
+		setlocale(LC_NUMERIC, "C");
+
 		// Read configuration into ps->o, because searching all the time is much
 		// less efficient, may introduce inconsistent default value, and
 		// occupies a lot more memory for non-string types.
@@ -996,63 +1059,85 @@ int main(int argc, char *argv[]) {
 				|| !parse_cliop(ps, config_get(config, "bindings", "miwMouse2", "close-ewmh"), &ps->o.bindings_miwMouse[2])
 				|| !parse_cliop(ps, config_get(config, "bindings", "miwMouse3", "iconify"), &ps->o.bindings_miwMouse[3]))
 			return RET_BADARG;
-		if (config) {
-  			char *lc_numeric_old = mstrdup(setlocale(LC_NUMERIC, NULL));
-			setlocale(LC_NUMERIC, "C");
-			config_get_int_wrap(config, "general", "distance", &ps->o.distance, 1, INT_MAX);
-			config_get_bool_wrap(config, "general", "useNetWMFullscreen", &ps->o.useNetWMFullscreen);
-			config_get_bool_wrap(config, "general", "ignoreSkipTaskbar", &ps->o.ignoreSkipTaskbar);
-			config_get_bool_wrap(config, "general", "acceptOvRedir", &ps->o.acceptOvRedir);
-			config_get_bool_wrap(config, "general", "acceptWMWin", &ps->o.acceptWMWin);
-			config_get_double_wrap(config, "general", "updateFreq", &ps->o.updateFreq, -1000.0, 1000.0);
-			config_get_bool_wrap(config, "general", "lazyTrans", &ps->o.lazyTrans);
-			config_get_bool_wrap(config, "general", "useNameWindowPixmap", &ps->o.useNameWindowPixmap);
-			config_get_bool_wrap(config, "general", "includeFrame", &ps->o.includeFrame);
-			config_get_bool_wrap(config, "general", "allowUpscale", &ps->o.allowUpscale);
-			config_get_bool_wrap(config, "general", "movePointerOnStart", &ps->o.movePointerOnStart);
-			config_get_bool_wrap(config, "general", "movePointerOnSelect", &ps->o.movePointerOnSelect);
-			config_get_bool_wrap(config, "general", "movePointerOnRaise", &ps->o.movePointerOnRaise);
-			config_get_bool_wrap(config, "xinerama", "showAll", &ps->o.xinerama_showAll);
-			config_get_int_wrap(config, "normal", "tintOpacity", &ps->o.normal_tintOpacity, 0, 256);
-			config_get_int_wrap(config, "normal", "opacity", &ps->o.normal_opacity, 0, 256);
-			config_get_int_wrap(config, "highlight", "tintOpacity", &ps->o.highlight_tintOpacity, 0, 256);
-			config_get_int_wrap(config, "highlight", "opacity", &ps->o.highlight_opacity, 0, 256);
-			config_get_bool_wrap(config, "tooltip", "show", &ps->o.tooltip_show);
-			config_get_bool_wrap(config, "tooltip", "followsMouse", &ps->o.tooltip_followsMouse);
-			config_get_int_wrap(config, "tooltip", "offsetX", &ps->o.tooltip_offsetX, INT_MIN, INT_MAX);
-			config_get_int_wrap(config, "tooltip", "offsetY", &ps->o.tooltip_offsetY, INT_MIN, INT_MAX);
-			if (!parse_align_full(ps, config_get(config, "tooltip", "align", "left"), &ps->o.tooltip_align))
+		config_get_int_wrap(config, "general", "distance", &ps->o.distance, 1, INT_MAX);
+		config_get_bool_wrap(config, "general", "useNetWMFullscreen", &ps->o.useNetWMFullscreen);
+		config_get_bool_wrap(config, "general", "ignoreSkipTaskbar", &ps->o.ignoreSkipTaskbar);
+		config_get_bool_wrap(config, "general", "acceptOvRedir", &ps->o.acceptOvRedir);
+		config_get_bool_wrap(config, "general", "acceptWMWin", &ps->o.acceptWMWin);
+		config_get_double_wrap(config, "general", "updateFreq", &ps->o.updateFreq, -1000.0, 1000.0);
+		config_get_bool_wrap(config, "general", "lazyTrans", &ps->o.lazyTrans);
+		config_get_bool_wrap(config, "general", "useNameWindowPixmap", &ps->o.useNameWindowPixmap);
+		config_get_bool_wrap(config, "general", "forceNameWindowPixmap", &ps->o.forceNameWindowPixmap);
+		config_get_bool_wrap(config, "general", "includeFrame", &ps->o.includeFrame);
+		config_get_bool_wrap(config, "general", "allowUpscale", &ps->o.allowUpscale);
+		config_get_int_wrap(config, "general", "preferredIconSize", &ps->o.preferredIconSize, 1, INT_MAX);
+		config_get_bool_wrap(config, "general", "showAllDesktops", &ps->o.showAllDesktops);
+		config_get_bool_wrap(config, "general", "showUnmapped", &ps->o.showUnmapped);
+		config_get_bool_wrap(config, "general", "movePointerOnStart", &ps->o.movePointerOnStart);
+		config_get_bool_wrap(config, "general", "movePointerOnSelect", &ps->o.movePointerOnSelect);
+		config_get_bool_wrap(config, "general", "movePointerOnRaise", &ps->o.movePointerOnRaise);
+		config_get_bool_wrap(config, "xinerama", "showAll", &ps->o.xinerama_showAll);
+		config_get_int_wrap(config, "normal", "tintOpacity", &ps->o.normal_tintOpacity, 0, 256);
+		config_get_int_wrap(config, "normal", "opacity", &ps->o.normal_opacity, 0, 256);
+		config_get_int_wrap(config, "highlight", "tintOpacity", &ps->o.highlight_tintOpacity, 0, 256);
+		config_get_int_wrap(config, "highlight", "opacity", &ps->o.highlight_opacity, 0, 256);
+		config_get_bool_wrap(config, "tooltip", "show", &ps->o.tooltip_show);
+		config_get_bool_wrap(config, "tooltip", "followsMouse", &ps->o.tooltip_followsMouse);
+		config_get_int_wrap(config, "tooltip", "offsetX", &ps->o.tooltip_offsetX, INT_MIN, INT_MAX);
+		config_get_int_wrap(config, "tooltip", "offsetY", &ps->o.tooltip_offsetY, INT_MIN, INT_MAX);
+		if (!parse_align_full(ps, config_get(config, "tooltip", "align", "left"), &ps->o.tooltip_align))
+			return RET_BADARG;
+		config_get_int_wrap(config, "tooltip", "tintOpacity", &ps->o.highlight_tintOpacity, 0, 256);
+		config_get_int_wrap(config, "tooltip", "opacity", &ps->o.tooltip_opacity, 0, 256);
+		{
+			const char *s = config_get(config, "general", "clientDisplayModes", NULL);
+			if (s && !(ps->o.clientDisplayModes = parse_client_disp_mode(ps, s)))
 				return RET_BADARG;
-			config_get_int_wrap(config, "tooltip", "tintOpacity", &ps->o.highlight_tintOpacity, 0, 256);
-			config_get_int_wrap(config, "tooltip", "opacity", &ps->o.tooltip_opacity, 0, 256);
-			{
-				const char *sspec = config_get(config, "general", "background", "");
-				if (sspec && strlen(sspec)) {
-					pictspec_t spec = PICTSPECT_INIT;
-					if (!parse_pictspec(ps, sspec, &spec))
-						return RET_BADARG;
-					int root_width = DisplayWidth(ps->dpy, ps->screen),
-							root_height = DisplayHeight(ps->dpy, ps->screen);
-					if (!(spec.twidth || spec.theight)) {
-						spec.twidth = root_width;
-						spec.theight = root_height;
-					}
-					pictw_t *p = simg_load_s(ps, &spec);
-					if (!p)
-						exit(1);
-					if (p->width != root_width || p->height != root_height)
-						ps->o.background = simg_postprocess(ps, p, PICTPOSP_ORIG,
-								root_width, root_height, spec.alg, spec.valg, &spec.c);
-					else
-						ps->o.background = p;
-					free_pictspec(ps, &spec);
-				}
+			if (!ps->o.clientDisplayModes) {
+				static const client_disp_mode_t DEF_CLIDISPM[] = {
+					CLIDISP_THUMBNAIL, CLIDISP_ICON, CLIDISP_FILLED, CLIDISP_NONE
+				};
+				ps->o.clientDisplayModes = allocchk(malloc(sizeof(DEF_CLIDISPM)));
+				memcpy(ps->o.clientDisplayModes, &DEF_CLIDISPM, sizeof(DEF_CLIDISPM));
 			}
-
-			setlocale(LC_NUMERIC, lc_numeric_old);
-			free(lc_numeric_old);
-			config_free(config);
 		}
+		{
+			const char *sspec = config_get(config, "general", "background", NULL);
+			if (sspec && strlen(sspec)) {
+				pictspec_t spec = PICTSPECT_INIT;
+				if (!parse_pictspec(ps, sspec, &spec))
+					return RET_BADARG;
+				int root_width = DisplayWidth(ps->dpy, ps->screen),
+						root_height = DisplayHeight(ps->dpy, ps->screen);
+				if (!(spec.twidth || spec.theight)) {
+					spec.twidth = root_width;
+					spec.theight = root_height;
+				}
+				pictw_t *p = simg_load_s(ps, &spec);
+				if (!p)
+					exit(1);
+				if (p->width != root_width || p->height != root_height)
+					ps->o.background = simg_postprocess(ps, p, PICTPOSP_ORIG,
+							root_width, root_height, spec.alg, spec.valg, &spec.c);
+				else
+					ps->o.background = p;
+				free_pictspec(ps, &spec);
+			}
+		}
+		if (!parse_pictspec(ps, config_get(config, "general", "iconFillSpec", "orig mid mid #FFFFFF"), &ps->o.iconFillSpec)
+				|| !parse_pictspec(ps, config_get(config, "general", "fillSpec", "orig mid mid #FFFFFF"), &ps->o.fillSpec))
+			return RET_BADARG;
+		if (!simg_cachespec(ps, &ps->o.fillSpec))
+			return RET_BADARG;
+		if (ps->o.iconFillSpec.path
+				&& !(ps->o.iconDefault = simg_load(ps, ps->o.iconFillSpec.path,
+						PICTPOSP_SCALEK, ps->o.preferredIconSize, ps->o.preferredIconSize,
+						ALIGN_MID, ALIGN_MID, NULL)))
+			return RET_BADARG;
+
+		setlocale(LC_NUMERIC, lc_numeric_old);
+		free(lc_numeric_old);
+		config_free(config);
 	}
 
 	// Second pass
@@ -1177,6 +1262,7 @@ main_end:
 		{
 			free(ps->o.config_path);
 			free(ps->o.pipePath);
+			free(ps->o.clientDisplayModes);
 			free(ps->o.normal_tint);
 			free(ps->o.highlight_tint);
 			free(ps->o.tooltip_border);
@@ -1185,6 +1271,9 @@ main_end:
 			free(ps->o.tooltip_textShadow);
 			free(ps->o.tooltip_font);
 			free_pictw(ps, &ps->o.background);
+			free_pictw(ps, &ps->o.iconDefault);
+			free_pictspec(ps, &ps->o.iconFillSpec);
+			free_pictspec(ps, &ps->o.fillSpec);
 		}
 
 		if (ps->dpy)

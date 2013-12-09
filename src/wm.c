@@ -38,7 +38,11 @@ Atom
 	_NET_CLOSE_WINDOW,
 	_NET_WM_STATE,
 	_NET_WM_STATE_SHADED,
-	_NET_ACTIVE_WINDOW;
+	_NET_ACTIVE_WINDOW,
+	_NET_WM_ICON,
+
+	// Other atoms
+	KWM_WIN_ICON;
 
 static Atom
 	/* Generic atoms */
@@ -142,7 +146,10 @@ wm_get_atoms(session_t *ps) {
 	T_GETATOM(_NET_ACTIVE_WINDOW);
 	T_GETATOM(_NET_CLOSE_WINDOW);
 	T_GETATOM(_NET_WM_STATE_SHADED);
-	
+	T_GETATOM(_NET_WM_ICON);
+
+	T_GETATOM(KWM_WIN_ICON);
+
 	T_GETATOM(_WIN_SUPPORTING_WM_CHECK);
 	T_GETATOM(_WIN_WORKSPACE);
 	T_GETATOM(_WIN_WORKSPACE_COUNT);
@@ -547,7 +554,7 @@ wm_validate_window(session_t *ps, Window wid) {
 		prop = wid_get_prop(ps, wid, _NET_WM_STATE, 8192, XA_ATOM, 32);
 		for (int i = 0; result && i < prop.nitems; i++) {
 			long v = prop.data32[i];
-			if (_NET_WM_STATE_HIDDEN == v)
+			if (!ps->o.showUnmapped && _NET_WM_STATE_HIDDEN == v)
 				result = false;
 			else if (ps->o.ignoreSkipTaskbar
 					&& _NET_WM_STATE_SKIP_TASKBAR == v)
@@ -561,7 +568,7 @@ wm_validate_window(session_t *ps, Window wid) {
 	else if (WMPSN_GNOME == ps->wmpsn) {
 		// Check _WIN_STATE
 		prop = wid_get_prop(ps, wid, _WIN_STATE, 1, XA_CARDINAL, 0);
-		if (winprop_get_int(&prop)
+		if (!ps->o.showUnmapped && winprop_get_int(&prop)
 				& (WIN_STATE_MINIMIZED | WIN_STATE_SHADED | WIN_STATE_HIDDEN))
 			result = false;
 		free_winprop(&prop);
@@ -801,18 +808,18 @@ wid_get_prop_adv(const session_t *ps, Window w, Atom atom, long offset,
   unsigned long nitems = 0, after = 0;
   unsigned char *data = NULL;
 
-  if (Success == XGetWindowProperty(ps->dpy, w, atom, offset, length,
-        False, rtype, &type, &format, &nitems, &after, &data)
-      && nitems && (AnyPropertyType == type || type == rtype)
-      && (!rformat || format == rformat)
-      && (8 == format || 16 == format || 32 == format)) {
-      return (winprop_t) {
-        .data8 = data,
-        .nitems = nitems,
-        .type = type,
-        .format = format,
-      };
-  }
+	if (Success == XGetWindowProperty(ps->dpy, w, atom, offset, length,
+				False, rtype, &type, &format, &nitems, &after, &data)
+			&& nitems && (AnyPropertyType == type || type == rtype)
+			&& (!rformat || format == rformat)
+			&& (8 == format || 16 == format || 32 == format)) {
+		return (winprop_t) {
+			.data8 = data,
+			.nitems = nitems,
+			.type = type,
+			.format = format,
+		};
+	}
 
   sxfree(data);
 

@@ -17,6 +17,17 @@ rect_crop(XRectangle *pdst, const XRectangle *psrc, const XRectangle *pbound) {
 }
 
 /**
+ * @brief Get length of 1 pixel of data for the specified depth.
+ */
+static inline int
+depth_to_len(int depth) {
+	int l = 8;
+	while (depth > l)
+		l *= 2;
+	return l / 8;
+}
+
+/**
  * @brief Get X Render format for a specified depth.
  */
 static inline const XRenderPictFormat *
@@ -33,13 +44,88 @@ depth_to_rfmt(session_t *ps, int depth) {
 }
 
 static inline void
-free_pictw(session_t *ps, pictw_t **ppictw) {
+free_pictw_keeppixmap(session_t *ps, pictw_t **ppictw) {
 	if (*ppictw) {
-		free_pixmap(ps, &(*ppictw)->pxmap);
 		free_picture(ps, &(*ppictw)->pict);
 		free(*ppictw);
 	}
 	*ppictw = NULL;
+}
+
+static inline void
+free_pictw(session_t *ps, pictw_t **ppictw) {
+	if (*ppictw) {
+		free_pixmap(ps, &(*ppictw)->pxmap);
+		free_pictw_keeppixmap(ps, ppictw);
+	}
+}
+
+/**
+ * @brief Destroy a <code>pictspec_t</code>.
+ */
+static inline void
+free_pictspec(session_t *ps, pictspec_t *p) {
+	free_pictw(ps, &p->img);
+	free(p->path);
+}
+
+/**
+ * @brief Build a pictw_t of specified size and depth.
+ */
+static inline pictw_t *
+create_pictw_frompixmap(session_t *ps, int width, int height, int depth,
+		Pixmap pxmap) {
+	pictw_t *pictw = NULL;
+
+	if (!pxmap) {
+		printfef("(%d, %d, %d, %#010lx): Missing pixmap.", width, height, depth, pxmap);
+		return NULL;
+	}
+
+	// Acquire Pixmap info
+	if (!(width && height && depth)) {
+		Window rroot = None;
+		int rx = 0, ry = 0;
+		unsigned rwidth = 0, rheight = 0, rborder_width = 0, rdepth = 0;
+		if (!XGetGeometry(ps->dpy, pxmap,
+				&rroot, &rx, &ry, &rwidth, &rheight, &rborder_width, &rdepth)) {
+			printfef("(%d, %d, %d, %#010lx): Failed to determine pixmap size.", width, height, depth, pxmap);
+			return NULL;
+		}
+		width = rwidth;
+		height = rheight;
+		depth = rdepth;
+	}
+
+	// Sanity check
+	if (!(width && height && depth)) {
+		printfef("(%d, %d, %d, %#010lx): Failed to get pixmap info.", width, height, depth, pxmap);
+		return NULL;
+	}
+
+	// Find X Render format
+	const XRenderPictFormat *rfmt = depth_to_rfmt(ps, depth);
+	if (!rfmt) {
+		printfef("(%d, %d, %d, %#010lx): Failed to find X Render format for depth %d.",
+				width, height, depth, pxmap, depth);
+		return NULL;
+	}
+
+	// Create Picture
+	pictw = scalloc(1, pictw_t);
+	pictw->pxmap = pxmap;
+	pictw->width = width;
+	pictw->height = height;
+	pictw->depth = depth;
+
+	if (!(pictw->pict = XRenderCreatePicture(ps->dpy, pictw->pxmap,
+					rfmt, 0, NULL))) {
+		printfef("(%d, %d, %d, %#010lx): Failed to create Picture.",
+				width, height, depth, pxmap);
+		free_pictw(ps, &pictw);
+	}
+
+	return pictw;
 }
 
 /**
@@ -47,30 +133,24 @@ free_pictw(session_t *ps, pictw_t **ppictw) {
  */
 static inline pictw_t *
 create_pictw(session_t *ps, int width, int height, int depth) {
-	pictw_t *pictw = allocchk(calloc(1, sizeof(pictw_t)));
-	
-	if (!(pictw->pxmap =
-				XCreatePixmap(ps->dpy, ps->root, width, height, depth))) {
-		printfef("(%d, %d, %d): Failed to create Pixmap.",
-				width, height, depth);
-		goto create_pictw_err;
+	Pixmap pxmap = XCreatePixmap(ps->dpy, ps->root, width, height, depth);
+	if (!pxmap) {
+		printfef("(%d, %d, %d): Failed to create Pixmap.", width, height, depth);
+		return NULL;
 	}
-	if (!(pictw->pict = XRenderCreatePicture(ps->dpy, pictw->pxmap,
-					depth_to_rfmt(ps, depth), 0, NULL))) {
-		printfef("(%d, %d, %d): Failed to create Picture.",
-				width, height, depth);
-		goto create_pictw_err;
-	}
-	pictw->width = width;
-	pictw->height = height;
-	pictw->depth = depth;
 
-	return pictw;
+	return create_pictw_frompixmap(ps, width, height, depth, pxmap);
+}
 
-create_pictw_err:
-	free_pictw(ps, &pictw);
+static inline pictw_t *
+clone_pictw(session_t *ps, pictw_t *pictw) {
+	if (!pictw) return NULL;
+	pictw_t *new_pictw = create_pictw(ps, pictw->width, pictw->height, pictw->depth);
+	if (!new_pictw) return NULL;
+	XRenderComposite(ps->dpy, PictOpSrc, pictw->pict, None, new_pictw->pict,
+			0, 0, 0, 0, 0, 0, new_pictw->width, new_pictw->height);
 
-	return NULL;
+	return new_pictw;
 }
 
 pictw_t *
@@ -84,15 +164,88 @@ simg_load_s(session_t *ps, const pictspec_t *spec) {
 			spec->alg, spec->valg, &spec->c);
 }
 
+static inline bool
+simg_cachespec(session_t *ps, pictspec_t *spec) {
+	free_pictw(ps, &spec->img);
+	if (spec->path
+			&& !(spec->img = simg_load(ps, spec->path, PICTPOSP_ORIG, 0, 0,
+					ALIGN_MID, ALIGN_MID, NULL)))
+		return false;
+	return true;
+}
+
 pictw_t *
 simg_postprocess(session_t *ps, pictw_t *src, enum pict_posp_mode mode,
 		int twidth, int theight, enum align alg, enum align valg,
 		const XRenderColor *pc);
 
 static inline pictw_t *
+simg_pixmap_to_pictw(session_t *ps, int width, int height, int depth,
+		Pixmap pxmap, Pixmap mask) {
+	GC gc = None;
+	pictw_t *porig = create_pictw_frompixmap(ps, width, height, depth, pxmap);
+	pictw_t *pmask = NULL;
+	pictw_t *pictw = NULL;
+
+	if (!porig) {
+		printfef("(%d, %d, %d, %#010lx, %#010lx): Failed to create picture for pixmap.",
+				width, height, depth, pxmap, mask);
+		goto simg_pixmap_to_pict_end;
+	}
+
+	if (mask) {
+		if (!(pmask = create_pictw_frompixmap(ps, width, height, depth, mask))) {
+			printfef("(%d, %d, %d, %#010lx, %#010lx): Failed to create picture for mask.",
+					width, height, depth, pxmap, mask);
+			goto simg_pixmap_to_pict_end;
+		}
+		// Probably we should check for width/height consistency between pixmap
+		// and mask...
+	}
+
+	if (!(pictw = create_pictw(ps, porig->width, porig->height, (mask ? 32: porig->depth)))) {
+		printfef("(%d, %d, %d, %#010lx, %#010lx): Failed to create target picture.",
+				width, height, depth, pxmap, mask);
+		goto simg_pixmap_to_pict_end;
+	}
+
+	// Copy content
+	static const XRenderColor XRC_TRANS = {
+		.red = 0, .green = 0, .blue = 0, .alpha = 0
+	};
+	XRenderFillRectangle(ps->dpy, PictOpSrc, pictw->pict, &XRC_TRANS,
+			0, 0, pictw->width, pictw->height);
+	XRenderComposite(ps->dpy, PictOpSrc, porig->pict, (pmask ? pmask->pict: None),
+			pictw->pict, 0, 0, 0, 0, 0, 0, pictw->width, pictw->height);
+
+	// Does core Xlib handle transparency correctly?
+	/*
+	gc = XCreateGC(ps->dpy, pictw->pxmap, 0, 0);
+	if (!gc) {
+		printfef("(%#010lx, %#010lx, %d, %d, %d): Failed to create GC.",
+				pxmap, mask, width, height, depth);
+		free_pictw(ps, &pictw);
+		goto simg_data_to_pict_end;
+	}
+	if (XCopyArea(ps->dpy, pxmap, pictw->pxmap, gc, 0, 0, width, height, 0, 0)) {
+	}
+	*/
+
+simg_pixmap_to_pict_end:
+	free_pictw_keeppixmap(ps, &porig);
+	free_pictw_keeppixmap(ps, &pmask);
+	if (gc)
+		XFreeGC(ps->dpy, gc);
+
+	return pictw;
+}
+
+static inline pictw_t *
 simg_data_to_pictw(session_t *ps, int width, int height, int depth,
 		const unsigned char *data, int bytes_per_line) {
 	assert(data);
+	data = mmemcpy(data, height
+			* (bytes_per_line ? bytes_per_line: depth_to_len(depth) * width));
 	pictw_t *pictw = NULL;
 	GC gc = None;
 	XImage *img = XCreateImage(ps->dpy, DefaultVisual(ps->dpy, ps->screen),
@@ -142,7 +295,7 @@ simg_data24_premultiply(unsigned char *data, int len) {
 
 static inline void
 simg_data24_fillalpha(unsigned char *data, int len) {
-	for (; len >= 0; --len) {
+	for (--len; len >= 0; --len) {
 		if (len) {
 			data[len * 4 + 0] = data[len * 3 + 0];
 			data[len * 4 + 1] = data[len * 3 + 1];
@@ -154,16 +307,27 @@ simg_data24_fillalpha(unsigned char *data, int len) {
 
 static inline void
 simg_data24_tobgr(unsigned char *data, int len) {
-	for (; len >= 0; --len) {
+	for (--len; len >= 0; --len) {
 		unsigned char r = data[len * 4];
 		data[len * 4 + 0] = data[len * 4 + 2];
 		data[len * 4 + 2] = r;
 	}
 }
 
+static inline unsigned char *
+simg_data32_from_long(const long *src, int len) {
+	if (4 == sizeof(long))
+		return (unsigned char *) src;
+
+	uint32_t *data = smalloc(len, uint32_t);
+	for (int i = 0; i < len; ++i)
+		data[i] = src[i];
+	return (unsigned char *) data;
+}
+
 static inline void
 simg_data32_premultiply(unsigned char *data, int len) {
-	for (; len > 0; --len) {
+	for (--len; len >= 0; --len) {
 		float a = (float) data[len * 4 + 3] / 0xff;
 		data[len * 4 + 0] *= a;
 		data[len * 4 + 1] *= a;

@@ -135,8 +135,9 @@ sgif_read(session_t *ps, const char *path) {
 			}
 		}
 	}
-	if (unlikely(!(pictw = simg_data_to_pictw(ps, width, height, depth,
-						tdata, 0)))) {
+	pictw = simg_data_to_pictw(ps, width, height, depth, tdata, 0);
+	free(tdata);
+	if (unlikely(!pictw)) {
 		printfef("(\"%s\"): Failed to create Picture.", path);
 		goto sgif_read_end;
 	}

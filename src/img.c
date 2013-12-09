@@ -18,7 +18,7 @@ simg_load(session_t *ps, const char *path, enum pict_posp_mode mode,
 			|| str_endwith(path, ".jpe"))
 		result = sjpg_read(ps, path);
 #endif
-#ifdef CFG_JPEG
+#ifdef CFG_GIFLIB
 	else if (str_endwith(path, ".gif"))
 		result = sgif_read(ps, path);
 #endif
@@ -33,6 +33,11 @@ pictw_t *
 simg_postprocess(session_t *ps, pictw_t *src, enum pict_posp_mode mode,
 		int twidth, int theight, enum align alg, enum align valg,
 		const XRenderColor *pc) {
+	static const XRenderColor XRC_TRANS = {
+		.red = 0, .green = 0, .blue = 0, .alpha = 0
+	};
+	if (!pc) pc = &XRC_TRANS;
+
 	const int depth = 32;
 	pictw_t *dest = NULL;
 	bool transformed = false;
@@ -55,19 +60,25 @@ simg_postprocess(session_t *ps, pictw_t *src, enum pict_posp_mode mode,
 	// Determine composite paramaters. We have to do this before create
 	// Picture because the width/height may need to be calculated.
 	int width = src->width, height = src->height;
-	if (!twidth) twidth = width;
-	if (!theight) theight = height;
+	if (!twidth) twidth = (double) theight / height * width;
+	else if (!theight) theight = (double) twidth / width * height;
 	double ratio_x = 1.0, ratio_y = 1.0;
 	switch (mode) {
 		case PICTPOSP_ORIG: break;
 		case PICTPOSP_TILE: break;
 		case PICTPOSP_SCALE:
 		case PICTPOSP_SCALEK:
+		case PICTPOSP_SCALEE:
+		case PICTPOSP_SCALEEK:
 							{
 								if (twidth) ratio_x = (double) twidth / width;
 								if (theight) ratio_y = (double) theight / height;
-								if (PICTPOSP_SCALEK == mode)
+								if (PICTPOSP_SCALEK == mode || PICTPOSP_SCALEEK == mode)
 									ratio_x = ratio_y = MIN(ratio_x, ratio_y);
+								if (PICTPOSP_SCALEE == mode || PICTPOSP_SCALEEK == mode) {
+									ratio_x = MAX(1.0f, ratio_x);
+									ratio_y = MAX(1.0f, ratio_y);
+								}
 								width *= ratio_x;
 								height *= ratio_y;
 							}
