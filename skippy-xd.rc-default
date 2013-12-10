@@ -60,7 +60,7 @@ fillSpec = orig mid mid #FFFFFF
 background =
 
 [xinerama]
-showAll = false
+showAll = true
 
 [normal]
 tint = black

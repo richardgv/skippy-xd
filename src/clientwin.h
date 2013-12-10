@@ -69,6 +69,9 @@ clientwin_get_disp_mode(session_t *ps, ClientWin *cw) {
 	XWindowAttributes wattr = { };
 	XGetWindowAttributes(ps->dpy, cw->src.window, &wattr);
 
+	if (!ps->o.showUnmapped && IsViewable != wattr.map_state)
+		return CLIDISP_NONE;
+
 	for (client_disp_mode_t *p = ps->o.clientDisplayModes; *p; p++) {
 		switch (*p) {
 			case CLIDISP_THUMBNAIL:

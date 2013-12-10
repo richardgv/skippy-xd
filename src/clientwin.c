@@ -269,11 +269,18 @@ clientwin_destroy(ClientWin *cw, bool destroyed) {
 }
 
 static void
-clientwin_repaint(ClientWin *cw, XRectangle *rect) {
+clientwin_repaint(ClientWin *cw, const XRectangle *rect) {
 	session_t *ps = cw->mainwin->ps;
 	Picture source = None;
-	int s_x = rect->x, s_y = rect->y,
-			s_w = rect->width, s_h = rect->height;
+	int s_x = 0, s_y = 0, s_w = cw->mini.width, s_h = cw->mini.height;
+	if (rect) {
+		s_x = rect->x;
+		s_y = rect->y;
+		s_w = rect->width;
+		s_h = rect->height;
+	}
+
+	// printfdf("(%#010lx): %d, %d, %d, %d", cw->wid_client, s_x, s_y, s_w, s_h);
 
 	switch (cw->mode) {
 		case CLIDISP_NONE:
@@ -286,10 +293,6 @@ clientwin_repaint(ClientWin *cw, XRectangle *rect) {
 			break;
 		case CLIDISP_THUMBNAIL:
 			source = cw->origin;
-			s_x *= cw->factor;
-			s_y *= cw->factor;
-			s_w *= cw->factor;
-			s_h *= cw->factor;
 			break;
 	}
 
@@ -321,28 +324,34 @@ clientwin_repaint(ClientWin *cw, XRectangle *rect) {
 
 void
 clientwin_render(ClientWin *cw) {
-	XRectangle rect = {
-		.x = 0, .y = 0, .width = cw->src.width, .height = cw->src.height
-	};
-	clientwin_repaint(cw, &rect);
+	clientwin_repaint(cw, NULL);
 }
 
 void
-clientwin_repair(ClientWin *cw)
-{
-	int nrects, i;
-	XRectangle *rects;
-	XserverRegion rgn = XFixesCreateRegion(cw->mainwin->ps->dpy, 0, 0);
-	
-	XDamageSubtract(cw->mainwin->ps->dpy, cw->damage, None, rgn);
-	
-	rects = XFixesFetchRegion(cw->mainwin->ps->dpy, rgn, &nrects);
-	XFixesDestroyRegion(cw->mainwin->ps->dpy, rgn);
-	
-	for(i = 0; i < nrects; i++)
-		clientwin_repaint(cw, &rects[i]);
-	
-	if(rects)
+clientwin_repair(ClientWin *cw) {
+	session_t *ps = cw->mainwin->ps;
+
+	int nrects = 0;
+	XRectangle *rects = NULL;
+
+	{
+		XserverRegion rgn = XFixesCreateRegion(ps->dpy, 0, 0);
+		XDamageSubtract(ps->dpy, cw->damage, None, rgn);
+		if (CLIDISP_THUMBNAIL == cw->mode)
+			rects = XFixesFetchRegion(ps->dpy, rgn, &nrects);
+		XFixesDestroyRegion(ps->dpy, rgn);
+	}
+	for (int i = 0; i < nrects; i++) {
+		XRectangle r = {
+			.x = rects[i].x * cw->factor,
+			.y = rects[i].y * cw->factor,
+			.width = rects[i].width * cw->factor,
+			.height = rects[i].height * cw->factor,
+		};
+		clientwin_repaint(cw, &r);
+	}
+
+	if (rects)
 		XFree(rects);
 	
 	cw->damaged = false;

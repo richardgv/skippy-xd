@@ -280,7 +280,7 @@ typedef struct {
 	.showUnmapped = true, \
 	.buttonImgs = { NULL }, \
 	.background = NULL, \
-	.xinerama_showAll = false, \
+	.xinerama_showAll = true, \
 	.normal_tint = NULL, \
 	.normal_tintOpacity = 0, \
 	.normal_opacity = 200, \
