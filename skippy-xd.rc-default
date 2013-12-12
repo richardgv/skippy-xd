@@ -47,6 +47,7 @@ pipePath = /tmp/skippy-xd-fifo
 movePointerOnStart = true
 movePointerOnSelect = true
 movePointerOnRaise = true
+switchDesktopOnActivate = false
 useNameWindowPixmap = false
 forceNameWindowPixmap = false
 includeFrame = true

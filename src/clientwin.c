@@ -164,7 +164,8 @@ clientwin_update(ClientWin *cw) {
 		cw->src.format = XRenderFindVisualFormat(ps->dpy, wattr.visual);
 	}
 
-	if (IsViewable == wattr.map_state) {
+	if (IsViewable == wattr.map_state
+			&& !(ps->o.includeAllScreens && ps->o.avoidThumbnailsFromOtherScreens && ps->root != wattr.root)) {
 		// Get window pixmap
 		if (ps->o.useNameWindowPixmap) {
 			XCompositeRedirectWindow(ps->dpy, cw->src.window,

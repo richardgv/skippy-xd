@@ -1071,11 +1071,14 @@ int main(int argc, char *argv[]) {
 		config_get_bool_wrap(config, "general", "includeFrame", &ps->o.includeFrame);
 		config_get_bool_wrap(config, "general", "allowUpscale", &ps->o.allowUpscale);
 		config_get_int_wrap(config, "general", "preferredIconSize", &ps->o.preferredIconSize, 1, INT_MAX);
+		config_get_bool_wrap(config, "general", "includeAllScreens", &ps->o.includeAllScreens);
+		config_get_bool_wrap(config, "general", "avoidThumbnailsFromOtherScreens", &ps->o.avoidThumbnailsFromOtherScreens);
 		config_get_bool_wrap(config, "general", "showAllDesktops", &ps->o.showAllDesktops);
 		config_get_bool_wrap(config, "general", "showUnmapped", &ps->o.showUnmapped);
 		config_get_bool_wrap(config, "general", "movePointerOnStart", &ps->o.movePointerOnStart);
 		config_get_bool_wrap(config, "general", "movePointerOnSelect", &ps->o.movePointerOnSelect);
 		config_get_bool_wrap(config, "general", "movePointerOnRaise", &ps->o.movePointerOnRaise);
+		config_get_bool_wrap(config, "general", "switchDesktopOnActivate", &ps->o.switchDesktopOnActivate);
 		config_get_bool_wrap(config, "xinerama", "showAll", &ps->o.xinerama_showAll);
 		config_get_int_wrap(config, "normal", "tintOpacity", &ps->o.normal_tintOpacity, 0, 256);
 		config_get_int_wrap(config, "normal", "opacity", &ps->o.normal_opacity, 0, 256);
