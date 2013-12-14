@@ -681,6 +681,8 @@ skippy_end(MainWin *mw, Window focus)
 {
 	session_t * const ps = mw->ps;
 
+	skippy_active = false;
+
 	// Unmap the main window and all clients, to make sure focus doesn't fall out
 	// when we start setting focus on client window
 	mainwin_unmap(mw);
@@ -728,6 +730,18 @@ static void
 activate_window_picker(const char* pipePath) {
 	printf("activating window picker...\n");
 	send_command_to_daemon_via_fifo(ACTIVATE_WINDOW_PICKER, pipePath);
+}
+
+static void
+deactivate_window_picker(const char* pipePath) {
+	printf("deactivating window picker...\n");
+	send_command_to_daemon_via_fifo(DEACTIVATE_WINDOW_PICKER, pipePath);
+}
+
+static void
+toggle_window_picker(const char* pipePath) {
+	printf("toggling window picker...\n");
+	send_command_to_daemon_via_fifo(TOGGLE_WINDOW_PICKER, pipePath);
 }
 
 static void
@@ -810,12 +824,15 @@ show_help() {
 	fputs("skippy-xd (" SKIPPYXD_VERSION ")\n"
 			"Usage: skippy-xd [command]\n\n"
 			"The available commands are:\n"
-			"\t--config                  - Read the specified configuration file.\n"
-			"\t--start-daemon            - starts the daemon running.\n"
-			"\t--stop-daemon             - stops the daemon running.\n"
-			"\t--activate-window-picker  - tells the daemon to show the window picker.\n"
-			"\t--help                    - show this message.\n"
-			"\t-S                        - Synchronize X operation (debugging).\n"
+			"    --config                    - Read the specified configuration file.\n"
+			"    --start-daemon              - starts the daemon running.\n"
+			"    --stop-daemon               - stops the daemon running.\n"
+			"    --activate-window-picker    - tells the daemon to show the window picker.\n"
+			"    --deactivate-window-picker  - tells the daemon to hide the window picker.\n"
+			"    --toggle-window-picker      - tells the daemon to show the window picker if\n"
+			"                                  not active or hide it if active.\n"
+			"    --help                      - show this message.\n"
+			"    -S                          - Synchronize X operation (debugging).\n"
 			, stdout);
 #ifdef CFG_LIBPNG
 	spng_about(stdout);
@@ -932,6 +949,8 @@ parse_args(session_t *ps, int argc, char **argv, bool first_pass) {
 	enum options {
 		OPT_CONFIG = 256,
 		OPT_ACTV_PICKER,
+		OPT_DEACTV_PICKER,
+		OPT_TOGGLE_PICKER,
 		OPT_DM_START,
 		OPT_DM_STOP,
 	};
@@ -939,7 +958,9 @@ parse_args(session_t *ps, int argc, char **argv, bool first_pass) {
 	static const struct option opts_long[] = {
 		{ "help",					no_argument,	NULL, 'h' },
 		{ "config",					required_argument, NULL, OPT_CONFIG },
-		{ "activate-window-picker", no_argument,	NULL, OPT_ACTV_PICKER },
+		{ "activate-window-picker",	no_argument,	NULL, OPT_ACTV_PICKER },
+		{ "deactivate-window-picker", no_argument,	NULL, OPT_DEACTV_PICKER },
+		{ "toggle-window-picker",	no_argument,	NULL, OPT_TOGGLE_PICKER },
 		{ "start-daemon",			no_argument,	NULL, OPT_DM_START },
 		{ "stop-daemon",			no_argument,	NULL, OPT_DM_STOP },
 		{ NULL, no_argument, NULL, 0 }
@@ -976,6 +997,12 @@ parse_args(session_t *ps, int argc, char **argv, bool first_pass) {
 			case OPT_ACTV_PICKER:
 				ps->o.mode = PROGMODE_ACTV_PICKER;
 				break;
+			case OPT_DEACTV_PICKER:
+				ps->o.mode = PROGMODE_DEACTV_PICKER;
+				break;
+			case OPT_TOGGLE_PICKER:
+				ps->o.mode = PROGMODE_TOGGLE_PICKER;
+				break;
 			T_CASEBOOL(OPT_DM_START, runAsDaemon);
 			case OPT_DM_STOP:
 				ps->o.mode = PROGMODE_DM_STOP;
@@ -1008,6 +1035,22 @@ handle_command_pipe (int pipe_fd, session_t *ps, MainWin *mw, dlist *clients, bo
 	{
 		case ACTIVATE_WINDOW_PICKER:
 			if (!skippy_active) {
+				leader = None, focused = wm_get_focused(ps->dpy);
+				clients = skippy_run(mw, clients, focused, leader,
+						ps->o.xinerama_showAll);
+			}
+			break;
+
+		case DEACTIVATE_WINDOW_PICKER:
+			if (skippy_active) {
+				skippy_end(mw, focused);
+			}
+			break;
+
+		case TOGGLE_WINDOW_PICKER:
+			if (skippy_active) {
+				skippy_end(mw, focused);
+			} else {
 				leader = None, focused = wm_get_focused(ps->dpy);
 				clients = skippy_run(mw, clients, focused, leader,
 						ps->o.xinerama_showAll);
@@ -1195,6 +1238,12 @@ int main(int argc, char *argv[]) {
 			break;
 		case PROGMODE_ACTV_PICKER:
 			activate_window_picker(pipePath);
+			goto main_end;
+		case PROGMODE_DEACTV_PICKER:
+			deactivate_window_picker(pipePath);
+			goto main_end;
+		case PROGMODE_TOGGLE_PICKER:
+			toggle_window_picker(pipePath);
 			goto main_end;
 		case PROGMODE_DM_STOP:
 			exit_daemon(pipePath);
