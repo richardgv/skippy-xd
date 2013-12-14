@@ -1007,9 +1007,11 @@ handle_command_pipe (int pipe_fd, session_t *ps, MainWin *mw, dlist *clients, bo
 	switch (piped_input)
 	{
 		case ACTIVATE_WINDOW_PICKER:
-			leader = None, focused = wm_get_focused(ps->dpy);
-			clients = skippy_run(mw, clients, focused, leader,
-					ps->o.xinerama_showAll);
+			if (!skippy_active) {
+				leader = None, focused = wm_get_focused(ps->dpy);
+				clients = skippy_run(mw, clients, focused, leader,
+						ps->o.xinerama_showAll);
+			}
 			break;
 
 		case EXIT_RUNNING_DAEMON:
