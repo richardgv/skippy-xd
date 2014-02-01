@@ -29,9 +29,8 @@ typedef struct {
 
 #define SKIPPYWINT_INIT { .window = None }
 
-struct _MainWin;
 struct _clientwin_t {
-	struct _MainWin *mainwin;
+	MainWin *mainwin;
 
 	client_disp_mode_t mode;
 	Window wid_client;
@@ -105,7 +104,7 @@ clientwin_free_res(session_t *ps, ClientWin *cw) {
 
 int clientwin_validate_func(dlist *, void *);
 int clientwin_sort_func(dlist *, dlist *, void *);
-ClientWin *clientwin_create(struct _MainWin *, Window);
+ClientWin *clientwin_create(MainWin *, Window);
 void clientwin_destroy(ClientWin *, bool destroyed);
 void clientwin_move(ClientWin *, float, int, int);
 void clientwin_map(ClientWin *);

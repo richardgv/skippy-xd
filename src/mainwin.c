@@ -284,7 +284,8 @@ mainwin_map(MainWin *mw) {
 	session_t *ps = mw->ps;
 
 	wm_set_fullscreen(ps, mw->window, mw->x, mw->y, mw->width, mw->height);
-	mw->pressed = 0;
+	mw->pressed = NULL;
+	mw->pressed_key = mw->pressed_mouse = false;
 	XMapWindow(ps->dpy, mw->window);
 	XRaiseWindow(ps->dpy, mw->window);
 
@@ -316,6 +317,9 @@ mainwin_unmap(MainWin *mw)
 void
 mainwin_destroy(MainWin *mw) {
 	session_t *ps = mw->ps; 
+
+	// Free all clients associated with this main window
+	dlist_free_with_func(mw->clients, (dlist_free_func) clientwin_destroy);
 
 	if(mw->tooltip)
 		tooltip_destroy(mw->tooltip);

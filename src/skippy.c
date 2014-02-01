@@ -26,6 +26,14 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+enum pipe_cmd_t {
+	// Not ordered properly for backward compatibility
+	PIPECMD_ACTIVATE_WINDOW_PICKER = 1,
+	PIPECMD_EXIT_RUNNING_DAEMON,
+	PIPECMD_DEACTIVATE_WINDOW_PICKER,
+	PIPECMD_TOGGLE_WINDOW_PICKER,
+};
+
 session_t *ps_g = NULL;
 
 /**
@@ -524,210 +532,304 @@ ev_dump(session_t *ps, const MainWin *mw, const XEvent *ev) {
 	printfd("Event %-13.13s wid %#010lx %s", name, wid, wextra);
 }
 
-static dlist *
-skippy_run(MainWin *mw, dlist *clients, Window focus, Window leader, bool all_xin) {
-	session_t * const ps = mw->ps;
-	XEvent ev;
-	int die = 0;
-	bool refocus = false;
-	
-	/* Update the main window's geometry (and Xinerama info if applicable) */
+static bool
+skippy_run_init(MainWin *mw, Window leader) {
+	session_t *ps = mw->ps;
+
+	// Update the main window's geometry (and Xinerama info if applicable)
 	mainwin_update(mw);
 #ifdef CFG_XINERAMA
-	if (all_xin)
+	if (ps->o.xinerama_showAll)
 		mw->xin_active = 0;
 #endif /* CFG_XINERAMA */
-	
-	/* Map the main window and run our event loop */
+
+	// Map the main window and run our event loop
 	if (ps->o.lazyTrans) {
 		mainwin_map(mw);
 		XFlush(ps->dpy);
 	}
-	
-	clients = do_layout(mw, clients, focus, leader);
+
+	mw->revert_focus_win = wm_get_focused(ps->dpy);
+	mw->client_to_focus = NULL;
+
+	mw->clients = do_layout(mw, mw->clients, mw->revert_focus_win, leader);
 	if (!mw->cod) {
 		printfef("(): Failed to build layout.");
-		return clients;
+		return false;
 	}
-	
+
 	/* Map the main window and run our event loop */
 	if (!ps->o.lazyTrans)
 		mainwin_map(mw);
 	XFlush(ps->dpy);
-	
+
+	return true;
+}
+
+static void
+mainloop(session_t *ps, bool activate_on_start) {
+	MainWin *mw = NULL;
+	bool die = false;
+	bool activate = activate_on_start;
+	bool refocus = false;
 	bool pending_damage = false;
-	int last_rendered = time_in_millis();
-	while (!die) {
+	long last_rendered = 0L;
+
+	while (true) {
+		// Activation goes first, so that it won't be delayed by poll()
+		if (!mw && activate) {
+			assert(ps->mainwin);
+			activate = false;
+			if (skippy_run_init(ps->mainwin, None)) {
+				last_rendered = time_in_millis();
+				mw = ps->mainwin;
+				refocus = false;
+				pending_damage = false;
+			}
+		}
+		if (mw)
+			activate = false;
+
+		// Main window destruction, before poll()
+		if (mw && die) {
+			// Unmap the main window and all clients, to make sure focus doesn't fall out
+			// when we start setting focus on client window
+			mainwin_unmap(mw);
+			foreach_dlist(mw->cod) { clientwin_unmap((ClientWin *) iter->data); }
+			XSync(ps->dpy, False);
+
+			// Focus the client window only after the main window get unmapped and
+			// keyboard gets ungrabbed.
+			if (mw->client_to_focus) {
+				childwin_focus(mw->client_to_focus);
+				mw->client_to_focus = NULL;
+				refocus = false;
+				pending_damage = false;
+			}
+
+			// Cleanup
+			dlist_free(mw->cod);
+			mw->cod = 0;
+
+			if (refocus) {
+				// No idea why. Plain XSetInputFocus() no longer works after ungrabbing.
+				wm_activate_window(ps, mw->revert_focus_win);
+				refocus = false;
+			}
+
+			XFlush(ps->dpy);
+
+			mw = NULL;
+		}
+		if (!mw)
+			die = false;
+		if (activate_on_start && !mw)
+			return;
+
 		// Poll for events
-		{
-			int timeout = -1;
-			struct pollfd r_fd = {
+		struct pollfd r_fd[2] = {
+			{
 				.fd = ConnectionNumber(ps->dpy),
 				.events = POLLIN,
-			};
-			if (mw->poll_time > 0 && pending_damage)
-				timeout = MAX(0,
-						mw->poll_time + last_rendered - time_in_millis());
-			poll(&r_fd, 1, timeout);
-		}
+			},
+			{
+				.fd = (ps->fp_pipe ? fileno(ps->fp_pipe): - 1),
+				.events = POLLIN,
+			},
+		};
+		poll(r_fd, (r_fd[1].fd >= 0 ? 2: 1), pending_damage && mw && mw->poll_time > 0 ?
+				MAX(0, mw->poll_time + last_rendered - time_in_millis()): -1);
 
-		// Process events
-		while (XEventsQueued(ps->dpy, QueuedAfterReading)) {
-			XNextEvent(ps->dpy, &ev);
+		if (mw) {
+			// Process X events
+			XEvent ev = { };
+			while (XEventsQueued(ps->dpy, QueuedAfterReading)) {
+				XNextEvent(ps->dpy, &ev);
 #ifdef DEBUG_EVENTS
-			ev_dump(ps, mw, &ev);
+				ev_dump(ps, mw, &ev);
 #endif
-			const Window wid = ev_window(ps, &ev);
+				const Window wid = ev_window(ps, &ev);
 
-			if (MotionNotify == ev.type) {
-				if (mw->tooltip && ps->o.tooltip_followsMouse)
-					tooltip_move(mw->tooltip,
-							ev.xmotion.x_root, ev.xmotion.y_root);
-			}
-			else if (ev.type == DestroyNotify || ev.type == UnmapNotify) {
-				dlist *iter = (wid ? dlist_find(clients, clientwin_cmp_func, (void *) wid): NULL);
-				if (iter) {
-					ClientWin *cw = (ClientWin *) iter->data;
-					if (DestroyNotify != ev.type)
-						cw->mode = clientwin_get_disp_mode(ps, cw);
-					if (DestroyNotify == ev.type || !cw->mode) {
-						clients = dlist_first(dlist_remove(iter));
-						iter = dlist_find(mw->cod, clientwin_cmp_func, (void *) wid);
-						if (iter)
-							mw->cod = dlist_first(dlist_remove(iter));
-						clientwin_destroy(cw, true);
-						if (!mw->cod) {
-							printfef("(): Last client window destroyed/unmapped, "
-									"exiting.");
-							die = 1;
+				if (MotionNotify == ev.type) {
+					if (mw->tooltip && ps->o.tooltip_followsMouse)
+						tooltip_move(mw->tooltip,
+								ev.xmotion.x_root, ev.xmotion.y_root);
+				}
+				else if (ev.type == DestroyNotify || ev.type == UnmapNotify) {
+					dlist *iter = (wid ? dlist_find(mw->clients, clientwin_cmp_func, (void *) wid): NULL);
+					if (iter) {
+						ClientWin *cw = (ClientWin *) iter->data;
+						if (DestroyNotify != ev.type)
+							cw->mode = clientwin_get_disp_mode(ps, cw);
+						if (DestroyNotify == ev.type || !cw->mode) {
+							mw->clients = dlist_first(dlist_remove(iter));
+							iter = dlist_find(mw->cod, clientwin_cmp_func, (void *) wid);
+							if (iter)
+								mw->cod = dlist_first(dlist_remove(iter));
+							clientwin_destroy(cw, true);
+							if (!mw->cod) {
+								printfef("(): Last client window destroyed/unmapped, "
+										"exiting.");
+								die = true;
+							}
+						}
+						else {
+							free_pixmap(ps, &cw->cpixmap);
+							free_picture(ps, &cw->origin);
+							free_damage(ps, &cw->damage);
+							clientwin_update2(cw);
+							clientwin_render(cw);
 						}
 					}
-					else {
-						free_pixmap(ps, &cw->cpixmap);
-						free_picture(ps, &cw->origin);
-						free_damage(ps, &cw->damage);
-						clientwin_update2(cw);
-						clientwin_render(cw);
-					}
 				}
-			}
-			else if (ps->xinfo.damage_ev_base + XDamageNotify == ev.type) {
-				// XDamageNotifyEvent *d_ev = (XDamageNotifyEvent *) &ev;
-				dlist *iter = dlist_find(mw->cod, clientwin_cmp_func,
-						(void *) wid);
-				pending_damage = true;
-				if (iter) {
-					if (!mw->poll_time)
-						clientwin_repair((ClientWin *)iter->data);
+				else if (ps->xinfo.damage_ev_base + XDamageNotify == ev.type) {
+					// XDamageNotifyEvent *d_ev = (XDamageNotifyEvent *) &ev;
+					dlist *iter = dlist_find(mw->cod, clientwin_cmp_func,
+							(void *) wid);
+					pending_damage = true;
+					if (iter) {
+						if (!mw->poll_time)
+							clientwin_repair((ClientWin *)iter->data);
+						else
+							((ClientWin *)iter->data)->damaged = true;
+					}
+
+				}
+				else if (KeyRelease == ev.type && (mw->key_q == ev.xkey.keycode
+							|| mw->key_escape == ev.xkey.keycode)) {
+					if (mw->pressed_key) {
+						die = true;
+						if (mw->key_escape == ev.xkey.keycode)
+							refocus = true;
+					}
 					else
-						((ClientWin *)iter->data)->damaged = true;
+						report_key_ignored(&ev);
 				}
-
-			}
-			else if (KeyRelease == ev.type && (mw->key_q == ev.xkey.keycode
-						|| mw->key_escape == ev.xkey.keycode)) {
-				if (mw->pressed_key) {
-					die = 1;
-					if (mw->key_escape == ev.xkey.keycode)
-						refocus = true;
+				else if (wid == mw->window)
+					die = mainwin_handle(mw, &ev);
+				else if (PropertyNotify == ev.type) {
+					if (!ps->o.background &&
+							(ESETROOT_PMAP_ID == ev.xproperty.atom
+							 || _XROOTPMAP_ID == ev.xproperty.atom)) {
+						mainwin_update_background(mw);
+						REDUCE(clientwin_render((ClientWin *)iter->data), mw->cod);
+					}
 				}
-				else
-					report_key_ignored(&ev);
-			}
-			else if (wid == mw->window)
-				die = mainwin_handle(mw, &ev);
-			else if (PropertyNotify == ev.type) {
-				if (!ps->o.background &&
-						(ESETROOT_PMAP_ID == ev.xproperty.atom
-						 || _XROOTPMAP_ID == ev.xproperty.atom)) {
-					mainwin_update_background(mw);
-					REDUCE(clientwin_render((ClientWin *)iter->data), mw->cod);
-				}
-			}
-			else if (mw->tooltip && wid == mw->tooltip->window)
-				tooltip_handle(mw->tooltip, &ev);
-			else if (wid) {
-				for (dlist *iter = mw->cod; iter; iter = iter->next) {
-					ClientWin *cw = (ClientWin *) iter->data;
-					if (cw->mini.window == wid) {
-						die = clientwin_handle(cw, &ev);
-						break;
+				else if (mw->tooltip && wid == mw->tooltip->window)
+					tooltip_handle(mw->tooltip, &ev);
+				else if (wid) {
+					for (dlist *iter = mw->cod; iter; iter = iter->next) {
+						ClientWin *cw = (ClientWin *) iter->data;
+						if (cw->mini.window == wid) {
+							die = clientwin_handle(cw, &ev);
+							break;
+						}
 					}
 				}
 			}
+
+			// Do delayed painting if it's active
+			if (mw->poll_time && pending_damage && !die) {
+				long now = time_in_millis();
+				if (now >= last_rendered + mw->poll_time) {
+					pending_damage = false;
+					foreach_dlist(mw->cod) {
+						if (((ClientWin *) iter->data)->damaged)
+							clientwin_repair(iter->data);
+					}
+					last_rendered = now;
+				}
+			}
+
+			XFlush(ps->dpy);
+		}
+		else {
+			XSync(ps->dpy, True);
 		}
 
-		// Do delayed painting if it's active
-		if (mw->poll_time && pending_damage && !die) {
-			long now = time_in_millis();
-			if (now >= last_rendered + mw->poll_time) {
-				pending_damage = false;
-				foreach_dlist(mw->cod) {
-					if (((ClientWin *) iter->data)->damaged)
-						clientwin_repair(iter->data);
-				}
-				last_rendered = now;
+		// Handle daemon commands
+		if (POLLIN & r_fd[1].revents) {
+			int piped_input = fgetc(ps->fp_pipe);
+			printfdf("(): Received pipe command: %d", piped_input);
+			switch (piped_input) {
+				case PIPECMD_ACTIVATE_WINDOW_PICKER:
+					activate = true;
+					break;
+				case PIPECMD_DEACTIVATE_WINDOW_PICKER:
+					if (mw)
+						die = true;
+					break;
+				case PIPECMD_TOGGLE_WINDOW_PICKER:
+					if (mw)
+						die = true;
+					else
+						activate = true;
+					break;
+				case PIPECMD_EXIT_RUNNING_DAEMON:
+					printfdf("(): Exit command received, killing daemon...");
+					unlink(ps->o.pipePath);
+					return;
+				case EOF:
+#ifdef DEBUG_XINERAMA
+					printfdf("(): EOF reached on pipe \"()\".\n");
+#endif
+					fclose(ps->fp_pipe);
+					ps->fp_pipe = fopen(ps->o.pipePath, "r");
+					if (!ps->fp_pipe) {
+						printfef("(): Failed to reopen pipe \"%s\".", ps->o.pipePath);
+					}
+					break;
+				default:
+					printfdf("(): Unknown daemon command \"%d\" received.", piped_input);
+					break;
 			}
 		}
-
-		XFlush(ps->dpy);
 	}
-
-	// Unmap the main window and all clients, to make sure focus doesn't fall out
-	// when we start setting focus on client window
-	mainwin_unmap(mw);
-	foreach_dlist(mw->cod) { clientwin_unmap((ClientWin *) iter->data); }
-	XSync(ps->dpy, False);
-
-	// Focus the client window only after the main window get unmapped and
-	// keyboard gets ungrabbed.
-	if (ps->client_to_focus) {
-		childwin_focus(ps->client_to_focus);
-		ps->client_to_focus = NULL;
-		refocus = false;
-	}
-
-	// Cleanup
-	dlist_free(mw->cod);
-	mw->cod = 0;
-
-	if (refocus) {
-		// No idea why. Plain XSetInputFocus() no longer works after ungrabbing.
-		wm_activate_window(ps, focus);
-	}
-
-	XFlush(ps->dpy);
-
-	return clients;
 }
 
-static void
-send_command_to_daemon_via_fifo(int command, const char* pipePath) {
-	FILE *fp;
-	if (access(pipePath, W_OK) != 0)
+static bool
+send_command_to_daemon_via_fifo(int command, const char *pipePath) {
 	{
-		fprintf(stderr, "pipe does not exist, exiting...\n");
-		exit(1);
+		int access_ret = 0;
+		if ((access_ret = access(pipePath, W_OK))) {
+			printfef("(): Failed to access() pipe \"%s\": %d", pipePath, access_ret);
+			perror("access");
+			exit(1);
+		}
 	}
-	
-	fp = fopen(pipePath, "w");
-	
-	printf("sending command...\n");
+
+	FILE *fp = fopen(pipePath, "w");
+
+	printfdf("(): Sending command...");
 	fputc(command, fp);
-	
+
 	fclose(fp);
+
+	return true;
 }
 
-static void
-activate_window_picker(const char* pipePath) {
-	printf("activating window picker...\n");
-	send_command_to_daemon_via_fifo(ACTIVATE_WINDOW_PICKER, pipePath);
+static inline bool
+activate_window_picker(const char *pipePath) {
+	printfdf("(): Activating window picker...");
+	return send_command_to_daemon_via_fifo(PIPECMD_ACTIVATE_WINDOW_PICKER, pipePath);
 }
 
-static void
-exit_daemon(const char* pipePath) {
-	printf("exiting daemon...\n");
-	send_command_to_daemon_via_fifo(EXIT_RUNNING_DAEMON, pipePath);
+static inline bool
+exit_daemon(const char *pipePath) {
+	printfdf("(): Killing daemon...");
+	return send_command_to_daemon_via_fifo(PIPECMD_EXIT_RUNNING_DAEMON, pipePath);
+}
+
+static inline bool
+deactivate_window_picker(const char *pipePath) {
+	printfdf("(): Deactivating window picker...");
+	return send_command_to_daemon_via_fifo(PIPECMD_DEACTIVATE_WINDOW_PICKER, pipePath);
+}
+
+static inline bool
+toggle_window_picker(const char *pipePath) {
+	printfdf("(): Toggling window picker...");
+	return send_command_to_daemon_via_fifo(PIPECMD_TOGGLE_WINDOW_PICKER, pipePath);
 }
 
 /**
@@ -804,12 +906,15 @@ show_help() {
 	fputs("skippy-xd (" SKIPPYXD_VERSION ")\n"
 			"Usage: skippy-xd [command]\n\n"
 			"The available commands are:\n"
-			"\t--config                  - Read the specified configuration file.\n"
-			"\t--start-daemon            - starts the daemon running.\n"
-			"\t--stop-daemon             - stops the daemon running.\n"
-			"\t--activate-window-picker  - tells the daemon to show the window picker.\n"
-			"\t--help                    - show this message.\n"
-			"\t-S                        - Synchronize X operation (debugging).\n"
+			"  --config                    - Read the specified configuration file.\n"
+			"  --start-daemon              - starts the daemon running.\n"
+			"  --stop-daemon               - stops the daemon running.\n"
+			"  --activate-window-picker    - tells the daemon to show the window picker.\n"
+			"  --deactivate-window-picker  - tells the daemon to hide the window picker.\n"
+			"  --toggle-window-picker      - tells the daemon to toggle the window picker.\n"
+			"\n"
+			"  --help                      - show this message.\n"
+			"  -S                          - Synchronize X operation (debugging).\n"
 			, stdout);
 #ifdef CFG_LIBPNG
 	spng_about(stdout);
@@ -926,16 +1031,20 @@ parse_args(session_t *ps, int argc, char **argv, bool first_pass) {
 	enum options {
 		OPT_CONFIG = 256,
 		OPT_ACTV_PICKER,
+		OPT_DEACTV_PICKER,
+		OPT_TOGGLE_PICKER,
 		OPT_DM_START,
 		OPT_DM_STOP,
 	};
 	static const char * opts_short = "hS";
 	static const struct option opts_long[] = {
-		{ "help",					no_argument,	NULL, 'h' },
-		{ "config",					required_argument, NULL, OPT_CONFIG },
-		{ "activate-window-picker", no_argument,	NULL, OPT_ACTV_PICKER },
-		{ "start-daemon",			no_argument,	NULL, OPT_DM_START },
-		{ "stop-daemon",			no_argument,	NULL, OPT_DM_STOP },
+		{ "help",                     no_argument,       NULL, 'h' },
+		{ "config",                   required_argument, NULL, OPT_CONFIG },
+		{ "activate-window-picker",   no_argument,       NULL, OPT_ACTV_PICKER },
+		{ "deactivate-window-picker", no_argument,       NULL, OPT_DEACTV_PICKER },
+		{ "toggle-window-picker",     no_argument,       NULL, OPT_TOGGLE_PICKER },
+		{ "start-daemon",             no_argument,       NULL, OPT_DM_START },
+		{ "stop-daemon",              no_argument,       NULL, OPT_DM_STOP },
 		{ NULL, no_argument, NULL, 0 }
 	};
 
@@ -970,6 +1079,12 @@ parse_args(session_t *ps, int argc, char **argv, bool first_pass) {
 			case OPT_ACTV_PICKER:
 				ps->o.mode = PROGMODE_ACTV_PICKER;
 				break;
+			case OPT_DEACTV_PICKER:
+				ps->o.mode = PROGMODE_DEACTV_PICKER;
+				break;
+			case OPT_TOGGLE_PICKER:
+				ps->o.mode = PROGMODE_TOGGLE_PICKER;
+				break;
 			T_CASEBOOL(OPT_DM_START, runAsDaemon);
 			case OPT_DM_STOP:
 				ps->o.mode = PROGMODE_DM_STOP;
@@ -985,17 +1100,8 @@ parse_args(session_t *ps, int argc, char **argv, bool first_pass) {
 int main(int argc, char *argv[]) {
 	session_t *ps = NULL;
 	int ret = RET_SUCCESS;
-
-	dlist *clients = NULL;
 	Display *dpy = NULL;
-	MainWin *mw = NULL;
-	Window leader, focused;
-	int result;
-	int flush_file = 0;
-	FILE *fp;
-	int piped_input;
-	int exitDaemon = 0;
-	
+
 	/* Set program locale */
 	setlocale (LC_ALL, "");
 
@@ -1145,14 +1251,21 @@ int main(int argc, char *argv[]) {
 
 	// Second pass
 	parse_args(ps, argc, argv, false);
-	
+
 	const char* pipePath = ps->o.pipePath;
 
+	// Handle special modes
 	switch (ps->o.mode) {
 		case PROGMODE_NORMAL:
 			break;
 		case PROGMODE_ACTV_PICKER:
 			activate_window_picker(pipePath);
+			goto main_end;
+		case PROGMODE_DEACTV_PICKER:
+			deactivate_window_picker(pipePath);
+			goto main_end;
+		case PROGMODE_TOGGLE_PICKER:
+			toggle_window_picker(pipePath);
 			goto main_end;
 		case PROGMODE_DM_STOP:
 			exit_daemon(pipePath);
@@ -1163,102 +1276,70 @@ int main(int argc, char *argv[]) {
 		/* ret = 1;
 		goto main_end; */
 	}
-	
-	mw = mainwin_create(ps);
+
+	// Main branch
+	MainWin *mw = mainwin_create(ps);
 	if (!mw) {
-		fprintf(stderr, "FATAL: Couldn't create main window.\n");
+		printfef("(): FATAL: Couldn't create main window.");
 		ret = 1;
 		goto main_end;
 	}
-	
+	ps->mainwin = mw;
+
 	XSelectInput(ps->dpy, ps->root, PropertyChangeMask);
 
+	// Daemon mode
 	if (ps->o.runAsDaemon) {
-		printf("Running as daemon...\n");
+		bool flush_file = false;
 
-		if (access(pipePath, R_OK) == 0)
+		printfdf("(): Running as daemon...");
+
+		// Flush file if we could access() it (or, usually, if it exists)
+		if (!access(pipePath, R_OK))
+			flush_file = true;
+
 		{
-			printf("access() returned 0.\n");
-			flush_file = 1;
+			int result = mkfifo(pipePath, S_IRUSR | S_IWUSR);
+			if (result < 0  && EEXIST != errno) {
+				printfef("(): Failed to create named pipe \"%s\": %d", pipePath, result);
+				perror("mkfifo");
+				exit(2);
+			}
 		}
-		
-		result = mkfifo (pipePath, S_IRUSR| S_IWUSR);
-		if (result < 0  && errno != EEXIST)
-		{
-			fprintf(stderr, "Error creating named pipe.\n");
-			perror("mkfifo");
-			exit(2);
-		}
-		
-		// Flush the file in non-blocking mode
+
+		// Flush the file in non-blocking mode, if required
 		if (flush_file) {
-			char *buf[BUF_LEN];
 			int fd = open(pipePath, O_RDONLY | O_NONBLOCK);
 
-			if (fd < 0) {
-				printfef("(): Failed to open() pipe \"%s\".", pipePath);
-				ret = RET_UNKNOWN;
-				goto main_end;
+			if (fd >= 0) {
+				char *buf[BUF_LEN];
+				while (read(fd, buf, sizeof(buf)) > 0)
+					continue;
+				close(fd);
+				printfdf("(): Finished flushing pipe \"%s\".", pipePath);
 			}
-
-			while (read(fd, buf, sizeof(buf)) > 0)
-				continue;
-
-			close(fd);
-
-			printf("Finished flushing pipe...\n");
+			else {
+				printfef("(): Failed to open() pipe \"%s\".", pipePath);
+				perror("open");
+			}
 		}
-		
-		if (!(fp = fopen(pipePath, "r"))) {
-			printfef("Failed to open pipe \"%s\".\n", pipePath);
+
+		// Opening pipe
+		if (!(ps->fp_pipe = fopen(pipePath, "r"))) {
+			printfef("(): Failed to fopen() pipe \"%s\".\n", pipePath);
+			perror("fopen");
 			ret = RET_UNKNOWN;
 			goto main_end;
 		}
-		
-		while (!exitDaemon)
-		{
-			piped_input = fgetc(fp);
-			switch (piped_input)
-			{
-				case ACTIVATE_WINDOW_PICKER:
-					leader = None, focused = wm_get_focused(ps->dpy);
-					clients = skippy_run(mw, clients, focused, leader,
-							ps->o.xinerama_showAll);
-					break;
-				
-				case EXIT_RUNNING_DAEMON:
-					printf("Exit command received, killing daemon cleanly...\n");
-					remove(pipePath);
-					exitDaemon = 1;
-				
-				case EOF:
-					#ifdef DEBUG_XINERAMA
-					printf("EOF reached.\n");
-					#endif
-					fclose(fp);
-					fp = fopen(pipePath, "r");
-					break;
-				
-				default:
-					printf("unknown code received: %d\n", piped_input);
-					printf("Ignoring...\n");
-					break;
-			}
-		}
+
+		mainloop(ps, false);
 	}
-	else
-	{
-		printf("running once then quitting...\n");
-		leader = None, focused = wm_get_focused(ps->dpy);
-		clients = skippy_run(mw, clients, focused, leader, ps->o.xinerama_showAll);
+	else {
+		printfdf("(): running once then quitting...");
+		mainloop(ps, true);
 	}
-	
-	dlist_free_with_func(clients, (dlist_free_func)clientwin_destroy);
-	
+
 main_end:
-	if (mw)
-		mainwin_destroy(mw);
-	
 	// Free session data
 	if (ps) {
 		// Free configuration strings
@@ -1279,8 +1360,15 @@ main_end:
 			free_pictspec(ps, &ps->o.fillSpec);
 		}
 
+		if (ps->fp_pipe)
+			fclose(ps->fp_pipe);
+
+		if (ps->mainwin)
+			mainwin_destroy(ps->mainwin);
+
 		if (ps->dpy)
 			XCloseDisplay(dpy);
+
 		free(ps);
 	}
 

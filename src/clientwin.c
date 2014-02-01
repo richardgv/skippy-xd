@@ -485,7 +485,7 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 				focus_right(cw);
 			else if (evk->keycode == cw->mainwin->key_enter
 					|| evk->keycode == cw->mainwin->key_space) {
-				ps->client_to_focus = cw;
+				mw->client_to_focus = cw;
 				return 1;
 			}
 			else if (ev_iskey(evk, &KEY_NEXT)) {
@@ -538,14 +538,15 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 
 static int
 clientwin_action(ClientWin *cw, enum cliop action) {
-	session_t * const ps = cw->mainwin->ps;
+	MainWin *mw = cw->mainwin;
+	session_t * const ps = mw->ps;
 	const Window wid = cw->wid_client;
 
 	switch (action) {
 		case CLIENTOP_NO:
 			break;
 		case CLIENTOP_FOCUS:
-			ps->client_to_focus = cw;
+			mw->client_to_focus = cw;
 			return 1;
 		case CLIENTOP_ICONIFY:
 			XIconifyWindow(ps->dpy, wid, ps->screen);

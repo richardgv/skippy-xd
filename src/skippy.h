@@ -112,6 +112,8 @@ enum {
 enum progmode {
 	PROGMODE_NORMAL,
 	PROGMODE_ACTV_PICKER,
+	PROGMODE_DEACTV_PICKER,
+	PROGMODE_TOGGLE_PICKER,
 	PROGMODE_DM_STOP,
 };
 
@@ -280,7 +282,7 @@ typedef struct {
 	.clientDisplayModes = NULL, \
 	.iconFillSpec = PICTSPECT_INIT, \
 	.fillSpec = PICTSPECT_INIT, \
-	.showAllDesktops = true, \
+	.showAllDesktops = false, \
 	.showUnmapped = true, \
 	.buttonImgs = { NULL }, \
 	.background = NULL, \
@@ -325,6 +327,7 @@ typedef struct {
 }
 
 typedef struct _clientwin_t ClientWin;
+typedef struct _mainwin_t MainWin;
 
 /// @brief Session global info structure.
 typedef struct {
@@ -344,8 +347,10 @@ typedef struct {
 	wmpsn_t wmpsn;
 	/// @brief Whether we have EWMH fullscreen support.
 	bool has_ewmh_fullscreen;
-	/// @brief The client window to eventually focus.
-	ClientWin *client_to_focus;
+	/// @brief FILE object of command pipe, in daemon mode.
+	FILE *fp_pipe;
+	/// @brief Main window.
+	MainWin *mainwin;
 } session_t;
 
 #define SESSIONT_INIT { \
@@ -710,8 +715,8 @@ ev_key_str(XKeyEvent *ev) {
 
 #include "img.h"
 #include "wm.h"
-#include "clientwin.h"
 #include "mainwin.h"
+#include "clientwin.h"
 #include "layout.h"
 #include "focus.h"
 #include "config.h"
@@ -730,8 +735,5 @@ ev_key_str(XKeyEvent *ev) {
 #endif
 
 extern session_t *ps_g;
-
-#define ACTIVATE_WINDOW_PICKER 1
-#define EXIT_RUNNING_DAEMON 2
 
 #endif /* SKIPPY_H */

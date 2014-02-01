@@ -22,12 +22,12 @@
 
 struct _Tooltip;
 
-struct _MainWin
-{
+struct _mainwin_t {
 	session_t *ps;
 	Visual *visual;
 	Colormap colormap;
 	int depth;
+	dlist *clients;
 	
 	/// @brief Whether the KeyRelease events should already be acceptable.
 	bool pressed_key;
@@ -59,8 +59,12 @@ struct _MainWin
 	int xin_screens;
 	XineramaScreenInfo *xin_info, *xin_active;
 #endif /* CFG_XINERAMA */
+
+	/// @brief Window ID to revert focus to when the main window is unmapped.
+	Window revert_focus_win;
+	/// @brief The client window to eventually focus.
+	ClientWin *client_to_focus;
 };
-typedef struct _MainWin MainWin;
 
 MainWin *mainwin_create(session_t *ps);
 void mainwin_destroy(MainWin *);
