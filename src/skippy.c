@@ -566,6 +566,28 @@ skippy_run_init(MainWin *mw, Window leader) {
 	return true;
 }
 
+static inline bool
+open_pipe(session_t *ps, struct pollfd *r_fd) {
+	if (ps->fd_pipe >= 0) {
+		close(ps->fd_pipe);
+		ps->fd_pipe = -1;
+		if (r_fd)
+			r_fd[1].fd = ps->fd_pipe;
+	}
+	ps->fd_pipe = open(ps->o.pipePath, O_RDONLY | O_NONBLOCK);
+	if (ps->fd_pipe >= 0) {
+		if (r_fd)
+			r_fd[1].fd = ps->fd_pipe;
+		return true;
+	}
+	else {
+		printfef("(): Failed to open pipe \"%s\": %d", ps->o.pipePath, errno);
+		perror("open");
+	}
+
+	return false;
+}
+
 static void
 mainloop(session_t *ps, bool activate_on_start) {
 	MainWin *mw = NULL;
@@ -575,7 +597,22 @@ mainloop(session_t *ps, bool activate_on_start) {
 	bool pending_damage = false;
 	long last_rendered = 0L;
 
+	struct pollfd r_fd[2] = {
+		{
+			.fd = ConnectionNumber(ps->dpy),
+			.events = POLLIN,
+		},
+		{
+			.fd = ps->fd_pipe,
+			.events = POLLIN,
+		},
+	};
+
 	while (true) {
+		// Clear revents in pollfd
+		for (int i = 0; i < CARR_LEN(r_fd); ++i)
+			r_fd[i].revents = 0;
+
 		// Activation goes first, so that it won't be delayed by poll()
 		if (!mw && activate) {
 			assert(ps->mainwin);
@@ -617,7 +654,9 @@ mainloop(session_t *ps, bool activate_on_start) {
 				refocus = false;
 			}
 
-			XFlush(ps->dpy);
+			// Catch all errors, but remove all events
+			XSync(ps->dpy, False);
+			XSync(ps->dpy, True);
 
 			mw = NULL;
 		}
@@ -627,18 +666,9 @@ mainloop(session_t *ps, bool activate_on_start) {
 			return;
 
 		// Poll for events
-		struct pollfd r_fd[2] = {
-			{
-				.fd = ConnectionNumber(ps->dpy),
-				.events = POLLIN,
-			},
-			{
-				.fd = (ps->fp_pipe ? fileno(ps->fp_pipe): - 1),
-				.events = POLLIN,
-			},
-		};
-		poll(r_fd, (r_fd[1].fd >= 0 ? 2: 1), pending_damage && mw && mw->poll_time > 0 ?
+		int timeout = (pending_damage && mw && mw->poll_time > 0 ?
 				MAX(0, mw->poll_time + last_rendered - time_in_millis()): -1);
+		poll(r_fd, (r_fd[1].fd >= 0 ? 2: 1), timeout);
 
 		if (mw) {
 			// Process X events
@@ -744,45 +774,54 @@ mainloop(session_t *ps, bool activate_on_start) {
 			XFlush(ps->dpy);
 		}
 		else {
+			// Discards all events so that poll() won't constantly hit data to read
 			XSync(ps->dpy, True);
+			assert(!XEventsQueued(ps->dpy, QueuedAfterReading));
 		}
 
 		// Handle daemon commands
 		if (POLLIN & r_fd[1].revents) {
-			int piped_input = fgetc(ps->fp_pipe);
-			printfdf("(): Received pipe command: %d", piped_input);
-			switch (piped_input) {
-				case PIPECMD_ACTIVATE_WINDOW_PICKER:
-					activate = true;
-					break;
-				case PIPECMD_DEACTIVATE_WINDOW_PICKER:
-					if (mw)
-						die = true;
-					break;
-				case PIPECMD_TOGGLE_WINDOW_PICKER:
-					if (mw)
-						die = true;
-					else
-						activate = true;
-					break;
-				case PIPECMD_EXIT_RUNNING_DAEMON:
-					printfdf("(): Exit command received, killing daemon...");
-					unlink(ps->o.pipePath);
-					return;
-				case EOF:
-#ifdef DEBUG_XINERAMA
-					printfdf("(): EOF reached on pipe \"()\".\n");
-#endif
-					fclose(ps->fp_pipe);
-					ps->fp_pipe = fopen(ps->o.pipePath, "r");
-					if (!ps->fp_pipe) {
-						printfef("(): Failed to reopen pipe \"%s\".", ps->o.pipePath);
-					}
-					break;
-				default:
-					printfdf("(): Unknown daemon command \"%d\" received.", piped_input);
-					break;
+			unsigned char piped_input = 0;
+			int read_ret = read(ps->fd_pipe, &piped_input, 1);
+			if (0 == read_ret) {
+				printfdf("(): EOF reached on pipe \"%s\".", ps->o.pipePath);
+				open_pipe(ps, r_fd);
 			}
+			else if (-1 == read_ret) {
+				if (EAGAIN != errno)
+					printfef("(): Reading pipe \"%s\" failed: %d", ps->o.pipePath, errno);
+			}
+			else {
+				assert(1 == read_ret);
+				printfdf("(): Received pipe command: %d", piped_input);
+				switch (piped_input) {
+					case PIPECMD_ACTIVATE_WINDOW_PICKER:
+						activate = true;
+						break;
+					case PIPECMD_DEACTIVATE_WINDOW_PICKER:
+						if (mw)
+							die = true;
+						break;
+					case PIPECMD_TOGGLE_WINDOW_PICKER:
+						if (mw)
+							die = true;
+						else
+							activate = true;
+						break;
+					case PIPECMD_EXIT_RUNNING_DAEMON:
+						printfdf("(): Exit command received, killing daemon...");
+						unlink(ps->o.pipePath);
+						return;
+					default:
+						printfdf("(): Unknown daemon command \"%d\" received.", piped_input);
+						break;
+				}
+			}
+		}
+
+		if (POLLHUP & r_fd[1].revents) {
+			printfdf("(): PIPEHUP on pipe \"%s\".", ps->o.pipePath);
+			open_pipe(ps, r_fd);
 		}
 	}
 }
@@ -1303,33 +1342,22 @@ int main(int argc, char *argv[]) {
 			if (result < 0  && EEXIST != errno) {
 				printfef("(): Failed to create named pipe \"%s\": %d", pipePath, result);
 				perror("mkfifo");
-				exit(2);
-			}
-		}
-
-		// Flush the file in non-blocking mode, if required
-		if (flush_file) {
-			int fd = open(pipePath, O_RDONLY | O_NONBLOCK);
-
-			if (fd >= 0) {
-				char *buf[BUF_LEN];
-				while (read(fd, buf, sizeof(buf)) > 0)
-					continue;
-				close(fd);
-				printfdf("(): Finished flushing pipe \"%s\".", pipePath);
-			}
-			else {
-				printfef("(): Failed to open() pipe \"%s\".", pipePath);
-				perror("open");
+				ret = 2;
+				goto main_end;
 			}
 		}
 
 		// Opening pipe
-		if (!(ps->fp_pipe = fopen(pipePath, "r"))) {
-			printfef("(): Failed to fopen() pipe \"%s\".\n", pipePath);
-			perror("fopen");
-			ret = RET_UNKNOWN;
+		if (!open_pipe(ps, NULL)) {
+			ret = 2;
 			goto main_end;
+		}
+		assert(ps->fd_pipe >= 0);
+		if (flush_file) {
+			char *buf[BUF_LEN];
+			while (read(ps->fd_pipe, buf, sizeof(buf)) > 0)
+				continue;
+			printfdf("(): Finished flushing pipe \"%s\".", pipePath);
 		}
 
 		mainloop(ps, false);
@@ -1360,8 +1388,8 @@ main_end:
 			free_pictspec(ps, &ps->o.fillSpec);
 		}
 
-		if (ps->fp_pipe)
-			fclose(ps->fp_pipe);
+		if (ps->fd_pipe >= 0)
+			close(ps->fd_pipe);
 
 		if (ps->mainwin)
 			mainwin_destroy(ps->mainwin);

@@ -347,8 +347,8 @@ typedef struct {
 	wmpsn_t wmpsn;
 	/// @brief Whether we have EWMH fullscreen support.
 	bool has_ewmh_fullscreen;
-	/// @brief FILE object of command pipe, in daemon mode.
-	FILE *fp_pipe;
+	/// @brief File descriptor of command pipe, in daemon mode.
+	int fd_pipe;
 	/// @brief Main window.
 	MainWin *mainwin;
 } session_t;
@@ -357,6 +357,7 @@ typedef struct {
 	.o = OPTIONST_INIT, \
 	.xinfo = XINFOT_INIT, \
 	.time_start = { .tv_sec = 0, .tv_usec = 0 }, \
+	.fd_pipe = -1, \
 }
 
 /// @brief Print out a debug message.
