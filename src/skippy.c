@@ -536,6 +536,9 @@ static bool
 skippy_run_init(MainWin *mw, Window leader) {
 	session_t *ps = mw->ps;
 
+	// Do this window before main window gets mapped
+	mw->revert_focus_win = wm_get_focused(ps);
+
 	// Update the main window's geometry (and Xinerama info if applicable)
 	mainwin_update(mw);
 #ifdef CFG_XINERAMA
@@ -549,7 +552,6 @@ skippy_run_init(MainWin *mw, Window leader) {
 		XFlush(ps->dpy);
 	}
 
-	mw->revert_focus_win = wm_get_focused(ps->dpy);
 	mw->client_to_focus = NULL;
 
 	mw->clients = do_layout(mw, mw->clients, mw->revert_focus_win, leader);
@@ -648,7 +650,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 			dlist_free(mw->cod);
 			mw->cod = 0;
 
-			if (refocus) {
+			if (refocus && mw->revert_focus_win) {
 				// No idea why. Plain XSetInputFocus() no longer works after ungrabbing.
 				wm_activate_window(ps, mw->revert_focus_win);
 				refocus = false;

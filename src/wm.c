@@ -616,33 +616,46 @@ wm_get_window_desktop(session_t *ps, Window wid) {
 
 /* Get focused window and traverse towards the root window until a window with WM_STATE is found */
 Window
-wm_get_focused(Display *dpy)
-{
-	Window focused = None, root = None, *children;
-	unsigned int tmp_u;
-	int revert_to, status, real_format;
-	Atom real_type;
-	unsigned long items_read, items_left;
-	unsigned char *data;
-	
-	XGetInputFocus(dpy, &focused, &revert_to);
-	
-	while(focused != None && focused != root)
+wm_get_focused(session_t *ps) {
+	Window focused = None;
+
 	{
-		status = XGetWindowProperty(dpy, focused, XA_WM_STATE,
-		                            0L, 1L, False, XA_WM_STATE, &real_type, &real_format,
-		                            &items_read, &items_left, &data);
-		if(status == Success)
-		{
-			XFree(data);
-			if(items_read)
-				break;
+		int revert_to = 0;
+		if (!XGetInputFocus(ps->dpy, &focused, &revert_to)) {
+			printfef("(): Failed to get current focused window.");
+			return None;
 		}
-		XQueryTree(dpy, focused, &root, &focused, &children, &tmp_u);
-		if(children)
-			XFree(children);
+		// printfdf("(): Focused window is %#010lx.", focused);
 	}
-	
+
+	while (focused) {
+		// Discard insane values
+		if (ps->root == focused || PointerRoot == focused)
+			return None;
+
+		// Check for WM_STATE
+		if (wid_has_prop(ps, focused, XA_WM_STATE))
+			return focused;
+
+		// Query window parent
+		{
+			Window rroot = None, parent = None;
+			Window *children = NULL;
+			unsigned int nchildren = 0;
+
+			Status status =
+				XQueryTree(ps->dpy, focused, &rroot, &parent, &children, &nchildren);
+			sxfree(children);
+			if (!status) {
+				printfef("(): Failed to get parent window of %#010lx.", focused);
+				return None;
+			}
+			// printfdf("(): Parent window of %#010lx is %#010lx.", focused, parent);
+			focused = parent;
+			assert(ps->root == rroot);
+		}
+	}
+
 	return focused;
 }
 

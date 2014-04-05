@@ -89,7 +89,7 @@ void wm_set_fullscreen(session_t *ps, Window window,
 		int x, int y, unsigned width, unsigned height);
 bool wm_validate_window(session_t *ps, Window wid);
 long wm_get_window_desktop(session_t *ps, Window wid);
-Window wm_get_focused(Display *dpy);
+Window wm_get_focused(session_t *ps);
 
 char *wm_wid_get_prop_rstr(session_t *ps, Window wid, Atom prop);
 char *wm_wid_get_prop_utf8(session_t *ps, Window wid, Atom prop);
@@ -154,6 +154,8 @@ wm_set_desktop_ewmh(session_t *ps, long desktop) {
  */
 static inline void
 wm_activate_window(session_t *ps, Window wid) {
+	if (!wid) return;
+
 	if (ps->o.switchDesktopOnActivate) {
 		long tgt = wm_get_window_desktop(ps, wid);
 		if (tgt >= 0)
