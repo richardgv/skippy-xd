@@ -67,10 +67,10 @@ skippy-xd${EXESUFFIX}: ${OBJS}
 clean:
 	rm -f ${BINS} ${OBJS} src/.clang_complete
 
-install: ${BINS} skippy-xd.rc-default
+install: ${BINS} skippy-xd.sample.rc
 	install -d "${DESTDIR}${BINDIR}/" "${DESTDIR}/etc/xdg/"
 	install -m 755 ${BINS} "${DESTDIR}${BINDIR}/"
-	install -m 644 skippy-xd.rc-default "${DESTDIR}/etc/xdg/skippy-xd.rc"
+	install -m 644 skippy-xd.sample.rc "${DESTDIR}/etc/xdg/skippy-xd.rc"
 
 uninstall:
 	# Should configuration file be removed?
