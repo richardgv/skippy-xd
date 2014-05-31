@@ -1,19 +1,56 @@
 #include "skippy.h"
 
+typedef struct {
+	XRectangle rect;
+	int num_x, num_y;
+	double ratio_x, ratio_y;
+} img_composite_params_t;
+
+#define XRECTANGLE_INIT { .x = 0, .y = 0, .width = 0, .height = 0 }
+
+#define IMG_COMPOSITE_PARAMS_INIT { \
+	.rect = XRECTANGLE_INIT, \
+	.num_x = 0, \
+	.num_y = 0, \
+	.ratio_x = 0.0f, \
+	.ratio_y = 0.0f, \
+}
+
 /**
  * @brief Crop a rectangle by another rectangle.
- *
- * psrc and pdst cannot be the same.
  */
 static inline void
 rect_crop(XRectangle *pdst, const XRectangle *psrc, const XRectangle *pbound) {
-  assert(psrc != pdst);
-  pdst->x = MAX(psrc->x, pbound->x);
-  pdst->y = MAX(psrc->y, pbound->y);
-  pdst->width = MAX(0,
-		  MIN(psrc->x + psrc->width, pbound->x + pbound->width) - pdst->x);
-  pdst->height = MAX(0,
-		  MIN(psrc->y + psrc->height, pbound->y + pbound->height) - pdst->y);
+	XRectangle *pdst_original = NULL;
+	XRectangle rtmp;
+	if (psrc == pdst) {
+		pdst_original = pdst;
+		pdst = &rtmp;
+	}
+	assert(psrc != pdst);
+	pdst->x = MAX(psrc->x, pbound->x);
+	pdst->y = MAX(psrc->y, pbound->y);
+	pdst->width = MAX(0,
+			MIN(psrc->x + psrc->width, pbound->x + pbound->width) - pdst->x);
+	pdst->height = MAX(0,
+			MIN(psrc->y + psrc->height, pbound->y + pbound->height) - pdst->y);
+	if (pdst_original)
+		*pdst_original = *pdst;
+}
+
+/**
+ * @brief Crop a rectangle by another rectangle, and adjust texture
+ *        start coordinate.
+ *
+ * ptex_x and ptex_y must point to initialized values.
+ */
+static inline void
+rect_crop2(XRectangle *pdst, const XRectangle *psrc, const XRectangle *pbound,
+		int *ptex_x, int *ptex_y, double ratio_x, double ratio_y) {
+	int original_x = psrc->x, original_y = psrc->y;
+	rect_crop(pdst, psrc, pbound);
+	*ptex_x += (pdst->x - original_x) / ratio_x;
+	*ptex_y += (pdst->y - original_y) / ratio_y;
 }
 
 /**
@@ -178,6 +215,46 @@ pictw_t *
 simg_postprocess(session_t *ps, pictw_t *src, enum pict_posp_mode mode,
 		int twidth, int theight, enum align alg, enum align valg,
 		const XRenderColor *pc);
+
+void
+simg_get_composite_params(pictw_t *src, int twidth, int theight,
+		enum pict_posp_mode mode, enum align alg, enum align valg,
+		img_composite_params_t *pparams);
+
+void
+simg_composite(session_t *ps, pictw_t *src, Picture dest,
+		int twidth, int theight, const img_composite_params_t *pparams,
+		const XRenderColor *pc, Picture mask, const XRectangle *pbound);
+
+/**
+ * @brief XRenderFillRectangle() with area cropped by a rectangle.
+ */
+static inline void
+XRenderFillRectangle_cropped(Display *dpy, int op, Picture dst,
+		const XRenderColor *color,
+		int x, int y, unsigned int width, unsigned int height,
+		const XRectangle *pbound) {
+	XRectangle r = { .x = x, .y = y, .width = width, .height = height };
+	if (pbound)
+		rect_crop(&r, &r, pbound);
+	XRenderFillRectangle(dpy, op, dst, color,
+			r.x, r.y, r.width, r.height);
+}
+
+/**
+ * @brief XRenderComposite() with area cropped by a rectangle.
+ */
+static inline void
+XRenderComposite_cropped(Display *dpy, int op, Picture src, Picture mask,
+		Picture dst, int src_x, int src_y, int mask_x, int mask_y,
+		int dst_x, int dst_y, unsigned int width, unsigned int height,
+		const XRectangle *pbound, double ratio_x, double ratio_y) {
+	XRectangle r = { .x = dst_x, .y = dst_y, .width = width, .height = height };
+	if (pbound)
+		rect_crop2(&r, &r, pbound, &src_x, &src_y, ratio_x, ratio_y);
+	XRenderComposite(dpy, op, src, mask, dst, src_x, src_y,
+			mask_x, mask_y, r.x, r.y, r.width, r.height);
+}
 
 static inline pictw_t *
 simg_pixmap_to_pictw(session_t *ps, int width, int height, int depth,

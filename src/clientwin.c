@@ -203,6 +203,28 @@ clientwin_update(ClientWin *cw) {
 	return true;
 }
 
+static inline bool
+clientwin_update2_filled(session_t *ps, MainWin *mw, ClientWin *cw) {
+	cw->pict_filled = simg_postprocess(ps,
+			clone_pictw(ps, ps->o.fillSpec.img),
+			ps->o.fillSpec.mode,
+			cw->mini.width, cw->mini.height,
+			ps->o.fillSpec.alg, ps->o.fillSpec.valg,
+			&ps->o.fillSpec.c);
+	return cw->pict_filled;
+}
+
+static inline bool
+clientwin_update2_icon(session_t *ps, MainWin *mw, ClientWin *cw) {
+	cw->icon_pict_filled = simg_postprocess(ps,
+			clone_pictw(ps, cw->icon_pict),
+			ps->o.iconFillSpec.mode,
+			cw->mini.width, cw->mini.height,
+			ps->o.iconFillSpec.alg, ps->o.iconFillSpec.valg,
+			&ps->o.iconFillSpec.c);
+	return cw->icon_pict_filled;
+}
+
 bool
 clientwin_update2(ClientWin *cw) {
 	MainWin *mw = cw->mainwin;
@@ -214,22 +236,13 @@ clientwin_update2(ClientWin *cw) {
 		case CLIDISP_NONE:
 			break;
 		case CLIDISP_FILLED:
-			cw->pict_filled = simg_postprocess(ps,
-					clone_pictw(ps, ps->o.fillSpec.img),
-					ps->o.fillSpec.mode,
-					cw->mini.width, cw->mini.height,
-					ps->o.fillSpec.alg, ps->o.fillSpec.valg,
-					&ps->o.fillSpec.c);
+			clientwin_update2_filled(ps, mw, cw);
 			break;
 		case CLIDISP_ICON:
-			cw->icon_pict_filled = simg_postprocess(ps,
-					clone_pictw(ps, cw->icon_pict),
-					ps->o.iconFillSpec.mode,
-					cw->mini.width, cw->mini.height,
-					ps->o.iconFillSpec.alg, ps->o.fillSpec.valg,
-					&ps->o.iconFillSpec.c);
+			clientwin_update2_icon(ps, mw, cw);
 			break;
 		case CLIDISP_THUMBNAIL:
+		case CLIDISP_THUMBNAIL_ICON:
 			break;
 	}
 
@@ -270,15 +283,15 @@ clientwin_destroy(ClientWin *cw, bool destroyed) {
 }
 
 static void
-clientwin_repaint(ClientWin *cw, const XRectangle *rect) {
+clientwin_repaint(ClientWin *cw, const XRectangle *pbound) {
 	session_t *ps = cw->mainwin->ps;
 	Picture source = None;
 	int s_x = 0, s_y = 0, s_w = cw->mini.width, s_h = cw->mini.height;
-	if (rect) {
-		s_x = rect->x;
-		s_y = rect->y;
-		s_w = rect->width;
-		s_h = rect->height;
+	if (pbound) {
+		s_x = pbound->x;
+		s_y = pbound->y;
+		s_w = pbound->width;
+		s_h = pbound->height;
 	}
 
 	// printfdf("(%#010lx): %d, %d, %d, %d", cw->wid_client, s_x, s_y, s_w, s_h);
@@ -293,6 +306,8 @@ clientwin_repaint(ClientWin *cw, const XRectangle *rect) {
 			source = cw->icon_pict_filled->pict;
 			break;
 		case CLIDISP_THUMBNAIL:
+		// We will draw the icon later
+		case CLIDISP_THUMBNAIL_ICON:
 			source = cw->origin;
 			break;
 	}
@@ -300,16 +315,31 @@ clientwin_repaint(ClientWin *cw, const XRectangle *rect) {
 
 	if (!source) return;
 
-	if (ps->o.lazyTrans) {
-		XRenderComposite(ps->dpy, PictOpSrc, source,
-				cw->focused ? cw->mainwin->highlightPicture : cw->mainwin->normalPicture,
-				cw->destination, s_x, s_y, 0, 0, s_x, s_y, s_w, s_h);
-	}
-	else {
-		XRenderComposite(ps->dpy, PictOpSrc, cw->mainwin->background, None, cw->destination, cw->mini.x + s_x, cw->mini.y + s_y, 0, 0, s_x, s_y, s_w, s_h);
-		XRenderComposite(ps->dpy, PictOpOver, source,
-				cw->focused ? cw->mainwin->highlightPicture : cw->mainwin->normalPicture,
-				cw->destination, s_x, s_y, 0, 0, s_x, s_y, s_w, s_h);
+	// Drawing main picture
+	{
+		const Picture mask = (cw->focused ? cw->mainwin->highlightPicture :
+				cw->mainwin->normalPicture);
+		if (ps->o.lazyTrans) {
+			XRenderComposite(ps->dpy, PictOpSrc, source, mask,
+					cw->destination, s_x, s_y, 0, 0, s_x, s_y, s_w, s_h);
+		}
+		else {
+			XRenderComposite(ps->dpy, PictOpSrc, cw->mainwin->background, None,
+					cw->destination, cw->mini.x + s_x, cw->mini.y + s_y, 0, 0,
+					s_x, s_y, s_w, s_h);
+			XRenderComposite(ps->dpy, PictOpOver, source, mask,
+					cw->destination, s_x, s_y, 0, 0, s_x, s_y, s_w, s_h);
+		}
+		if (CLIDISP_THUMBNAIL_ICON == cw->mode) {
+			assert(cw->icon_pict && cw->icon_pict->pict);
+			img_composite_params_t params = IMG_COMPOSITE_PARAMS_INIT;
+			simg_get_composite_params(cw->icon_pict,
+					cw->mini.width, cw->mini.height,
+					ps->o.iconFillSpec.mode, ps->o.iconFillSpec.alg, ps->o.iconFillSpec.valg,
+					&params);
+			simg_composite(ps, cw->icon_pict, cw->destination,
+					cw->mini.width, cw->mini.height, &params, NULL, mask, pbound);
+		}
 	}
 
 	// Tinting
@@ -338,7 +368,7 @@ clientwin_repair(ClientWin *cw) {
 	{
 		XserverRegion rgn = XFixesCreateRegion(ps->dpy, 0, 0);
 		XDamageSubtract(ps->dpy, cw->damage, None, rgn);
-		if (CLIDISP_THUMBNAIL == cw->mode)
+		if (CLIDISP_THUMBNAIL == cw->mode || CLIDISP_THUMBNAIL_ICON == cw->mode)
 			rects = XFixesFetchRegion(ps->dpy, rgn, &nrects);
 		XFixesDestroyRegion(ps->dpy, rgn);
 	}

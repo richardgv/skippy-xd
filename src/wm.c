@@ -602,6 +602,8 @@ wm_get_window_desktop(session_t *ps, Window wid) {
 	prop = wid_get_prop(ps, wid, _NET_WM_DESKTOP, 1, XA_CARDINAL, 0);
 	if (prop.nitems)
 		desktop = winprop_get_int(&prop);
+	if ((long) 0xFFFFFFFFL == desktop)
+		desktop = -1;
 	free_winprop(&prop);
 	if (LONG_MIN != desktop) return desktop;
 

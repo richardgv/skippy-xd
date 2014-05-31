@@ -192,6 +192,7 @@ typedef enum {
 	CLIDISP_FILLED,
 	CLIDISP_ICON,
 	CLIDISP_THUMBNAIL,
+	CLIDISP_THUMBNAIL_ICON,
 } client_disp_mode_t;
 
 /// @brief Option structure.

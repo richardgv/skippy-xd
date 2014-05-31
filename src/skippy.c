@@ -266,6 +266,7 @@ parse_client_disp_mode(session_t *ps, const char *s) {
 		{ CLIDISP_FILLED, "filled" },
 		{ CLIDISP_ICON, "icon" },
 		{ CLIDISP_THUMBNAIL, "thumbnail" },
+		{ CLIDISP_THUMBNAIL_ICON, "thumbnail-icon" },
 	};
 	static const int ALLOC_STEP = 3;
 	int capacity = 0;
@@ -1180,12 +1181,15 @@ int main(int argc, char *argv[]) {
 	{
 		dlist *config = NULL;
 		{
+			bool user_specified_config = ps->o.config_path;
 			if (!ps->o.config_path)
 				ps->o.config_path = get_cfg_path();
 			if (ps->o.config_path)
 				config = config_load(ps->o.config_path);
 			else
 				printfef("(): WARNING: No configuration file found.");
+			if (!config && user_specified_config)
+				return 1;
 		}
 
 		char *lc_numeric_old = mstrdup(setlocale(LC_NUMERIC, NULL));

@@ -40,7 +40,6 @@ simg_postprocess(session_t *ps, pictw_t *src, enum pict_posp_mode mode,
 
 	const int depth = 32;
 	pictw_t *dest = NULL;
-	bool transformed = false;
 
 	if (!src) {
 		if (twidth && theight) {
@@ -57,38 +56,53 @@ simg_postprocess(session_t *ps, pictw_t *src, enum pict_posp_mode mode,
 			|| (twidth == src->width && theight == src->height))
 		return src;
 
-	// Determine composite paramaters. We have to do this before create
-	// Picture because the width/height may need to be calculated.
-	int width = src->width, height = src->height;
-	if (!twidth) twidth = (double) theight / height * width;
-	else if (!theight) theight = (double) twidth / width * height;
-	double ratio_x = 1.0, ratio_y = 1.0;
-	switch (mode) {
-		case PICTPOSP_ORIG: break;
-		case PICTPOSP_TILE: break;
-		case PICTPOSP_SCALE:
-		case PICTPOSP_SCALEK:
-		case PICTPOSP_SCALEE:
-		case PICTPOSP_SCALEEK:
-							{
-								if (twidth) ratio_x = (double) twidth / width;
-								if (theight) ratio_y = (double) theight / height;
-								if (PICTPOSP_SCALEK == mode || PICTPOSP_SCALEEK == mode)
-									ratio_x = ratio_y = MIN(ratio_x, ratio_y);
-								if (PICTPOSP_SCALEE == mode || PICTPOSP_SCALEEK == mode) {
-									ratio_x = MAX(1.0f, ratio_x);
-									ratio_y = MAX(1.0f, ratio_y);
-								}
-								width *= ratio_x;
-								height *= ratio_y;
-							}
-							break;
-		default:            assert(0); break;
-	}
+	if (!twidth) twidth = (double) theight / src->height * src->width;
+	else if (!theight) theight = (double) twidth / src->width * src->height;
 
 	if (!(dest = create_pictw(ps, twidth, theight, depth))) {
 		printfef("(): Failed to create Picture.");
 		goto simg_postprocess_end;
+	}
+
+	img_composite_params_t params = IMG_COMPOSITE_PARAMS_INIT;
+	simg_get_composite_params(src, twidth, theight, mode, alg, valg, &params);
+	simg_composite(ps, src, dest->pict, twidth, theight, &params, pc,
+			None, NULL);
+
+simg_postprocess_end:
+	free_pictw(ps, &src);
+	return dest;
+}
+
+void
+simg_get_composite_params(pictw_t *src, int twidth, int theight,
+		enum pict_posp_mode mode, enum align alg, enum align valg,
+		img_composite_params_t *pparams) {
+	int width = src->width, height = src->height;
+	double ratio_x = 1.0, ratio_y = 1.0;
+	switch (mode) {
+		case PICTPOSP_ORIG:
+			break;
+		case PICTPOSP_TILE:
+			break;
+		case PICTPOSP_SCALE:
+		case PICTPOSP_SCALEK:
+		case PICTPOSP_SCALEE:
+		case PICTPOSP_SCALEEK:
+			{
+				if (twidth) ratio_x = (double) twidth / width;
+				if (theight) ratio_y = (double) theight / height;
+				if (PICTPOSP_SCALEK == mode || PICTPOSP_SCALEEK == mode)
+					ratio_x = ratio_y = MIN(ratio_x, ratio_y);
+				if (PICTPOSP_SCALEE == mode || PICTPOSP_SCALEEK == mode) {
+					ratio_x = MAX(1.0f, ratio_x);
+					ratio_y = MAX(1.0f, ratio_y);
+				}
+				width *= ratio_x;
+				height *= ratio_y;
+			}
+							break;
+		default:            assert(0); break;
 	}
 
 	int x = 0, y = 0;
@@ -111,23 +125,51 @@ simg_postprocess(session_t *ps, pictw_t *src, enum pict_posp_mode mode,
 	};
 	x = MAX(x, 0);
 	y = MAX(y, 0);
+
+	pparams->rect.x = x;
+	pparams->rect.y = y;
+	pparams->rect.width = width;
+	pparams->rect.height = height;
+	pparams->num_x = num_x;
+	pparams->num_y = num_y;
+	pparams->ratio_x = ratio_x;
+	pparams->ratio_y = ratio_y;
+}
+
+void
+simg_composite(session_t *ps, pictw_t *src, Picture dest,
+		int twidth, int theight, const img_composite_params_t *pparams,
+		const XRenderColor *pc, Picture mask, const XRectangle *pbound) {
+	assert(src);
+	assert(pparams);
+
+	const double ratio_x = pparams->ratio_x, ratio_y = pparams->ratio_y;
+	const int num_x = pparams->num_x;
+	const int num_y = pparams->num_y;
+	const int width = src->width * pparams->ratio_x;
+	const int height = src->height * pparams->ratio_y;
+	const int x = pparams->rect.x;
+	const int y = pparams->rect.y;
+
 	int x2 = MIN(x + width * num_x, twidth),
 			y2 = MIN(y + height * num_y, theight);
-	/* if (pc->alpha) */ {
+	if (pc) {
 		if (src->depth >= 32)
-			XRenderFillRectangle(ps->dpy, PictOpSrc, dest->pict, pc, 0, 0,
-					twidth, theight);
+			XRenderFillRectangle_cropped(ps->dpy, PictOpSrc, dest, pc, 0, 0,
+					twidth, theight, pbound);
 		else {
-			XRenderFillRectangle(ps->dpy, PictOpSrc, dest->pict, pc, 0, 0,
-					twidth, y);
-			XRenderFillRectangle(ps->dpy, PictOpSrc, dest->pict, pc, 0, y2,
-					twidth, theight - y2);
-			XRenderFillRectangle(ps->dpy, PictOpSrc, dest->pict, pc, 0, y,
-					x, y2 - y);
-			XRenderFillRectangle(ps->dpy, PictOpSrc, dest->pict, pc, x2, y,
-					twidth - x2, y2 - y);
+			XRenderFillRectangle_cropped(ps->dpy, PictOpSrc, dest, pc, 0, 0,
+					twidth, y, pbound);
+			XRenderFillRectangle_cropped(ps->dpy, PictOpSrc, dest, pc, 0, y2,
+					twidth, theight - y2, pbound);
+			XRenderFillRectangle_cropped(ps->dpy, PictOpSrc, dest, pc, 0, y,
+					x, y2 - y, pbound);
+			XRenderFillRectangle_cropped(ps->dpy, PictOpSrc, dest, pc, x2, y,
+					twidth - x2, y2 - y, pbound);
 		}
 	}
+
+	bool transformed = false;
 	if (src->pict) {
 		if (1.0 != ratio_x || 1.0 != ratio_y) {
 			XTransform transform = { .matrix = {
@@ -139,18 +181,20 @@ simg_postprocess(session_t *ps, pictw_t *src, enum pict_posp_mode mode,
 			XRenderSetPictureTransform(ps->dpy, src->pict, &transform);
 		}
 
-		XRectangle bound = { .x = x, .y = y, .width = x2, .height = y2 };
-		int op = (src->depth >= 32 && pc->alpha ? PictOpOver: PictOpSrc);
+		XRectangle bound = { .x = x, .y = y, .width = x2 - x, .height = y2 - y};
+		int op = (src->depth >= 32 || (pc && pc->alpha) || mask ? PictOpOver: PictOpSrc);
 		for (int i = 0; i < num_x; ++i)
 			for (int j = 0; j < num_y; ++j) {
 				XRectangle reg = { .x = x + i * width, .y = y + j * height,
 					.width = width, .height = height };
+				int tex_x = 0, tex_y = 0;
 				XRectangle reg2;
-				rect_crop(&reg2, &reg, &bound);
-				if (reg2.width && reg2.height) {
-					XRenderComposite(ps->dpy, op, src->pict, None,
-							dest->pict, 0, 0, 0, 0,
-							reg2.x, reg2.y, reg2.width, reg2.height);
+				rect_crop2(&reg2, &reg, &bound, &tex_x, &tex_y, ratio_x, ratio_y);
+				if (reg2.width > 0 && reg2.height > 0) {
+					XRenderComposite_cropped(ps->dpy, op, src->pict, mask,
+							dest, tex_x, tex_y, 0, 0,
+							reg2.x, reg2.y, reg2.width, reg2.height,
+							pbound, ratio_x, ratio_y);
 				}
 			}
 	}
@@ -163,8 +207,5 @@ simg_postprocess(session_t *ps, pictw_t *src, enum pict_posp_mode mode,
 		} };
 		XRenderSetPictureTransform(ps->dpy, src->pict, &transform);
 	}
-
-simg_postprocess_end:
-	free_pictw(ps, &src);
-	return dest;
 }
+

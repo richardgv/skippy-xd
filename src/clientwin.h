@@ -73,6 +73,10 @@ clientwin_get_disp_mode(session_t *ps, ClientWin *cw) {
 
 	for (client_disp_mode_t *p = ps->o.clientDisplayModes; *p; p++) {
 		switch (*p) {
+			case CLIDISP_THUMBNAIL_ICON:
+				if (IsViewable == wattr.map_state && cw->origin && cw->icon_pict)
+					return *p;
+				break;
 			case CLIDISP_THUMBNAIL:
 				if (IsViewable == wattr.map_state && cw->origin) return *p;
 				break;
