@@ -145,8 +145,14 @@ sgif_read(session_t *ps, const char *path) {
 sgif_read_end:
 	if (data)
 		free(data);
-	if (likely(f))
+	if (likely(f)){
+#ifdef SGIF_THREADSAFE
+		int err;
+		DGifCloseFile(f, &err);
+#else
 		DGifCloseFile(f);
+#endif	
+	}
 
 	return pictw;
 }
