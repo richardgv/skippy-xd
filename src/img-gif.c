@@ -146,8 +146,12 @@ sgif_read_end:
 	if (data)
 		free(data);
 	if (likely(f)){
+#ifdef SGIF_THREADSAFE
 		int err;
 		DGifCloseFile(f, &err);
+#else
+		DGifCloseFile(f);
+#endif	
 	}
 
 	return pictw;
