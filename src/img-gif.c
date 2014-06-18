@@ -11,6 +11,11 @@
 #define SGIF_THREADSAFE
 #endif
 
+// More thread-safe error flag on >=giflib-5.1
+#if defined(GIFLIB_MAJOR) && GIFLIB_MAJOR >= 5 && defined(GIFLIB_MINOR) && GIFLIB_MINOR >= 1
+#define SGIF_THREADSAFE_510
+#endif
+
 pictw_t *
 sgif_read(session_t *ps, const char *path) {
 	assert(path);
@@ -145,8 +150,14 @@ sgif_read(session_t *ps, const char *path) {
 sgif_read_end:
 	if (data)
 		free(data);
-	if (likely(f))
+	if (likely(f)) {
+#ifdef SGIF_THREADSAFE_510
+		int error_code = 0;
+		DGifCloseFile(f, &error_code);
+#else
 		DGifCloseFile(f);
+#endif
+	}
 
 	return pictw;
 }
