@@ -48,7 +48,7 @@ simg_load_icon(session_t *ps, Window wid, int desired_size) {
 					best_height = height;
 					best_scale = scale;
 					best_area = area;
-					best_data = (const unsigned char *) p;
+					best_data = (const unsigned char *) (p + 2);
 				}
 			}
 		}
