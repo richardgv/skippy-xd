@@ -57,14 +57,19 @@ mainwin_create(session_t *ps) {
 	XWindowAttributes rootattr;
 	XRenderPictureAttributes pa;
 	XRenderColor clear;
-	
+
+	// Get ARGB visual.
+	// FIXME: Move this to skippy.c?
+	if (!ps->argb_visual)
+		ps->argb_visual = find_argb_visual(dpy, ps->screen);
+
 	// calloc() makes sure it's filled with zero
 	MainWin *mw = allocchk(calloc(1, sizeof(MainWin)));
-	
+
 	mw->ps = ps;
 	if (ps->o.lazyTrans) {
 		mw->depth  = 32;
-		mw->visual = find_argb_visual(dpy, DefaultScreen(dpy));
+		mw->visual = ps->argb_visual;
 		if (!mw->visual) {
 			printfef("(): Couldn't find ARGB visual, lazy transparency can't work.");
 			goto mainwin_create_err;

@@ -348,6 +348,8 @@ typedef struct {
 	wmpsn_t wmpsn;
 	/// @brief Whether we have EWMH fullscreen support.
 	bool has_ewmh_fullscreen;
+	/// @brief ARGB visual of the current screen.
+	Visual *argb_visual;
 	/// @brief File descriptor of command pipe, in daemon mode.
 	int fd_pipe;
 	/// @brief Main window.

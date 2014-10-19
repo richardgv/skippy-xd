@@ -56,6 +56,7 @@ simg_load_icon(session_t *ps, Window wid, int desired_size) {
 			{
 				unsigned char *converted_data = simg_data32_from_long(
 						(const long *) best_data, best_width * best_height);
+				simg_data32_premultiply(converted_data, best_width * best_height);
 				pictw = simg_data_to_pictw(ps, best_width, best_height, 32, converted_data, 0);
 				if (converted_data != best_data)
 					free(converted_data);

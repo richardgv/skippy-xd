@@ -325,7 +325,12 @@ simg_data_to_pictw(session_t *ps, int width, int height, int depth,
 			* (bytes_per_line ? bytes_per_line: depth_to_len(depth) * width));
 	pictw_t *pictw = NULL;
 	GC gc = None;
-	XImage *img = XCreateImage(ps->dpy, DefaultVisual(ps->dpy, ps->screen),
+
+	// Use ARGB visual if needed
+	Visual *visual = DefaultVisual(ps->dpy, ps->screen);
+	if (32 == depth && ps->argb_visual)
+		visual = ps->argb_visual;
+	XImage *img = XCreateImage(ps->dpy, visual,
 			depth, ZPixmap, 0, (char *) data, width, height,
 			8, bytes_per_line);
 	if (!img) {
