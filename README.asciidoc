@@ -1,3 +1,6 @@
 link:https://code.google.com/p/skippy-xd/[Skippy-XD] -- a full-screen task-switcher for X11. 
 
 This GitHub repo hosts the code of a fork from the original 0.5.0 release (2004), initially maintained by Nick Watts (2011) and now by Richard Grenville (2013). The project's home page, downloads and wiki are hosted at link:https://code.google.com/p/skippy-xd/[Skippy-XD on Google Code]. An Ubuntu PPA for daily builds is available at link:https://launchpad.net/~landronimirc/+archive/skippy-xd-daily/[Skippy-XD PPA (daily)].
+
+
+image:https://badges.gitter.im/Join%20Chat.svg[link="https://gitter.im/richardgv/skippy-xd?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge"]
