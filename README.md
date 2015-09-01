@@ -2,9 +2,13 @@
 
 [![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/richardgv/skippy-xd)
 
-A full-screen expose-style task-switcher for X11.
+A full-screen expose-style task-switcher for X11.  You know that thing Mac OS X, Gnome 3, Compiz and KWin do where you press a hotkey and suddenly you see miniature versions of all your windows at once? Skippy-XD does just that. It's most commonly known by Mac OS X's name for it - **Exposé**.  **You can see a demo on [YouTube](http://www.youtube.com/watch?v=gVRPCd7OS38).**
 
 Originally mirrored from [the Google Code project](https://code.google.com/p/skippy-xd/) this GitHub repo hosts the code of a fork from the original 0.5.0 release (2004). That fork was initially maintained by Nick Watts (2011) and is now maintained by [Richard Grenville](https://github.com/richardgv) (2013).
+
+So why do I want Skippy-XD instead of Mac OS X, Compiz or KWin? Well many Linux users prefer a lightweight, speedy desktop environment like Xfce, LXDE or their own Openbox-based hodge podge. Many even appreciate that these environments don't have compositing because it can degrade performance in some applications (especially 3D applications).
+
+Skippy-XD is a standalone application for providing a window picker with live previews (including live video) on Linux desktops that run an X server with compositing support. That means it's not baked into the window manager, and the compositing is not being used all the time. So the performance of you're window manager isn't degraded, but you still get a window picker that's every bit as pretty as OSX's Exposé or KWin's "Present Windows", with all the desktop-navigational efficiency. Compositing only takes effect when you press the hotkey to display the window picker.
 
 ## Installation
 
@@ -15,6 +19,8 @@ sudo add-apt-repository ppa:landronimirc/skippy-xd
 sudo apt-get update
 sudo apt-get install skippy-xd
 ```
+
+You can also check the [downloads page at the Google Code project](https://code.google.com/p/skippy-xd/downloads/list).
 
 ### From Source
 
@@ -98,3 +104,5 @@ If you installed it from the Skippy-XD PPA, then you're advised to use skippy-xd
 
 * [Skippy-XD on Ubuntu Wiki](https://wiki.ubuntu.com/Skippy)
 * [Skippy-XD on Google Code](https://code.google.com/p/skippy-xd/)
+* [Original home of Skippy-XD](http://thegraveyard.org/skippy.html)
+* [Skippy-XD on freecode](http://freecode.com/projects/skippy)
