@@ -73,9 +73,9 @@ This will wait 1 second, then activate the picker.
 
 Typically, it is helpful to set up keyboard shortcuts for skippy-xd. It is up to you to figure out how to set up keyboard shortcuts for your own window manager (it would be crazy to cover them all here). However, to get you started, here's some links:
 
-Xfce: http://wiki.xfce.org/faq#keyboard
-Openbox: https://urukrama.wordpress.com/openbox-guide/#Key_mouse
-Fluxbox: http://fluxbox-wiki.org/index.php/Keyboard_shortcuts#How_to_use_the_keys_file
+* Xfce: http://wiki.xfce.org/faq#keyboard
+* Openbox: https://urukrama.wordpress.com/openbox-guide/#Key_mouse
+* Fluxbox: http://fluxbox-wiki.org/index.php/Keyboard_shortcuts#How_to_use_the_keys_file
 
 A good method is to set `skippy-xd --start-daemon` to be run after login, and bind a key (like **SUPER_L** [windows key] or **F9**) to `skippy-xd --activate-window-picker`.  Then the flicker mentioned above only happens when starting the daemon on login, and you are free to use the hotkey you bound to open skippy-xd.
 
