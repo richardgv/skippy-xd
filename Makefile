@@ -2,6 +2,7 @@ PREFIX ?= /usr
 BINDIR ?= ${PREFIX}/bin
 
 CC ?= gcc
+CPPFLAGS += -std=c99 -Wall -I/usr/include/freetype2
 
 SRCS_RAW = skippy wm dlist mainwin clientwin layout focus config tooltip img img-xlib
 PACKAGES = x11 xft xrender xcomposite xdamage xfixes
@@ -71,6 +72,7 @@ install: ${BINS} skippy-xd.sample.rc
 	install -d "${DESTDIR}${BINDIR}/" "${DESTDIR}/etc/xdg/"
 	install -m 755 ${BINS} "${DESTDIR}${BINDIR}/"
 	install -m 644 skippy-xd.sample.rc "${DESTDIR}/etc/xdg/skippy-xd.rc"
+	install -m 755 skippy-xd-toggle "${DESTDIR}${BINDIR}/"
 
 uninstall:
 	# Should configuration file be removed?
