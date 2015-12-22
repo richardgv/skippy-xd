@@ -1,14 +1,14 @@
 # Skippy-XD
 
-[![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/richardgv/skippy-xd)
-
-A full-screen expose-style task-switcher for X11.  You know that thing Mac OS X, Gnome 3, Compiz and KWin do where you press a hotkey and suddenly you see miniature versions of all your windows at once? Skippy-XD does just that. It's most commonly known by Mac OS X's name for it - **Exposé**.  **You can see a demo on [YouTube](http://www.youtube.com/watch?v=gVRPCd7OS38).**
+...is a full-screen, expose-style, task-switcher for X11. You know that thing Mac OS X, Gnome 3, Compiz and KWin do where you press a hotkey and suddenly you see miniature versions of all your windows at once? Skippy-XD does just that.
 
 Originally mirrored from [the Google Code project](https://code.google.com/p/skippy-xd/) this GitHub repo hosts the code of a fork from the original 0.5.0 release (2004). That fork was initially maintained by Nick Watts (2011) and is now maintained by [Richard Grenville](https://github.com/richardgv) (2013).
 
-So why do I want Skippy-XD instead of Mac OS X, Compiz or KWin? Well many Linux users prefer a lightweight, speedy desktop environment like Xfce, LXDE or their own Openbox-based hodge podge. Many even appreciate that these environments don't have compositing because it can degrade performance in some applications (especially 3D applications).
+Skippy-XD is a standalone application for providing a window picker with live previews (including live video) on Linux desktops that run an X server with compositing support. That means it's not baked into the window manager, and compositing is used only when the window picker is active. 
 
-Skippy-XD is a standalone application for providing a window picker with live previews (including live video) on Linux desktops that run an X server with compositing support. That means it's not baked into the window manager, and the compositing is not being used all the time. So the performance of you're window manager isn't degraded, but you still get a window picker that's every bit as pretty as OSX's Exposé or KWin's "Present Windows", with all the desktop-navigational efficiency. Compositing only takes effect when you press the hotkey to display the window picker.
+The performance of your window manager isn't degraded, and you get a window picker that's every bit as elegant as OSX's Exposé or KWin's "Present Windows", with all the desktop-navigational efficiency.
+
+**You can see a demo on [YouTube](http://www.youtube.com/watch?v=gVRPCd7OS38).**
 
 ## Installation
 
@@ -19,8 +19,6 @@ sudo add-apt-repository ppa:landronimirc/skippy-xd
 sudo apt-get update
 sudo apt-get install skippy-xd
 ```
-
-You can also check the [downloads page at the Google Code project](https://code.google.com/p/skippy-xd/downloads/list).
 
 ### From Source
 
@@ -75,30 +73,42 @@ sleep 1 && skippy-xd --activate-window-picker
 This will wait 1 second, then activate the picker.
 ```
 
+Alternatively, you can use the included toggle script, which starts the daemon, if it isn't already started, and activates the window picker:
+
+```
+skippy-xd-toggle
+```
+
+or, with the path to your configuration file:
+
+```
+skippy-xd-toggle /PATH/TO/YOUR/CONFIG
+```
+
 ### Keyboard Shortcuts
 
-Typically, it is helpful to set up keyboard shortcuts for skippy-xd. It is up to you to figure out how to set up keyboard shortcuts for your own window manager (it would be crazy to cover them all here). However, to get you started, here's some links:
+Typically, it is helpful to set up keyboard shortcuts for skippy-xd. To get you started, here are some links:
 
 * Xfce: http://wiki.xfce.org/faq#keyboard
 * Openbox: https://urukrama.wordpress.com/openbox-guide/#Key_mouse
 * Fluxbox: http://fluxbox-wiki.org/index.php/Keyboard_shortcuts#How_to_use_the_keys_file
 
-A good method is to set `skippy-xd --start-daemon` to be run after login, and bind a key (like **SUPER_L** [windows key] or **F9**) to `skippy-xd --activate-window-picker`.  Then the flicker mentioned above only happens when starting the daemon on login, and you are free to use the hotkey you bound to open skippy-xd.
+A good method is to set `skippy-xd --start-daemon` to be run after login, and bind a key (like **SUPER_L** [windows key] or **F9**) to , `skippy-xd --toggle-window-picker`, or `skippy-xd-toggle`.
 
 ## Troubleshooting
 
-Admittedly, skippy-xd is not yet perfect. I find that sometimes it will just stop working. I'm not sure why yet (or else I'd fix it!), but it doesn't seem to be a crash (`ps aux | grep skippy` shows the daemon is still running).  To work around it I currently have a script in my home folder called `restart-skippy-xd.sh` that contains this:
+Admittedly, skippy-xd is not yet perfect. Sometimes it will just stop working, but it doesn't seem to be a crash (`ps aux | grep skippy` shows the daemon is still running).  
+To avoid this, your best option is to use the included toggle script:
 
 ```
-#!/bin/sh
-killall skippy-xd
-rm /tmp/skippy-xd-fifo
-skippy-xd --start-daemon
+skippy-xd-toggle
 ```
 
-Next, I bind this script to **CTRL+SHIFT+F9**. This means that when skippy-xd occasionally stops working, a quick **CTRL+SHIFT+F9**, then **F9** again and its back.
+or, with the path to your configuration file:
 
-If you installed it from the Skippy-XD PPA, then you're advised to use skippy-xd-activate to activate the task-switcher (if the daemon is already running); the simple bash script will introduce a small delay before calling Skippy-XD, and this tends to increase reliability. If the plugin has already crashed, then use a different keyboard shortcut for skippy-xd-restart, another simple script that will clean up and restart Skippy-XD daemon (the same as `restart-skippy-xd.sh` above).
+```
+skippy-xd-toggle /PATH/TO/YOUR/CONFIG
+```
 
 ## See Also
 
