@@ -47,7 +47,7 @@ INCS = $(shell pkg-config --cflags $(PACKAGES))
 LIBS += -lm $(shell pkg-config --libs $(PACKAGES))
 
 # === Version string ===
-SKIPPYXD_VERSION ?= git-$(shell git describe --always --dirty)-$(shell git log -1 --date=short --pretty=format:%cd)
+SKIPPYXD_VERSION = "2015.12.21"
 CPPFLAGS += -DSKIPPYXD_VERSION="\"${SKIPPYXD_VERSION}\""
 
 # === Recipes ===
