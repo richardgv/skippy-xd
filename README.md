@@ -2,7 +2,7 @@
 
 ...is a full-screen, expose-style, task-switcher for X11. You know that thing Mac OS X, Gnome 3, Compiz and KWin do where you press a hotkey and suddenly you see miniature versions of all your windows at once? Skippy-XD does just that.
 
-Originally mirrored from [the Google Code project](https://code.google.com/p/skippy-xd/) this GitHub repo hosts the code of a fork from the original 0.5.0 release (2004). That fork was initially maintained by Nick Watts (2011) and is now maintained by [Richard Grenville](https://github.com/richardgv) (2013).
+Originally mirrored from [the Google Code project](https://code.google.com/p/skippy-xd/) this GitHub repo hosts the code of a fork from the original 0.5.0 release (2004), initially maintained by Nick Watts (2011) and Richard Grenville (2013).
 
 Skippy-XD is a standalone application for providing a window picker with live previews (including live video) on Linux desktops that run an X server with compositing support. That means it's not baked into the window manager, and compositing is used only when the window picker is active. 
 
@@ -56,21 +56,20 @@ skippy-xd --start-daemon
 
 If for whatever reason you need to cleanly stop the running daemon, do this:
 
-```
+```sh
 skippy-xd --stop-daemon
 ```
 
 Once the daemon is running you can use the following command to activate it:
 
-```
+```sh
 skippy-xd --activate-window-picker
 ```
 
 However, sometimes pressing the Return key to run this last command also causes the window to be selected, so it is probably more effective in testing to do this:
 
-```
-sleep 1 && skippy-xd --activate-window-picker
-This will wait 1 second, then activate the picker.
+```sh
+sleep 0.5 && skippy-xd --activate-window-picker
 ```
 
 Alternatively, you can use the included toggle script, which starts the daemon, if it isn't already started, and activates the window picker:
