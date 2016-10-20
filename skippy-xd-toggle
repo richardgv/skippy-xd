@@ -17,9 +17,9 @@ killSkippyXd() {
 toggleSkippyXd() {
 
   skippyDaemonStartCommand="skippy-xd --start-daemon"
-  psSkippyOut="`pgrep 'skippy-xd '`"
-  psSkippyActivateOut="`pgrep 'skippy-xd --activate-window-picker'`"
-  psSkippyToggleOut="`pgrep 'skippy-xd --toggle-window-picker'`"
+  psSkippyOut="`pgrep -f 'skippy-xd '`"
+  psSkippyActivateOut="`pgrep -f 'skippy-xd --activate-window-picker'`"
+  psSkippyToggleOut="`pgrep -f 'skippy-xd --toggle-window-picker'`"
 
   skippyConfig="$1"
 
