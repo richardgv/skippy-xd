@@ -7,16 +7,26 @@ killSkippyXd() {
   if [ -f '/tmp/skippy-xd-fifo' ]
   then
     rm /tmp/skippy-xd-fifo
+    touch /tmp/skippy-xd-fifo
   fi
+
+  exit $?
 
 }
 
 toggleSkippyXd() {
 
+  skippyDaemonStartCommand="skippy-xd --start-daemon"
+  psSkippyOut="`pgrep 'skippy-xd '`"
+  psSkippyActivateOut="`pgrep 'skippy-xd --activate-window-picker'`"
+  psSkippyToggleOut="`pgrep 'skippy-xd --toggle-window-picker'`"
+
   skippyConfig="$1"
-  psSkippyOut=`ps aux | grep '[s]kippy-xd '`
-  psSkippyActivateOut=`ps aux | grep '[s]kippy-xd --activate-window-picker'`
-  psSkippyToggleOut=`ps aux | grep '[s]kippy-xd --toggle-window-picker'`
+
+  if [ -f "$skippyConfig" ]
+  then
+    skippyDaemonStartCommand="$skippyDaemonStartCommand --config $skippyConfig"
+  fi
 
   ## IF, when calling skippy-xd, to start the window picker, 
   ## a process to do so already exists, then skippy-xd is stuck, 
@@ -27,10 +37,10 @@ toggleSkippyXd() {
   if [ ! -z "$psSkippyActivateOut" ] || [ ! -z "$psSkippyToggleOut" ]
   then
     killSkippyXd
-    skippy-xd --start-daemon --config "$skippyConfig" &
+    $skippyDaemonStartCommand &
   elif [ -z "$psSkippyOut" ]
   then
-    skippy-xd --start-daemon --config "$skippyConfig" &
+    $skippyDaemonStartCommand &
   fi
 
   skippy-xd --toggle-window-picker
