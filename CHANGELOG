@@ -3,6 +3,12 @@ Skippy-XD changelog
 0.5.2~pre -- "Puzzlebox" (09 Sept 2018) ~/dreamcat4
  - Fully customizable keybindings, and documentation for configuring them
  - Default keybindings settings made consistent with 'Alt-Tab' behaviour
+ - Valgrind - added .valgrind.supressions file
+ - Makefile - prefer clang over gcc, if clang is present on the system
+ - Makefile - a slight improvment to the handling of compiler warnings
+ - Makefile - added 'install-check' build target, informational
+ - Version string - changed format, and now includes the version number
+ - Readme - new section for developers / maintainers / contributors
 
 0.5.1~hg -- "No codename" (23 Dec 2011)
  - Correctly auto-detect 32 or 64-bit system and compile appropriately.

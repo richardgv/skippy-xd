@@ -1,7 +1,12 @@
 PREFIX ?= /usr
 BINDIR ?= ${PREFIX}/bin
 
-CC ?= gcc
+ifeq ($(shell command -v clang 2>&1 | grep -c "clang"), 1)
+	CC = clang
+else
+	CC ?= gcc
+endif
+
 CPPFLAGS += -std=c99 -Wall -I/usr/include/freetype2
 
 SRCS_RAW = skippy wm dlist mainwin clientwin layout focus config tooltip img img-xlib
@@ -33,6 +38,12 @@ endif
 
 ifeq "$(CFG_DEV)" ""
 	CFLAGS ?= -DNDEBUG -O2 -D_FORTIFY_SOURCE=2
+
+	ifeq "$(CC)" "clang"
+		CPPFLAGS += -Wno-unused-function
+	else # gcc
+		CPPFLAGS += -Wno-unused-but-set-variable
+	endif
 else
 	CC = clang
 	CFLAGS += -ggdb -Wshadow -Weverything -Wno-unused-parameter -Wno-conversion -Wno-sign-conversion -Wno-gnu -Wno-disabled-macro-expansion -Wno-padded -Wno-c11-extensions -Wno-sign-compare -Wno-vla -Wno-cast-align
@@ -47,8 +58,8 @@ INCS = $(shell pkg-config --cflags $(PACKAGES))
 LIBS += -lm $(shell pkg-config --libs $(PACKAGES))
 
 # === Version string ===
-SKIPPYXD_VERSION = "2015.12.21"
-CPPFLAGS += -DSKIPPYXD_VERSION="\"${SKIPPYXD_VERSION}\""
+SKIPPYXD_VERSION = "v0.5.2~pre (2018.09.09) - \\\"Puzzlebox\\\" Edition"
+CPPFLAGS += -DSKIPPYXD_VERSION=\"${SKIPPYXD_VERSION}\"
 
 # === Recipes ===
 EXESUFFIX =
@@ -67,6 +78,12 @@ skippy-xd${EXESUFFIX}: ${OBJS}
 
 clean:
 	rm -f ${BINS} ${OBJS} src/.clang_complete
+
+install-check:
+	@echo "'make install' target folders:"
+	@echo "PREFIX=${PREFIX} DESTDIR=${DESTDIR} BINDIR=${BINDIR}"
+	@echo "skippy executables will be installed into: ${DESTDIR}${BINDIR}"
+	@echo "skippy's config file will be installed to: ${DESTDIR}/etc/xdg/skippy-xd.rc"
 
 install: ${BINS} skippy-xd.sample.rc
 	install -d "${DESTDIR}${BINDIR}/" "${DESTDIR}/etc/xdg/"

@@ -935,7 +935,7 @@ xerror(Display *dpy, XErrorEvent *ev) {
 
 static void
 show_help() {
-	fputs("skippy-xd (" SKIPPYXD_VERSION ")\n"
+	fputs("skippy-xd " SKIPPYXD_VERSION "\n"
 			"Usage: skippy-xd [command]\n\n"
 			"The available commands are:\n"
 			"  --config                    - Read the specified configuration file.\n"
@@ -944,6 +944,7 @@ show_help() {
 			"  --activate-window-picker    - tells the daemon to show the window picker.\n"
 			"  --deactivate-window-picker  - tells the daemon to hide the window picker.\n"
 			"  --toggle-window-picker      - tells the daemon to toggle the window picker.\n"
+			// "  --test                      - Temporary development testing. To be removed.\n"
 			"\n"
 			"  --help                      - show this message.\n"
 			"  -S                          - Synchronize X operation (debugging).\n"
@@ -952,6 +953,31 @@ show_help() {
 	spng_about(stdout);
 #endif
 }
+
+// static void
+// developer_tests() {
+// 	fputs("skippy-xd (" SKIPPYXD_VERSION ")\n", stdout);
+// 	fputs("Running: developer tests\n", stdout);
+// 	fputs("\n", stdout);
+
+// 	char *str = "one two three four,five six!!!!";
+//     fprintf(stdout, "testing str_count_words(), str=\"%s\"\n", str);
+
+// 	int num_words = str_count_words(str);
+//     fprintf(stdout, "num_words=%i\n", num_words);
+
+// 	fputs("done.\n", stdout);
+// 	fputs("\n", stdout);
+
+// 	fputs("sleep(0.3);\n", stdout);
+// 	usleep(0.3 *1000000);
+// 	fputs("done.\n", stdout);
+
+
+// 	fputs("\n", stdout);
+// 	fputs("Finished. Exiting.\n"
+// 			, stdout);
+// }
 
 static inline bool
 init_xexts(session_t *ps) {
@@ -1077,6 +1103,7 @@ parse_args(session_t *ps, int argc, char **argv, bool first_pass) {
 		{ "toggle-window-picker",     no_argument,       NULL, OPT_TOGGLE_PICKER },
 		{ "start-daemon",             no_argument,       NULL, OPT_DM_START },
 		{ "stop-daemon",              no_argument,       NULL, OPT_DM_STOP },
+		// { "test",                     no_argument,       NULL, 't' },
 		{ NULL, no_argument, NULL, 0 }
 	};
 
@@ -1092,6 +1119,9 @@ parse_args(session_t *ps, int argc, char **argv, bool first_pass) {
 					ps->o.config_path = mstrdup(optarg);
 					break;
 				T_CASEBOOL('S', synchronize);
+				// case 't':
+				// 	developer_tests();
+				// 	exit('t' == o ? RET_SUCCESS: RET_BADARG);
 				case '?':
 				case 'h':
 					show_help();
