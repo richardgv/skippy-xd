@@ -1448,7 +1448,7 @@ int main(int argc, char *argv[]) {
 				return RET_BADARG;
 			if (!ps->o.clientDisplayModes) {
 				static const client_disp_mode_t DEF_CLIDISPM[] = {
-					CLIDISP_THUMBNAIL, CLIDISP_ICON, CLIDISP_FILLED, CLIDISP_NONE
+					CLIDISP_THUMBNAIL_ICON, CLIDISP_THUMBNAIL, CLIDISP_ICON, CLIDISP_FILLED, CLIDISP_NONE
 				};
 				ps->o.clientDisplayModes = allocchk(malloc(sizeof(DEF_CLIDISPM)));
 				memcpy(ps->o.clientDisplayModes, &DEF_CLIDISPM, sizeof(DEF_CLIDISPM));
