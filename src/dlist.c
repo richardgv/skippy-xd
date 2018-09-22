@@ -22,6 +22,9 @@
 dlist *
 dlist_last(dlist *l)
 {
+	if (! l)
+		return NULL;
+
 	while(l && l->next)
 		l = l->next;
 	return l;
@@ -70,7 +73,7 @@ dlist_remove(dlist *l)
 	dlist *n = 0;
 	
 	if(! l)
-		return 0;
+		return NULL;
 	
 	if(l->prev) {
 		n = l->prev;
@@ -107,6 +110,9 @@ dlist_remove_nth_free_data(dlist *l, unsigned int n)
 int
 dlist_same(dlist *l1, dlist *l2)
 {
+	if (! l2)
+		return 0;
+
 	l1 = dlist_first(l1);
 	while(l1) {
 		if(l1 == l2)
@@ -119,6 +125,9 @@ dlist_same(dlist *l1, dlist *l2)
 void
 dlist_reverse(dlist *l)
 {
+	if (! l)
+		return;
+
 	dlist *iter1 = dlist_first(l),
 		*iter2 = dlist_last(l);
 	
@@ -134,6 +143,9 @@ dlist_reverse(dlist *l)
 dlist *
 dlist_free(dlist *l)
 {
+	if (! l)
+		return NULL;
+
 	l = dlist_first(l);
 	
 	while(l) {
@@ -142,13 +154,16 @@ dlist_free(dlist *l)
 		free(c);
 	}
 	
-	return 0;
+	return NULL;
 }
 
 dlist *
 dlist_dup(dlist *l)
 {
-	dlist *n = 0;
+	if (! l)
+		return NULL;
+
+	dlist *n = NULL;
 	l = dlist_first(l);
 	
 	while(l) {
@@ -175,6 +190,12 @@ dlist_join(dlist *l, dlist *l2) {
 dlist *
 dlist_find_all(dlist *l, dlist_match_func match, void *data)
 {
+	if (! l)
+		return NULL;
+
+	if (! data)
+		return NULL;
+
 	dlist *n = 0;
 	l = dlist_first(l);
 	
@@ -190,6 +211,12 @@ dlist_find_all(dlist *l, dlist_match_func match, void *data)
 dlist *
 dlist_find(dlist *l, dlist_match_func func, void *data)
 {
+	if (! l)
+		return NULL;
+
+	if (! data)
+		return NULL;
+
 	for(l = dlist_first(l); l; l = l->next)
 		if(func(l, data))
 			break;
@@ -231,7 +258,7 @@ dlist_free_with_data(dlist *l)
 		free(c);
 	}
 	
-	return 0;
+	return NULL;
 }
 
 dlist *
@@ -247,7 +274,7 @@ dlist_free_with_func(dlist *l, dlist_free_func func)
 		free(c);
 	}
 	
-	return 0;
+	return NULL;
 }
 
 unsigned int
@@ -280,6 +307,12 @@ dlist_nth(dlist *l, unsigned int n)
 void
 dlist_swap(dlist *l1, dlist *l2)
 {
+	if (! l1)
+		return;
+
+	if (! l2)
+		return;
+
 	void *tmp = l1->data;
 	l1->data = l2->data;
 	l2->data = tmp;
