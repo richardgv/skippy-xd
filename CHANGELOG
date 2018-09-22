@@ -1,5 +1,9 @@
 Skippy-XD changelog
 
+0.5.2~pre -- "Puzzlebox" (09 Sept 2018) ~/dreamcat4
+ - Fully customizable keybindings, and documentation for configuring them
+ - Default keybindings settings made consistent with 'Alt-Tab' behaviour
+
 0.5.1~hg -- "No codename" (23 Dec 2011)
  - Correctly auto-detect 32 or 64-bit system and compile appropriately.
  - Removed X11-based hotkey activation code (skippy now displays once on

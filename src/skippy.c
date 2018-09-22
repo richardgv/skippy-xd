@@ -728,16 +728,6 @@ mainloop(session_t *ps, bool activate_on_start) {
 					}
 
 				}
-				else if (KeyRelease == ev.type && (mw->key_q == ev.xkey.keycode
-							|| mw->key_escape == ev.xkey.keycode)) {
-					if (mw->pressed_key) {
-						die = true;
-						if (mw->key_escape == ev.xkey.keycode)
-							refocus = true;
-					}
-					else
-						report_key_ignored(&ev);
-				}
 				else if (wid == mw->window)
 					die = mainwin_handle(mw, &ev);
 				else if (PropertyNotify == ev.type) {
@@ -1206,6 +1196,29 @@ int main(int argc, char *argv[]) {
 		ps->o.tooltip_text = mstrdup(config_get(config, "tooltip", "text", "#e0e0e0"));
 		ps->o.tooltip_textShadow = mstrdup(config_get(config, "tooltip", "textShadow", "black"));
 		ps->o.tooltip_font = mstrdup(config_get(config, "tooltip", "font", "fixed-11:weight=bold"));
+
+		// load keybindings settings
+		ps->o.bindings_keysUp = mstrdup(config_get(config, "bindings", "keysUp", "Up w"));
+		ps->o.bindings_keysDown = mstrdup(config_get(config, "bindings", "keysDown", "Down s"));
+		ps->o.bindings_keysLeft = mstrdup(config_get(config, "bindings", "keysLeft", "Left b a"));
+		ps->o.bindings_keysRight = mstrdup(config_get(config, "bindings", "keysRight", "Right Tab f d"));
+		ps->o.bindings_keysExitCancelOnPress = mstrdup(config_get(config, "bindings", "keysExitOnPress", "Escape BackSpace x q"));
+		ps->o.bindings_keysExitCancelOnRelease = mstrdup(config_get(config, "bindings", "keysExitOnRelease", ""));
+		ps->o.bindings_keysExitSelectOnPress = mstrdup(config_get(config, "bindings", "keysExitOnPress", "Return space"));
+		ps->o.bindings_keysExitSelectOnRelease = mstrdup(config_get(config, "bindings", "keysExitOnRelease", "Super_L Super_R Alt_L Alt_R ISO_Level3_Shift"));
+		ps->o.bindings_modifierKeyMasksReverseDirection = mstrdup(config_get(config, "bindings", "modifierKeyMasksReverseDirection", "ShiftMask ControlMask"));
+
+		// print an error message for any key bindings that aren't recognized
+		check_keysyms(ps->o.config_path, ": [bindings] keysUp =", ps->o.bindings_keysUp);
+		check_keysyms(ps->o.config_path, ": [bindings] keysDown =", ps->o.bindings_keysDown);
+		check_keysyms(ps->o.config_path, ": [bindings] keysLeft =", ps->o.bindings_keysLeft);
+		check_keysyms(ps->o.config_path, ": [bindings] keysRight =", ps->o.bindings_keysRight);
+		check_keysyms(ps->o.config_path, ": [bindings] keysExitCancelOnPress =", ps->o.bindings_keysExitCancelOnPress);
+		check_keysyms(ps->o.config_path, ": [bindings] keysExitCancelOnRelease =", ps->o.bindings_keysExitCancelOnRelease);
+		check_keysyms(ps->o.config_path, ": [bindings] keysExitSelectOnPress =", ps->o.bindings_keysExitSelectOnPress);
+		check_keysyms(ps->o.config_path, ": [bindings] keysExitSelectOnRelease =", ps->o.bindings_keysExitSelectOnRelease);
+		check_modmasks(ps->o.config_path, ": [bindings] modifierKeyMasksReverseDirection =", ps->o.bindings_modifierKeyMasksReverseDirection);
+
 		if (!parse_cliop(ps, config_get(config, "bindings", "miwMouse1", "focus"), &ps->o.bindings_miwMouse[1])
 				|| !parse_cliop(ps, config_get(config, "bindings", "miwMouse2", "close-ewmh"), &ps->o.bindings_miwMouse[2])
 				|| !parse_cliop(ps, config_get(config, "bindings", "miwMouse3", "iconify"), &ps->o.bindings_miwMouse[3]))
@@ -1392,6 +1405,15 @@ main_end:
 			free_pictw(ps, &ps->o.iconDefault);
 			free_pictspec(ps, &ps->o.iconFillSpec);
 			free_pictspec(ps, &ps->o.fillSpec);
+			free(ps->o.bindings_keysUp);
+			free(ps->o.bindings_keysDown);
+			free(ps->o.bindings_keysLeft);
+			free(ps->o.bindings_keysRight);
+			free(ps->o.bindings_keysExitCancelOnPress);
+			free(ps->o.bindings_keysExitCancelOnRelease);
+			free(ps->o.bindings_keysExitSelectOnPress);
+			free(ps->o.bindings_keysExitSelectOnRelease);
+			free(ps->o.bindings_modifierKeyMasksReverseDirection);
 		}
 
 		if (ps->fd_pipe >= 0)

@@ -472,10 +472,94 @@ childwin_focus(ClientWin *cw) {
 
 int
 clientwin_handle(ClientWin *cw, XEvent *ev) {
+	// printfef("(): ");
+
+	if (! cw)
+		return 1;
+
 	MainWin *mw = cw->mainwin;
 	session_t *ps = mw->ps;
+	XKeyEvent * const evk = &ev->xkey;
 
-	if (ev->type == ButtonRelease) {
+
+	if (ev->type == KeyPress)
+	{
+		report_key(ev);
+		report_key_modifiers(evk);
+		fputs("\n", stdout);
+
+		bool reverse_direction = false;
+
+		if (arr_modkeymasks_includes(cw->mainwin->modifierKeyMasks_ReverseDirection, evk->state))
+			reverse_direction = true;
+
+		if (arr_keycodes_includes(cw->mainwin->keycodes_Right, evk->keycode))
+		{
+			if(reverse_direction)
+				focus_miniw_prev(ps, cw);
+			else
+				focus_miniw_next(ps, cw);
+		}
+
+		else if (arr_keycodes_includes(cw->mainwin->keycodes_Left, evk->keycode))
+		{
+			if(reverse_direction)
+				focus_miniw_next(ps, cw);
+			else
+				focus_miniw_prev(ps, cw);
+		}
+
+		else if (arr_keycodes_includes(cw->mainwin->keycodes_Down, evk->keycode))
+		{
+			focus_down(cw);
+		}
+
+		else if (arr_keycodes_includes(cw->mainwin->keycodes_Up, evk->keycode))
+		{
+			focus_up(cw);
+		}
+
+		else if (arr_keycodes_includes(cw->mainwin->keycodes_ExitCancelOnPress, evk->keycode))
+		{
+			printfef("(): Quitting.");
+			mw->client_to_focus = NULL;
+			return 1;
+		}
+
+		else if (arr_keycodes_includes(cw->mainwin->keycodes_ExitSelectOnPress, evk->keycode))
+		{
+			mw->client_to_focus = cw;
+			return 1;
+		}
+	}
+	else if (ev->type == KeyRelease)
+	{
+		// report_key(ev);
+
+		report_key(ev);
+		report_key_modifiers(evk);
+		fputs("\n", stdout);
+
+		if (arr_keycodes_includes(cw->mainwin->keycodes_ExitSelectOnRelease, evk->keycode))
+		{
+			mw->client_to_focus = cw;
+			return 1;
+		}
+
+		else if (arr_keycodes_includes(cw->mainwin->keycodes_ExitCancelOnRelease, evk->keycode))
+		{
+			printfef("(): Quitting.");
+			return 1;
+		}
+	}
+
+	else if (ev->type == ButtonPress) {
+		cw->mainwin->pressed_mouse = true;
+		/* if (ev->xbutton.button == 1)
+			cw->mainwin->pressed = cw; */
+	}
+	else if (ev->type == ButtonRelease) {
+		// printfef("(): else if (ev->type == ButtonRelease) {");
 		const unsigned button = ev->xbutton.button;
 		if (cw->mainwin->pressed_mouse) {
 			if (button < MAX_MOUSE_BUTTONS) {
@@ -489,55 +573,8 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 		}
 		else
 			printfef("(): ButtonRelease %u ignored.", button);
-	} else if (ev->type == KeyRelease) {
-		XKeyEvent * const evk = &ev->xkey;
-		if (cw->mainwin->pressed_key) {
-			const keydef_t KEY_NEXT = {
-				.key = XKeysymToKeycode(ps->dpy, XK_Tab),
-				.mod = KEYMOD_CTRL,
-			};
-			const keydef_t KEY_PREV = {
-				.key = XKeysymToKeycode(ps->dpy, XK_Tab),
-				.mod = KEYMOD_CTRL | KEYMOD_SHIFT,
-			};
+	}
 
-			if (evk->keycode == cw->mainwin->key_up ||
-					evk->keycode == cw->mainwin->key_k)
-				focus_up(cw);
-			else if (evk->keycode == cw->mainwin->key_down ||
-					evk->keycode == cw->mainwin->key_j)
-				focus_down(cw);
-			else if (evk->keycode == cw->mainwin->key_left ||
-					evk->keycode == cw->mainwin->key_h)
-				focus_left(cw);
-			else if (evk->keycode == cw->mainwin->key_right ||
-					evk->keycode == cw->mainwin->key_l)
-				focus_right(cw);
-			else if (evk->keycode == cw->mainwin->key_enter
-					|| evk->keycode == cw->mainwin->key_space) {
-				mw->client_to_focus = cw;
-				return 1;
-			}
-			else if (ev_iskey(evk, &KEY_NEXT)) {
-				focus_miniw_next(ps, cw);
-			}
-			else if (ev_iskey(evk, &KEY_PREV)) {
-				focus_miniw_prev(ps, cw);
-			}
-			else
-				report_key_unbinded(ev);
-		}
-		else
-			report_key_ignored(ev);
-	}
-	else if (ev->type == ButtonPress) {
-		cw->mainwin->pressed_mouse = true;
-		/* if (ev->xbutton.button == 1)
-			cw->mainwin->pressed = cw; */
-	}
-	else if (KeyPress == ev->type) {
-		cw->mainwin->pressed_key = true;
-	}
 	else if (ev->type == FocusIn) {
 		cw->focused = true;
 		clientwin_render(cw);

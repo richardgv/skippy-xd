@@ -253,6 +253,15 @@ typedef struct {
 	char *tooltip_font;
 
 	enum cliop bindings_miwMouse[MAX_MOUSE_BUTTONS];
+	char *bindings_keysUp;
+	char *bindings_keysDown;
+	char *bindings_keysLeft;
+	char *bindings_keysRight;
+	char *bindings_keysExitCancelOnPress;
+	char *bindings_keysExitCancelOnRelease;
+	char *bindings_keysExitSelectOnPress;
+	char *bindings_keysExitSelectOnRelease;
+	char *bindings_modifierKeyMasksReverseDirection;
 } options_t;
 
 #define OPTIONST_INIT { \
