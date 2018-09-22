@@ -57,18 +57,44 @@ printfefXFocusChangeEvent(session_t *ps, XFocusChangeEvent *evf)
 		printfef("(): evf->detail = %i (not recognized)", evf->detail);
 }
 
+static inline void
+clear_focus_all(dlist *cod)
+{
+	foreach_dlist (cod)
+	{
+		ClientWin *cw = (ClientWin *)iter->data;
+		cw->focused = 0;
+	}
+
+}
+
 /**
  * @brief Focus the mini window of a client window.
  */
 static inline void
 focus_miniw_adv(session_t *ps, ClientWin *cw, bool move_ptr) {
+	// printfef("(): ");
+	clear_focus_all(cw->mainwin->cod);
+
+	printfefWindowName(ps, "(): window = ", cw->wid_client);
+
 	if (unlikely(!cw))
+	{
+		// printfef("(): if (unlikely(!cw))");
 		return;
+	}
 	assert(cw->mini.window);
 	if (move_ptr)
+	{
+		// printfef("(): if (move_ptr)");
 		XWarpPointer(ps->dpy, None, cw->mini.window, 0, 0, 0, 0, cw->mini.width / 2, cw->mini.height / 2);
+	}
 	XSetInputFocus(ps->dpy, cw->mini.window, RevertToParent, CurrentTime);
 	XFlush(ps->dpy);
+
+	ps->mainwin->client_to_focus = cw;
+	ps->mainwin->client_to_focus->focused = 1;
+
 }
 
 static inline void

@@ -344,6 +344,12 @@ clientwin_repaint(ClientWin *cw, const XRectangle *pbound) {
 
 	// Tinting
 	{
+		// here the client window is being tinted
+		// if (cw->focused)
+		// 	printfef("(): *tint = &cw->mainwin->highlightTint");
+		// else
+		// 	printfef("(): *tint = &cw->mainwin->normalTint");
+
 		XRenderColor *tint = (cw->focused ? &cw->mainwin->highlightTint
 				: &cw->mainwin->normalTint);
 		if (tint->alpha)
@@ -576,16 +582,53 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 	}
 
 	else if (ev->type == FocusIn) {
-		cw->focused = true;
+		printfef("(): else if (ev->type == FocusIn) {");
+		XFocusChangeEvent *evf = &ev->xfocus;
+
+		// for debugging XEvents
+		// see: https://tronche.com/gui/x/xlib/events/input-focus/normal-and-grabbed.html
+		printfef("(): main window id = %#010lx", cw->mainwin->window);
+		printfefWindowName(ps, "(): client window = ", cw->mainwin->window);
+		printfef("(): client window id = %#010lx", cw->wid_client);
+		printfefXFocusChangeEvent(ps, evf);
+
+		// printfef("(): usleep(10000);");
+		// usleep(10000);
+
+		// here
+
+		if (evf->detail == NotifyWhileGrabbed)
+			cw->focused = true;
+
 		clientwin_render(cw);
+		fputs("\n", stdout);
 		XFlush(ps->dpy);
+
 	} else if (ev->type == FocusOut) {
-		cw->focused = false;
+		printfef("(): else if (ev->type == FocusOut) {");
+		XFocusChangeEvent *evf = &ev->xfocus;
+
+		// for debugging XEvents
+		// see: https://tronche.com/gui/x/xlib/events/input-focus/normal-and-grabbed.html
+		printfef("(): main window id = %#010lx", cw->mainwin->window);
+		printfefWindowName(ps, "(): client window = ", cw->mainwin->window);
+		printfef("(): client window id = %#010lx", cw->wid_client);
+		printfefXFocusChangeEvent(ps, evf);
+
+		// printfef("(): usleep(10000);");
+		// usleep(10000);
+
+		if (evf->detail == NotifyWhileGrabbed)
+			cw->focused = false;
+
 		clientwin_render(cw);
+		fputs("\n", stdout);
 		XFlush(ps->dpy);
+
 	} else if(ev->type == EnterNotify) {
 		XSetInputFocus(ps->dpy, cw->mini.window, RevertToParent, CurrentTime);
 		if (cw->mainwin->tooltip) {
+			cw->mainwin->cw_tooltip = cw;
 			int win_title_len = 0;
 			FcChar8 *win_title = wm_get_window_title(ps, cw->wid_client, &win_title_len);
 			if (win_title) {
@@ -597,6 +640,7 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 		}
 	} else if(ev->type == LeaveNotify) {
 		// XSetInputFocus(ps->dpy, mw->window, RevertToParent, CurrentTime);
+		cw->mainwin->cw_tooltip = NULL;
 		if(cw->mainwin->tooltip)
 			tooltip_unmap(cw->mainwin->tooltip);
 	}
@@ -613,6 +657,7 @@ clientwin_action(ClientWin *cw, enum cliop action) {
 		case CLIENTOP_NO:
 			break;
 		case CLIENTOP_FOCUS:
+			printfef("(): case CLIENTOP_FOCUS:");
 			mw->client_to_focus = cw;
 			return 1;
 		case CLIENTOP_ICONIFY:

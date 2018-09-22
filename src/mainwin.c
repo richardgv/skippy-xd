@@ -88,7 +88,8 @@ mainwin_create(session_t *ps) {
 	mw->xin_screens = 0;
 #endif /* CFG_XINERAMA */
 	
-	mw->pressed = mw->focus = 0;
+	// mw->pressed = mw->focus = 0;
+	mw->pressed = mw->client_to_focus = 0;
 	mw->tooltip = 0;
 	mw->cod = 0;
 
@@ -344,6 +345,7 @@ mainwin_map(MainWin *mw) {
 		if (Success != ret)
 			printfef("(): Failed to grab keyboard (%d), troubles ahead.", ret);
 	} */
+	mw->mapped = true;
 }
 
 void
@@ -358,6 +360,7 @@ mainwin_unmap(MainWin *mw)
 	}
 	XUngrabKeyboard(mw->ps->dpy, CurrentTime);
 	XUnmapWindow(mw->ps->dpy, mw->window);
+	mw->mapped = false;
 }
 
 void

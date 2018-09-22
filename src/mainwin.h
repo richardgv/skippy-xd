@@ -71,6 +71,8 @@ struct _mainwin_t {
 	KeyCode *keycodes_ExitSelectOnPress;
 	KeyCode *keycodes_ExitSelectOnRelease;
 
+	bool mapped;
+
 #ifdef CFG_XINERAMA
 	int xin_screens;
 	XineramaScreenInfo *xin_info, *xin_active;
@@ -80,6 +82,8 @@ struct _mainwin_t {
 	Window revert_focus_win;
 	/// @brief The client window to eventually focus.
 	ClientWin *client_to_focus;
+	// int ignore_next_refocus;
+	ClientWin *cw_tooltip;
 };
 
 MainWin *mainwin_create(session_t *ps);

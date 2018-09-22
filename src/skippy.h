@@ -195,12 +195,19 @@ typedef enum {
 	CLIDISP_THUMBNAIL_ICON,
 } client_disp_mode_t;
 
+typedef enum {
+	FI_PREV = -1,
+	FI_CURR =  0,
+	FI_NEXT = +1,
+} focus_initial;
+
 /// @brief Option structure.
 typedef struct {
 	char *config_path;
 	enum progmode mode;
 	bool runAsDaemon;
 	bool synchronize;
+	int focus_initial;
 
 	int distance;
 	bool useNetWMFullscreen;
