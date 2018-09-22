@@ -437,6 +437,7 @@ mainwin_transform(MainWin *mw, float f)
 
 int
 mainwin_handle(MainWin *mw, XEvent *ev) {
+	// printfef("(): ");
 	session_t *ps = mw->ps;
 
 	switch(ev->type) {
@@ -444,13 +445,19 @@ mainwin_handle(MainWin *mw, XEvent *ev) {
 			XSetInputFocus(ps->dpy, mw->window, RevertToParent, CurrentTime);
 			break;
 		case KeyPress:
-			mw->pressed_key = true;
-			break;
 		case KeyRelease:
-			if (mw->pressed_key)
-				report_key_unbinded(ev);
-			else
-				report_key_ignored(ev);
+			// printfef("(): KeyPress or KeyRelease");
+			// if(mw->client_to_focus)
+			// {
+				// printfef("(): clientwin_handle(mw->client_to_focus, ev);");
+			if(clientwin_handle(mw->client_to_focus, ev))
+				return 1;
+
+			// }
+			// else
+			// {
+			// 	printfef("(): mw->client_to_focus == NULL");				
+			// }
 			break;
 		case ButtonPress:
 			mw->pressed_mouse = true;
