@@ -32,6 +32,8 @@ enum pipe_cmd_t {
 	PIPECMD_EXIT_RUNNING_DAEMON,
 	PIPECMD_DEACTIVATE_WINDOW_PICKER,
 	PIPECMD_TOGGLE_WINDOW_PICKER,
+	PIPECMD_QUEUE_FI_PREV,
+	PIPECMD_QUEUE_FI_NEXT,
 };
 
 session_t *ps_g = NULL;
@@ -309,6 +311,8 @@ parse_client_disp_mode(session_t *ps, const char *s) {
 
 static dlist *
 update_clients(MainWin *mw, dlist *clients, Bool *touched) {
+	// printfef("(): getting clients");
+
 	dlist *stack = dlist_first(wm_get_stack(mw->ps));
 	clients = dlist_first(clients);
 
@@ -316,6 +320,7 @@ update_clients(MainWin *mw, dlist *clients, Bool *touched) {
 		*touched = False;
 	
 	// Terminate clients that are no longer managed
+	// printfef("(): weeding dead clients");
 	for (dlist *iter = clients; iter; ) {
 		ClientWin *cw = (ClientWin *) iter->data;
 		if (dlist_find_data(stack, (void *) cw->src.window)
@@ -334,6 +339,7 @@ update_clients(MainWin *mw, dlist *clients, Bool *touched) {
 	XFlush(mw->ps->dpy);
 
 	// Add new clients
+	// printfef("(): adding new clients");
 	foreach_dlist (stack) {
 		ClientWin *cw = (ClientWin *)
 			dlist_find(clients, clientwin_cmp_func, iter->data);
@@ -354,12 +360,15 @@ update_clients(MainWin *mw, dlist *clients, Bool *touched) {
 
 static dlist *
 do_layout(MainWin *mw, dlist *clients, Window focus, Window leader) {
+
+	printfef("(): ");
 	session_t * const ps = mw->ps;
 
 	long desktop = wm_get_current_desktop(ps);
 	float factor;
 	
 	/* Update the client table, pick the ones we want and sort them */
+	// printfef("(): updating dl list of clients");
 	clients = update_clients(mw, clients, 0);
 	if (!clients) {
 		printfef("(): No client windows found.");
@@ -416,10 +425,50 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader) {
 	// Get the currently focused window and select which mini-window to focus
 	{
 		dlist *iter = dlist_find(mw->cod, clientwin_cmp_func, (void *) focus);
+
+		// check if the user specified --prev or --next on the cmdline
+		if(ps->o.focus_initial)
+		{
+
+			// ps->mainwin->ignore_next_refocus = 1;
+			// ps->mainwin->ignore_next_refocus = 2;
+			// ps->mainwin->ignore_next_refocus = 4;
+
+
+			if(ps->o.focus_initial == FI_PREV)
+			{
+				// here, mw->cod is the first (dlist*) item in the list
+				if (iter == mw->cod)
+					iter = dlist_last(mw->cod);
+				else
+				{
+					dlist *i = mw->cod;
+					for (; i != NULL; i = i->next)
+						if (i->next && i->next == iter)
+							break;
+					iter = i;
+				}
+			}
+			else if(ps->o.focus_initial == FI_NEXT)
+				iter = iter->next;
+
+		}
+
+
+		// then clear this flag, so daemon not remember on its next activation
+		ps->o.focus_initial = 0;
+
 		if (!iter)
 			iter = mw->cod;
-		mw->focus = (ClientWin *) iter->data;
-		mw->focus->focused = 1;
+
+		// mw->focus = (ClientWin *) iter->data;
+		mw->client_to_focus = (ClientWin *) iter->data;
+		// mw->focus->focused = 1;
+
+
+		mw->client_to_focus->focused = 1;
+		// focus_miniw(ps, mw->client_to_focus);
+
 	}
 
 	// Map the client windows
@@ -428,7 +477,9 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader) {
 	}
 
 	// Unfortunately it does not work...
-	focus_miniw_adv(ps, mw->focus, ps->o.movePointerOnStart);
+	// focus_miniw_adv(ps, mw->focus, ps->o.movePointerOnStart);
+	focus_miniw_adv(ps, mw->client_to_focus, ps->o.movePointerOnStart);
+	// clientwin_render(mw->client_to_focus);
 
 	return clients;
 }
@@ -536,9 +587,16 @@ ev_dump(session_t *ps, const MainWin *mw, const XEvent *ev) {
 static bool
 skippy_run_init(MainWin *mw, Window leader) {
 	session_t *ps = mw->ps;
+	// printfef("(): ");
+	// printfef("(): ");
 
 	// Do this window before main window gets mapped
 	mw->revert_focus_win = wm_get_focused(ps);
+	// printfef("(): mainwin_update(mw);");
+
+	// printfef("(): ");
+	// printfef("(): sleep(3);");
+	// sleep(3);
 
 	// Update the main window's geometry (and Xinerama info if applicable)
 	mainwin_update(mw);
@@ -547,22 +605,35 @@ skippy_run_init(MainWin *mw, Window leader) {
 		mw->xin_active = 0;
 #endif /* CFG_XINERAMA */
 
+	// printfef("(): sleep(3) part 2;");
+	// sleep(3);
+
 	// Map the main window and run our event loop
 	if (ps->o.lazyTrans) {
+		// printfef("(if (ps->o.lazyTrans) {): ");
+		// printfef("(): mainwin_map(mw);");
 		mainwin_map(mw);
 		XFlush(ps->dpy);
 	}
 
 	mw->client_to_focus = NULL;
 
+	// fputs("\n");
+	// printfef("(): mw->clients = do_layout(mw, mw->clients, mw->revert_focus_win, leader);");
 	mw->clients = do_layout(mw, mw->clients, mw->revert_focus_win, leader);
 	if (!mw->cod) {
 		printfef("(): Failed to build layout.");
 		return false;
 	}
 
+	// printfef("(): sleep(3);");
+	// sleep(3);
+
 	/* Map the main window and run our event loop */
 	if (!ps->o.lazyTrans)
+	// printfef("(): map here");
+		// printfef("(): if (!ps->o.lazyTrans)");
+		// printfef("(): mainwin_map(mw);");
 		mainwin_map(mw);
 	XFlush(ps->dpy);
 
@@ -618,9 +689,13 @@ mainloop(session_t *ps, bool activate_on_start) {
 
 		// Activation goes first, so that it won't be delayed by poll()
 		if (!mw && activate) {
+printfef("(): if (!mw && activate) {");
+
 			assert(ps->mainwin);
 			activate = false;
 			if (skippy_run_init(ps->mainwin, None)) {
+printfef("(): if (skippy_run_init(ps->mainwin, None)) {");
+printfef("(): was in skippy_run_init");
 				last_rendered = time_in_millis();
 				mw = ps->mainwin;
 				refocus = false;
@@ -652,6 +727,8 @@ mainloop(session_t *ps, bool activate_on_start) {
 			mw->cod = 0;
 
 			if (refocus && mw->revert_focus_win) {
+				// printfef("(): if (refocus && mw->revert_focus_win) {");
+				// printfef("(): wm_activate_window(ps, mw->revert_focus_win);");
 				// No idea why. Plain XSetInputFocus() no longer works after ungrabbing.
 				wm_activate_window(ps, mw->revert_focus_win);
 				refocus = false;
@@ -684,13 +761,28 @@ mainloop(session_t *ps, bool activate_on_start) {
 				const Window wid = ev_window(ps, &ev);
 
 				if (MotionNotify == ev.type) {
+
+					// the mouse has moved
+					// refocus enable
+					// mw->ignore_next_refocus = 0;
+
+					// we also need to refocus here
+					if(mw->client_to_focus != mw->cw_tooltip)
+					{
+						focus_miniw(ps, mw->cw_tooltip);
+						clientwin_render(mw->client_to_focus);
+					}
+
+
 					if (mw->tooltip && ps->o.tooltip_followsMouse)
 						tooltip_move(mw->tooltip,
 								ev.xmotion.x_root, ev.xmotion.y_root);
 				}
 				else if (ev.type == DestroyNotify || ev.type == UnmapNotify) {
+					// printfef("(): else if (ev.type == DestroyNotify || ev.type == UnmapNotify) {");
 					dlist *iter = (wid ? dlist_find(mw->clients, clientwin_cmp_func, (void *) wid): NULL);
 					if (iter) {
+						// printfef("(): if (iter) {");
 						ClientWin *cw = (ClientWin *) iter->data;
 						if (DestroyNotify != ev.type)
 							cw->mode = clientwin_get_disp_mode(ps, cw);
@@ -707,6 +799,8 @@ mainloop(session_t *ps, bool activate_on_start) {
 							}
 						}
 						else {
+							// printfef("(): else {");
+							// printfef("(): do: clientwin_render(cw);");
 							free_pixmap(ps, &cw->cpixmap);
 							free_picture(ps, &cw->origin);
 							free_damage(ps, &cw->damage);
@@ -722,7 +816,10 @@ mainloop(session_t *ps, bool activate_on_start) {
 					pending_damage = true;
 					if (iter) {
 						if (!mw->poll_time)
+						{
+							// printfef("(): if (!mw->poll_time)");
 							clientwin_repair((ClientWin *)iter->data);
+						}
 						else
 							((ClientWin *)iter->data)->damaged = true;
 					}
@@ -731,9 +828,17 @@ mainloop(session_t *ps, bool activate_on_start) {
 				else if (wid == mw->window)
 					die = mainwin_handle(mw, &ev);
 				else if (PropertyNotify == ev.type) {
+
+					// printfef("(): else if (PropertyNotify == ev.type) {");
+
 					if (!ps->o.background &&
 							(ESETROOT_PMAP_ID == ev.xproperty.atom
 							 || _XROOTPMAP_ID == ev.xproperty.atom)) {
+
+					// printfef("(): if (!ps->o.background && ...");
+					// printfef("(): mainwin_update_background(mw);");
+					// printfef("(): REDUCE(clientwin_render((ClientWin *)iter->data), mw->cod);");
+
 						mainwin_update_background(mw);
 						REDUCE(clientwin_render((ClientWin *)iter->data), mw->cod);
 					}
@@ -744,6 +849,9 @@ mainloop(session_t *ps, bool activate_on_start) {
 					for (dlist *iter = mw->cod; iter; iter = iter->next) {
 						ClientWin *cw = (ClientWin *) iter->data;
 						if (cw->mini.window == wid) {
+// printfef("(): die = clientwin_handle(cw, &ev);");
+if (!(POLLIN & r_fd[1].revents))
+							// we handle key events in here
 							die = clientwin_handle(cw, &ev);
 							break;
 						}
@@ -758,7 +866,11 @@ mainloop(session_t *ps, bool activate_on_start) {
 					pending_damage = false;
 					foreach_dlist(mw->cod) {
 						if (((ClientWin *) iter->data)->damaged)
+						{
+							// printfef("(): if (((ClientWin *) iter->data)->damaged)");
 							clientwin_repair(iter->data);
+							// fputs("\n", stdout);
+						}
 					}
 					last_rendered = now;
 				}
@@ -787,9 +899,62 @@ mainloop(session_t *ps, bool activate_on_start) {
 			else {
 				assert(1 == read_ret);
 				printfdf("(): Received pipe command: %d", piped_input);
+
+				// printfef("(): sleep(3);");
+				// sleep(3);
 				switch (piped_input) {
+					case PIPECMD_QUEUE_FI_PREV:
+						ps->o.focus_initial = FI_PREV;
+						// printfdf("(): Received focus initial: %i", ps->o.focus_initial);
+						// usleep(10000); // we must pause slightly, otherwise will miss next read() call in this loop()
+						break;
+					case PIPECMD_QUEUE_FI_NEXT:
+						ps->o.focus_initial = FI_NEXT;
+						// printfdf("(): Received focus initial: %i", ps->o.focus_initial);
+						// usleep(10000); // we must pause slightly, otherwise will miss next read() call in this loop()
+						break;
 					case PIPECMD_ACTIVATE_WINDOW_PICKER:
-						activate = true;
+						printfef("(): case PIPECMD_ACTIVATE_WINDOW_PICKER:");
+						if (ps->mainwin->mapped)
+						{
+							printfef("(): if (ps->mainwin->mapped)");
+							fflush(stdout);fflush(stderr);
+							// ps->mainwin->ignore_next_refocus = 1;
+							// ps->mainwin->ignore_next_refocus = 2;
+							// ps->mainwin->ignore_next_refocus = 4;
+
+							// There is a glitch whereby calling focus_miniw_prev() or focus_miniw_next()
+							// does not trigger an Xev to focus-out and un-highlight the focus of the
+							// 1st highlighted win, so we manually unfocus it here first, before moving on
+							// to focus and highlight the next window... it's probably because we miss the Xev
+							// since we are not in the right place in the main loop, cant unwind the call stack
+							mw->client_to_focus->focused = 0;
+							clientwin_render(mw->client_to_focus);
+
+							if (ps->o.focus_initial == FI_PREV)
+							{
+								printfef("(): focus_miniw_prev(ps, mw->client_to_focus);");
+								// focus_miniw_prev(ps, mw->focus);
+								focus_miniw_prev(ps, mw->client_to_focus);
+								// clientwin_render(mw->client_to_focus);
+							}
+
+							else if (ps->o.focus_initial == FI_NEXT)
+							{
+								printfef("(): focus_miniw_next(ps, mw->client_to_focus);");
+								// focus_miniw_next(ps, mw->focus);
+								focus_miniw_next(ps, mw->client_to_focus);
+								// clientwin_render(mw->client_to_focus);
+							}
+							clientwin_render(mw->client_to_focus);
+
+
+						}
+						else
+						{
+							printfef("(): activate = true;");
+							activate = true;
+						}
 						break;
 					case PIPECMD_DEACTIVATE_WINDOW_PICKER:
 						if (mw)
@@ -838,6 +1003,18 @@ send_command_to_daemon_via_fifo(int command, const char *pipePath) {
 	fclose(fp);
 
 	return true;
+}
+
+static inline bool
+queue_initial_focus_prev(const char *pipePath) {
+	printfdf("(): Set initial focus to previous selection...");
+	return send_command_to_daemon_via_fifo(PIPECMD_QUEUE_FI_PREV, pipePath);
+}
+
+static inline bool
+queue_initial_focus_next(const char *pipePath) {
+	printfdf("(): Set initial focus to next selection...");
+	return send_command_to_daemon_via_fifo(PIPECMD_QUEUE_FI_NEXT, pipePath);
 }
 
 static inline bool
@@ -944,6 +1121,8 @@ show_help() {
 			"  --activate-window-picker    - tells the daemon to show the window picker.\n"
 			"  --deactivate-window-picker  - tells the daemon to hide the window picker.\n"
 			"  --toggle-window-picker      - tells the daemon to toggle the window picker.\n"
+			"  --prev                      - launch initially focussed to previous selection.\n"
+			"  --next                      - launch initially focussed to next selection.\n"
 			// "  --test                      - Temporary development testing. To be removed.\n"
 			"\n"
 			"  --help                      - show this message.\n"
@@ -1093,6 +1272,8 @@ parse_args(session_t *ps, int argc, char **argv, bool first_pass) {
 		OPT_TOGGLE_PICKER,
 		OPT_DM_START,
 		OPT_DM_STOP,
+		OPT_PREV,
+		OPT_NEXT,
 	};
 	static const char * opts_short = "hS";
 	static const struct option opts_long[] = {
@@ -1103,6 +1284,8 @@ parse_args(session_t *ps, int argc, char **argv, bool first_pass) {
 		{ "toggle-window-picker",     no_argument,       NULL, OPT_TOGGLE_PICKER },
 		{ "start-daemon",             no_argument,       NULL, OPT_DM_START },
 		{ "stop-daemon",              no_argument,       NULL, OPT_DM_STOP },
+		{ "prev",                     no_argument,       NULL, OPT_PREV },
+		{ "next",                     no_argument,       NULL, OPT_NEXT },
 		// { "test",                     no_argument,       NULL, 't' },
 		{ NULL, no_argument, NULL, 0 }
 	};
@@ -1117,6 +1300,14 @@ parse_args(session_t *ps, int argc, char **argv, bool first_pass) {
 #define T_CASEBOOL(idx, option) case idx: ps->o.option = true; break
 				case OPT_CONFIG:
 					ps->o.config_path = mstrdup(optarg);
+					break;
+				case OPT_PREV:
+					ps->o.focus_initial = FI_PREV;
+					fprintf(stdout, "ps->o.focus_initial=%i\n", ps->o.focus_initial);
+					break;
+				case OPT_NEXT:
+					ps->o.focus_initial = FI_NEXT;
+					fprintf(stdout, "ps->o.focus_initial=%i\n", ps->o.focus_initial);
 					break;
 				T_CASEBOOL('S', synchronize);
 				// case 't':
@@ -1138,6 +1329,8 @@ parse_args(session_t *ps, int argc, char **argv, bool first_pass) {
 		switch (o) {
 			case 'S': break;
 			case OPT_CONFIG: break;
+			case OPT_PREV: break;
+			case OPT_NEXT: break;
 			case OPT_ACTV_PICKER:
 				ps->o.mode = PROGMODE_ACTV_PICKER;
 				break;
@@ -1166,6 +1359,7 @@ int main(int argc, char *argv[]) {
 
 	/* Set program locale */
 	setlocale (LC_ALL, "");
+	// printfef("(): chirp a");
 
 	// Initialize session structure
 	{
@@ -1174,6 +1368,7 @@ int main(int argc, char *argv[]) {
 		memcpy(ps, &SESSIONT_DEF, sizeof(session_t));
 		gettimeofday(&ps->time_start, NULL);
 	}
+	// printfef("(): chirp b");
 
 	// First pass
 	parse_args(ps, argc, argv, true);
@@ -1196,11 +1391,14 @@ int main(int argc, char *argv[]) {
 	ps->root = RootWindow(dpy, ps->screen);
 
 	wm_get_atoms(ps);
+	// printfef("(): chirp c");
 
 	// Load configuration file
 	{
+		// printfef("(): chirp d");
 		dlist *config = NULL;
 		{
+			// printfef("(): chirp e");
 			bool user_specified_config = ps->o.config_path;
 			if (!ps->o.config_path)
 				ps->o.config_path = get_cfg_path();
@@ -1208,8 +1406,13 @@ int main(int argc, char *argv[]) {
 				config = config_load(ps->o.config_path);
 			else
 				printfef("(): WARNING: No configuration file found.");
+
+			// printfef("(): chirp f");
+
 			if (!config && user_specified_config)
 				return 1;
+
+			// printfef("(): chirp g");
 		}
 
 		char *lc_numeric_old = mstrdup(setlocale(LC_NUMERIC, NULL));
@@ -1336,9 +1539,14 @@ int main(int argc, char *argv[]) {
 		free(lc_numeric_old);
 		config_free(config);
 	}
+	// printfef("(): chirp 0");
 
 	// Second pass
 	parse_args(ps, argc, argv, false);
+
+	// fprintf(stdout, "after 2nd pass:  ps->o.focus_initial =  %i\n", ps->o.focus_initial);
+	// printfef("(): chirp 1");
+
 
 	const char* pipePath = ps->o.pipePath;
 
@@ -1347,12 +1555,33 @@ int main(int argc, char *argv[]) {
 		case PROGMODE_NORMAL:
 			break;
 		case PROGMODE_ACTV_PICKER:
+			if(ps->o.focus_initial)
+			{
+				if(ps->o.focus_initial == FI_PREV)
+					queue_initial_focus_prev(pipePath);
+
+				else if(ps->o.focus_initial == FI_NEXT)
+					queue_initial_focus_next(pipePath);
+
+				// we must pause slightly, otherwise will miss next read() call in this loop()
+				usleep(1000);
+			}
 			activate_window_picker(pipePath);
 			goto main_end;
 		case PROGMODE_DEACTV_PICKER:
 			deactivate_window_picker(pipePath);
 			goto main_end;
 		case PROGMODE_TOGGLE_PICKER:
+			if(ps->o.focus_initial)
+			{
+				if(ps->o.focus_initial == FI_PREV)
+					queue_initial_focus_prev(pipePath);
+				else if(ps->o.focus_initial == FI_NEXT)
+					queue_initial_focus_next(pipePath);
+
+				// we must pause slightly, otherwise will miss next read() call in this loop()
+				usleep(1000);
+			}
 			toggle_window_picker(pipePath);
 			goto main_end;
 		case PROGMODE_DM_STOP:
@@ -1364,6 +1593,7 @@ int main(int argc, char *argv[]) {
 		/* ret = 1;
 		goto main_end; */
 	}
+	// printfef("(): chirp 2");
 
 	// Main branch
 	MainWin *mw = mainwin_create(ps);
@@ -1373,6 +1603,7 @@ int main(int argc, char *argv[]) {
 		goto main_end;
 	}
 	ps->mainwin = mw;
+	// printfef("(): chirp 3");
 
 	XSelectInput(ps->dpy, ps->root, PropertyChangeMask);
 
