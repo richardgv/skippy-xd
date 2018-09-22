@@ -470,6 +470,24 @@ wm_get_window_title(session_t *ps, Window wid, int *length_return) {
 	return (FcChar8 *) ret;
 }
 
+void
+printfefWindowName(session_t *ps, char *prefix_str, Window wid)
+{
+	int win_title_len = 0;
+	FcChar8 *win_title = wm_get_window_title(ps, wid, &win_title_len);
+
+	if (! win_title)
+		return;
+
+	if (prefix_str)
+		printfef("%s%s", prefix_str, win_title);
+
+	else
+		printfef("%s", win_title);
+
+	free(win_title);
+}
+
 Window
 wm_get_group_leader(Display *dpy, Window window)
 {

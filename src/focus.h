@@ -20,6 +20,43 @@
 #ifndef SKIPPY_FOCUS_H
 #define SKIPPY_FOCUS_H
 
+static inline void
+printfefXFocusChangeEvent(session_t *ps, XFocusChangeEvent *evf)
+{
+	printfefWindowName(ps, "(): event window = ", evf->window);
+	printfef("(): event window id = %#010lx", evf->window);
+
+	if(evf->mode == NotifyNormal)
+		printfef("(): evf->mode = NotifyNormal");
+	else if(evf->mode == NotifyGrab)
+		printfef("(): evf->mode = NotifyGrab");
+	else if(evf->mode == NotifyUngrab)
+		printfef("(): evf->mode = NotifyUngrab");
+	else if(evf->mode == NotifyWhileGrabbed)
+		printfef("(): evf->mode = NotifyWhileGrabbed");
+	else
+		printfef("(): evf->mode = %i (not recognized)", evf->mode);
+
+	if(evf->detail == NotifyAncestor)
+		printfef("(): evf->detail = NotifyAncestor");
+	else if(evf->detail == NotifyVirtual)
+		printfef("(): evf->detail = NotifyVirtual");
+	else if(evf->detail == NotifyInferior)
+		printfef("(): evf->detail = NotifyInferior");
+	else if(evf->detail == NotifyNonlinear)
+		printfef("(): evf->detail = NotifyNonlinear");
+	else if(evf->detail == NotifyNonlinearVirtual)
+		printfef("(): evf->detail = NotifyNonlinearVirtual");
+	else if(evf->detail == NotifyPointer)
+		printfef("(): evf->detail = NotifyPointer");
+	else if(evf->detail == NotifyPointerRoot)
+		printfef("(): evf->detail = NotifyPointerRoot");
+	else if(evf->detail == NotifyDetailNone)
+		printfef("(): evf->detail = NotifyDetailNone");
+	else
+		printfef("(): evf->detail = %i (not recognized)", evf->detail);
+}
+
 /**
  * @brief Focus the mini window of a client window.
  */

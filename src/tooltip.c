@@ -190,6 +190,9 @@ tooltip_map(Tooltip *tt, int mouse_x, int mouse_y,
 
 void
 tooltip_move(Tooltip *tt, int mouse_x, int mouse_y) {
+
+	// printfdf("(): x=%i y=%i",mouse_x,mouse_y);
+
 	session_t *ps = tt->mainwin->ps;
 	int x = ps->o.tooltip_offsetX, y = ps->o.tooltip_offsetY;
 	if (ps->o.tooltip_followsMouse) {
