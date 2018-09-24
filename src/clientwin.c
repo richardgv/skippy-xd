@@ -492,12 +492,13 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 	{
 		report_key(ev);
 		report_key_modifiers(evk);
-		fputs("\n", stdout);
+		fputs("\n", stdout); fflush(stdout);
 
 		bool reverse_direction = false;
 
 		if (arr_modkeymasks_includes(cw->mainwin->modifierKeyMasks_ReverseDirection, evk->state))
-			reverse_direction = true;
+			if(arr_keycodes_includes(cw->mainwin->keycodes_ReverseDirection, evk->keycode))
+				reverse_direction = true;
 
 		if (arr_keycodes_includes(cw->mainwin->keycodes_Right, evk->keycode))
 		{
@@ -517,12 +518,18 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 
 		else if (arr_keycodes_includes(cw->mainwin->keycodes_Down, evk->keycode))
 		{
-			focus_down(cw);
+			if(reverse_direction)
+				focus_up(cw);
+			else
+				focus_down(cw);
 		}
 
 		else if (arr_keycodes_includes(cw->mainwin->keycodes_Up, evk->keycode))
 		{
-			focus_up(cw);
+			if(reverse_direction)
+				focus_down(cw);
+			else
+				focus_up(cw);
 		}
 
 		else if (arr_keycodes_includes(cw->mainwin->keycodes_ExitCancelOnPress, evk->keycode))

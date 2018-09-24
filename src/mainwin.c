@@ -102,6 +102,7 @@ mainwin_create(session_t *ps) {
 	keys_str_syms(ps->o.bindings_keysExitCancelOnRelease, &mw->keysyms_ExitCancelOnRelease);
 	keys_str_syms(ps->o.bindings_keysExitSelectOnPress, &mw->keysyms_ExitSelectOnPress);
 	keys_str_syms(ps->o.bindings_keysExitSelectOnRelease, &mw->keysyms_ExitSelectOnRelease);
+	keys_str_syms(ps->o.bindings_keysReverseDirection, &mw->keysyms_ReverseDirection);
 
 	// convert the modifier key masks settings strings into arrays of enums
 	modkeymasks_str_enums(ps->o.bindings_modifierKeyMasksReverseDirection, &mw->modifierKeyMasks_ReverseDirection);
@@ -115,6 +116,7 @@ mainwin_create(session_t *ps) {
 	keysyms_arr_keycodes(dpy, mw->keysyms_ExitCancelOnRelease, &mw->keycodes_ExitCancelOnRelease);
 	keysyms_arr_keycodes(dpy, mw->keysyms_ExitSelectOnPress, &mw->keycodes_ExitSelectOnPress);
 	keysyms_arr_keycodes(dpy, mw->keysyms_ExitSelectOnRelease, &mw->keycodes_ExitSelectOnRelease);
+	keysyms_arr_keycodes(dpy, mw->keysyms_ReverseDirection, &mw->keycodes_ReverseDirection);
 
 	// we check all possible pairs, one pair at a time. This is in a specific order, to give a more helpful error msg
 	check_keybindings_conflict(ps->o.config_path, "keysUp", mw->keysyms_Up, "keysDown", mw->keysyms_Down);
@@ -406,6 +408,7 @@ mainwin_destroy(MainWin *mw) {
 	free(mw->keysyms_ExitCancelOnRelease);
 	free(mw->keysyms_ExitSelectOnPress);
 	free(mw->keysyms_ExitSelectOnRelease);
+	free(mw->keysyms_ReverseDirection);
 
 	free(mw->modifierKeyMasks_ReverseDirection);
 
@@ -417,6 +420,7 @@ mainwin_destroy(MainWin *mw) {
 	free(mw->keycodes_ExitCancelOnRelease);
 	free(mw->keycodes_ExitSelectOnPress);
 	free(mw->keycodes_ExitSelectOnRelease);
+	free(mw->keycodes_ReverseDirection);
 
 	free(mw);
 }
