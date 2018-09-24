@@ -1516,7 +1516,7 @@ int main(int argc, char *argv[]) {
 					queue_initial_focus_next(pipePath);
 
 				// we must pause slightly, otherwise will miss next read() call in this loop()
-				usleep(1000);
+				usleep(10000);
 			}
 			activate_window_picker(pipePath);
 			goto main_end;
@@ -1532,7 +1532,7 @@ int main(int argc, char *argv[]) {
 					queue_initial_focus_next(pipePath);
 
 				// we must pause slightly, otherwise will miss next read() call in this loop()
-				usleep(1000);
+				usleep(10000);
 			}
 			toggle_window_picker(pipePath);
 			goto main_end;
