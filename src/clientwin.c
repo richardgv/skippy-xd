@@ -544,11 +544,14 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 
 		report_key(ev);
 		report_key_modifiers(evk);
-		fputs("\n", stdout);
+		// fputs("\n", stdout); fflush(stdout);
 
 		if (arr_keycodes_includes(cw->mainwin->keycodes_ExitSelectOnRelease, evk->keycode))
 		{
-			mw->client_to_focus = cw;
+			// printfef("(): if (arr_keycodes_includes(cw->mainwin->keycodes_ExitSelectOnRelease, evk->keycode))");
+			// printfef("(): client_to_focus = %p", (uintptr_t)ps->mainwin->client_to_focus);
+			// mw->client_to_focus = cw;
+			// printfef("(): client_to_focus = %p", (uintptr_t)ps->mainwin->client_to_focus);
 			return 1;
 		}
 
@@ -595,9 +598,8 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 		// printfef("(): usleep(10000);");
 		// usleep(10000);
 
-		// here
-
-		if (evf->detail == NotifyWhileGrabbed)
+		// if (evf->detail == NotifyWhileGrabbed)
+		if (evf->detail == NotifyNonlinear)
 			cw->focused = true;
 
 		clientwin_render(cw);
@@ -618,7 +620,8 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 		// printfef("(): usleep(10000);");
 		// usleep(10000);
 
-		if (evf->detail == NotifyWhileGrabbed)
+		// if (evf->detail == NotifyWhileGrabbed)
+		if (evf->detail == NotifyNonlinear)
 			cw->focused = false;
 
 		clientwin_render(cw);

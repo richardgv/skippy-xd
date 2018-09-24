@@ -95,6 +95,8 @@ focus_miniw_adv(session_t *ps, ClientWin *cw, bool move_ptr) {
 	ps->mainwin->client_to_focus = cw;
 	ps->mainwin->client_to_focus->focused = 1;
 
+	// printfef("(): ");
+	// printfef("(): client_to_focus = %p", (uintptr_t)ps->mainwin->client_to_focus);
 }
 
 static inline void
