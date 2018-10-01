@@ -60,12 +60,14 @@ printfefXFocusChangeEvent(session_t *ps, XFocusChangeEvent *evf)
 static inline void
 clear_focus_all(dlist *cod)
 {
-	foreach_dlist (cod)
+	dlist *elem = dlist_first(cod);
+	while (elem)
 	{
-		ClientWin *cw = (ClientWin *)iter->data;
-		cw->focused = 0;
+		ClientWin *cw = (ClientWin *)elem->data;
+		if (cw)
+			cw->focused = 0;
+		elem = elem->next;
 	}
-
 }
 
 /**
