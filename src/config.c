@@ -128,6 +128,10 @@ config_load(const char *path)
 		fprintf(stderr, "WARNING: Couldn't load config file '%s'.\n", path);
 		return 0;
 	}
+	else
+	{
+		printfef("(): config file found. using \"%s\"", path);
+	}
 	
 	fseek(fin, 0, SEEK_END);
 	flen = ftell(fin);

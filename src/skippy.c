@@ -1201,15 +1201,16 @@ get_cfg_path(void) {
 		free(path);
 		path = NULL;
 	}
-	// Check $XDG_CONFIG_DIRS
-	if (!((dir = getenv("XDG_CONFIG_DIRS")) && strlen(dir)))
-		dir = PATH_CONFIG_SYS;
+
+	// Look in env $XDG_CONFIG_DIRS
+	if ((dir = getenv("XDG_CONFIG_DIRS")))
 	{
 		char *dir_free = mstrdup(dir);
 		char *part = strtok(dir_free, ":");
 		while (part) {
 			path = mstrjoin(part, PATH_CONFIG_SYS_SUFFIX);
-			if (fexists(path)) {
+			if (fexists(path))
+			{
 				free(dir_free);
 				goto get_cfg_path_found;
 			}
@@ -1218,6 +1219,16 @@ get_cfg_path(void) {
 			part = strtok(NULL, ":");
 		}
 		free(dir_free);
+	}
+
+	// Use the default location if env var not set
+	{
+		dir = PATH_CONFIG_SYS;
+		path = mstrjoin(dir, PATH_CONFIG_SYS_SUFFIX);
+		if (fexists(path))
+			goto get_cfg_path_found;
+		free(path);
+		path = NULL;
 	}
 
 	return NULL;
