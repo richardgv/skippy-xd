@@ -89,7 +89,7 @@ install: ${BINS} skippy-xd.sample.rc
 	install -d "${DESTDIR}${BINDIR}/" "${DESTDIR}/etc/xdg/"
 	install -m 755 ${BINS} "${DESTDIR}${BINDIR}/"
 	install -m 644 skippy-xd.sample.rc "${DESTDIR}/etc/xdg/skippy-xd.rc"
-	install -m 755 skippy-xd-toggle "${DESTDIR}${BINDIR}/"
+	install -m 755 skippy-xd-runner "${DESTDIR}${BINDIR}/"
 
 uninstall:
 	# Should configuration file be removed?

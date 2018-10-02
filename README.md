@@ -46,47 +46,41 @@ Download the original `skippy-xd.rc-default` config file and copy it to `~/.conf
 
 ### Command Line
 
-Once Skippy-XD is installed, you can run it by entering `skippy-xd` at the command line. This will start the program, activate the window picker once, then exit. However, starting the program produces a brief flicker, so its better to keep the application running in the background as a daemon and just activate it when you want to use the window picker.
-
-To run the daemon, use the following command:
+Once Skippy-XD is installed, you can run it by entering `skippy-xd` at the command line. This will start the program, activate the window picker once, then exit. However it is far better to keep the application running in the background as a daemon and just activate it when you want to use the window picker.
 
 ```sh
-skippy-xd --start-daemon
+skippy-xd --help
+skippy-xd v0.5.2~pre (2018.09.09) - "Puzzlebox" Edition
+Usage: skippy-xd [command]
+
+The available commands are:
+  --config                    - Read the specified configuration file.
+  --start-daemon              - starts the daemon running.
+  --stop-daemon               - stops the daemon running.
+  --activate-window-picker    - tells the daemon to show the window picker.
+  --deactivate-window-picker  - tells the daemon to hide the window picker.
+  --toggle-window-picker      - tells the daemon to toggle the window picker.
+  --prev                      - launch initially focussed to previous selection.
+  --next                      - launch initially focussed to next selection.
+
+  --help                      - show this message.
+  -S                          - Synchronize X operation (debugging).
+PNG support: Yes
+  Compiled with libpng 1.6.34, using 1.6.34.
+  Compiled with zlib 1.2.11, using 1.2.11.
 ```
 
-If for whatever reason you need to cleanly stop the running daemon, do this:
+### skippy-xd-runner
 
-```sh
-skippy-xd --stop-daemon
-```
+However, sometimes skippy won't activate properly. This can either be because it launches too quickly, and receives the last Return key press event, that was used to launch it by. Or because when bound to a global key binding, and when the key is being held down. Then the key repeats and skippy will be activated far too much, causing the daemon to lock up. Because it is getting many more requests than it can actually handle. Over it's simple FIFO buffer loop.
 
-Once the daemon is running you can use the following command to activate it:
+To try to address those kinds of problems, we now include the wrapper script `skippy-xd-runner`. However it is not an ideal solution and introduces new problems of it's own. Ideally we should prefer to upgrade or replace the FIFO queue (file socket) / polling of `read()`. With someting a bit less dumb.
 
-```sh
-skippy-xd --activate-window-picker
-```
-
-However, sometimes pressing the Return key to run this last command also causes the window to be selected, so it is probably more effective in testing to do this:
-
-```sh
-sleep 0.5 && skippy-xd --activate-window-picker
-```
-
-Alternatively, you can use the included toggle script, which starts the daemon, if it isn't already started, and activates the window picker:
-
-```
-skippy-xd-toggle
-```
-
-or, with the path to your configuration file:
-
-```
-skippy-xd-toggle /PATH/TO/YOUR/CONFIG
-```
+Anyhow, for the time being `skippy-xd-runner` is a useful safeguard. To prevent lockups of your window manager (or whatever your parent process) that is activating skippy. Those types of background usage / invokation of skippy are discussed in more detail in the next sections.
 
 ### Keyboard Shortcuts
 
-There are 2 types of keyboard shortcuts. Global keyboard shortcuts, and the program's own keyboard shortcuts.
+There are 2 types of keyboard shortcuts. Global keyboard shortcuts, and skippy's own keyboard shortcuts, for when the skippy window picker becomes activated.
 
 
 #### Global keyboard shortcuts
@@ -97,7 +91,7 @@ Firstly, there are global keyboard shortcuts, to be configured for invoking / la
 * Openbox: https://urukrama.wordpress.com/openbox-guide/#Key_mouse
 * Fluxbox: http://fluxbox-wiki.org/index.php/Keyboard_shortcuts#How_to_use_the_keys_file
 
-It is recommended (best way) to set `skippy-xd --start-daemon` to be run after login. By adding it to the Startup Applications of your window manager. Then you should bind `skippy-xd --toggle-window-picker`, or `skippy-xd-toggle` to your preferred global keyboard shortcut. For most people, that will be `Alt+Tab` or `Super+Tab`.
+It is recommended (best way) to set `skippy-xd --start-daemon` to be run after login. By adding it to the Startup Applications of your window manager. Then you should bind `skippy-xd-runner --toggle`, or `skippy-xd-runner --activate` to your preferred global keyboard shortcut. For most people, that will be `Alt+Tab` or `Super+Tab`.
 
 Quite a few window managers already assign `Alt+Tab` (or `Super+Tab`) to something else. Like their own built-in Alt-Tab feature. So you might also need to figure out how to un-bind those pre-existing shortcuts, before you can re-assign them to Skippy-XD instead.
 
@@ -171,21 +165,6 @@ Key strings are case sensitive. So `alt_l` will not work - it will no match anyt
 
 Be sure to separate with ` ` spaces each keybinding in a given setting. Like `keysLeft = Left b a h B A H` for example. You cannot use commas `, ; :` or other special characters in the keybindings settings in the `[bindings]` section of the skippy rc file. Otherwise it won't work.
 
-## Troubleshooting
-
-Admittedly, skippy-xd is not yet perfect. Sometimes it will just stop working, but it doesn't seem to be a crash (`ps aux | grep skippy` shows the daemon is still running).  
-To avoid this, your best option is to use the included toggle script:
-
-```
-skippy-xd-toggle
-```
-
-or, with the path to your configuration file:
-
-```
-skippy-xd-toggle /PATH/TO/YOUR/CONFIG
-```
-
 ## See Also
 
 * [Skippy-XD on Ubuntu Wiki](https://wiki.ubuntu.com/Skippy)
@@ -197,7 +176,11 @@ skippy-xd-toggle /PATH/TO/YOUR/CONFIG
 
 The last 'stable maintiner' of this software was [richardgv](https://github.com/richardgv). And that is where the vast majority of Skippy issues are raised / the bug tracker is still on his [fork over there](https://github.com/richardgv/skippy-xd/issues). However at this time, it looks like Richard really does not have time anymore to continue to maintain this software anymore (since 2015). And neither do I as a matter of fact.
 
-This project is definately in need of a new maintainer. In the meantime, best thing we can do is to just fork based off the latest / most reaonable commits. And add whatever feature(s) or bugfixes ontop of that version. A top priority (very important) is not to be super-picky about this but: make safe changes to the code. Do not do anything that is *too risky* or over-extend yourself. Definately play on the safe side. Here are 3 basic safeguard mechanisms you can use in this project:
+This project is definately in need of a new maintainer. In the meantime, best thing we can do is to just fork based off the latest / most reaonable commits. And add whatever feature(s) or bugfixes ontop of that version. A top priority (very important) is not to be super-picky about this but: make safe changes to the code. Do not do anything that is *too risky* or over-extend yourself. Definately play on the safe side. For some pointers see next section
+
+## Developer notes
+
+Here are 3 basic safeguard mechanisms you can use in this project:
 
 1) Uncomment the `--test` developer test mode. And use it as a temporary sandbox to test any new library functions that you need to add. Throw bad input at all your new funtions. Specifically try to catch errors regarding the memory management. Bad pointers, not checking for null, etc. And when such a bug is found, try to use that as a reason for justifying a further scrutinyg / enhancement of your error handling, in your new code. Spend the vast majority of your developer time just writing the parts of the code that does the error handling. I estimate that I spend something like around 75% of my time doing that, and catching errors. With the remaining 25% of my time (or even less than that) on the actual 'doing stuff' new code that not library functinos. I.e. working in the existing skippy code paths / where I was actually trying to implement the new feature. That 'felt right' (for me) in C. Particularly because C has is no garbage collection / pointer safety, etc. And a large percentage of my bugs (perhaps about half of them!) were almost completely hidden to me, unless the code was actually exercised with bad input. In order to exercise those non-critical code paths.
 
