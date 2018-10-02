@@ -7,6 +7,8 @@ Skippy-XD changelog
  =====
  - Fully customizable keybindings, and documentation for configuring them
  - Default keybindings settings made consistent with 'Alt-Tab' behaviour
+ - (Alt-Tab) New --prev and --next args for --activate and --toggle modes
+ - Replaced wrapper script skippy-xd-toggle --> skippy-xd-runner
  - Valgrind - added .valgrind.supressions file
  - Makefile - prefer clang over gcc, if clang is present on the system
  - Makefile - a slight improvment to the handling of compiler warnings
