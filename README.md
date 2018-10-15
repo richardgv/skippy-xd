@@ -87,6 +87,7 @@ There are 2 types of keyboard shortcuts. Global keyboard shortcuts, and skippy's
 
 Firstly, there are global keyboard shortcuts, to be configured for invoking / launching Skippy. How to setup a global keyboard shortcut depends entirely on your chosen window manager. So we cannot provide you with specific instructions in that regard. But here are some links for a few of them:
 
+* Budgie: https://gist.github.com/dreamcat4/bc4d6e6b6959901bf641f03b3c18462e
 * Xfce: http://wiki.xfce.org/faq#keyboard
 * Openbox: https://urukrama.wordpress.com/openbox-guide/#Key_mouse
 * Fluxbox: http://fluxbox-wiki.org/index.php/Keyboard_shortcuts#How_to_use_the_keys_file
