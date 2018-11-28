@@ -43,6 +43,10 @@ focus_miniw_dir(ClientWin *cw, match_func match, dist_func func) {
 		}
 	}
 
+	clear_focus_all(cw->mainwin->cod);
+	clientwin_render(cw);
+	XFlush(ps->dpy);
+
 	focus_miniw(ps, candidate);
 	dlist_free(candidates);
 }
