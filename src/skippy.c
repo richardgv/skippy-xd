@@ -726,15 +726,36 @@ mainloop(session_t *ps, bool activate_on_start) {
 
 		if (mw) {
 			// Process X events
+			int num_events = 0;
 			XEvent ev = { };
-			while (XEventsQueued(ps->dpy, QueuedAfterReading)) {
+			while ((num_events = XEventsQueued(ps->dpy, QueuedAfterReading)))
+			{
 				XNextEvent(ps->dpy, &ev);
+
 #ifdef DEBUG_EVENTS
 				ev_dump(ps, mw, &ev);
 #endif
-				const Window wid = ev_window(ps, &ev);
+				Window wid = ev_window(ps, &ev);
 
-				if (MotionNotify == ev.type) {
+				if (MotionNotify == ev.type)
+				{
+					// Speed up responsiveness when the user is moving the mouse around
+					// The queue gets filled up with consquetive MotionNotify events
+					// discard all except the last MotionNotify event in a contiguous block of MotionNotify events
+
+					XEvent ev_next = { };
+					while(num_events > 0)
+					{
+						XPeekEvent(ps->dpy, &ev_next);
+
+						if(ev_next.type != MotionNotify)
+							break;
+
+						XNextEvent(ps->dpy, &ev);
+						wid = ev_window(ps, &ev);
+
+						num_events--;
+					}
 
 					// the mouse has moved
 					// refocus enable
