@@ -76,6 +76,10 @@ clear_focus_all(dlist *cod)
 static inline void
 focus_miniw_adv(session_t *ps, ClientWin *cw, bool move_ptr) {
 	// printfef("(): ");
+
+	if (!cw || !ps)
+		return;
+
 	clear_focus_all(cw->mainwin->cod);
 
 	printfefWindowName(ps, "(): window = ", cw->wid_client);

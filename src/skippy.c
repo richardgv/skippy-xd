@@ -762,7 +762,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 					// mw->ignore_next_refocus = 0;
 
 					// we also need to refocus here
-					if(mw->client_to_focus != mw->cw_tooltip)
+					if(mw->cw_tooltip && (mw->cw_tooltip != mw->client_to_focus))
 					{
 						focus_miniw(ps, mw->cw_tooltip);
 						clientwin_render(mw->client_to_focus);
