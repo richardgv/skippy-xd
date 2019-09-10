@@ -1420,10 +1420,10 @@ int main(int argc, char *argv[]) {
 		ps->o.bindings_keysDown = mstrdup(config_get(config, "bindings", "keysDown", "Down s"));
 		ps->o.bindings_keysLeft = mstrdup(config_get(config, "bindings", "keysLeft", "Left b a"));
 		ps->o.bindings_keysRight = mstrdup(config_get(config, "bindings", "keysRight", "Right Tab f d"));
-		ps->o.bindings_keysExitCancelOnPress = mstrdup(config_get(config, "bindings", "keysExitOnPress", "Escape BackSpace x q"));
-		ps->o.bindings_keysExitCancelOnRelease = mstrdup(config_get(config, "bindings", "keysExitOnRelease", ""));
-		ps->o.bindings_keysExitSelectOnPress = mstrdup(config_get(config, "bindings", "keysExitOnPress", "Return space"));
-		ps->o.bindings_keysExitSelectOnRelease = mstrdup(config_get(config, "bindings", "keysExitOnRelease", "Super_L Super_R Alt_L Alt_R ISO_Level3_Shift"));
+		ps->o.bindings_keysExitCancelOnPress = mstrdup(config_get(config, "bindings", "keysExitCancelOnPress", "Escape BackSpace x q"));
+		ps->o.bindings_keysExitCancelOnRelease = mstrdup(config_get(config, "bindings", "keysExitCancelOnRelease", ""));
+		ps->o.bindings_keysExitSelectOnPress = mstrdup(config_get(config, "bindings", "keysExitSelectOnPress", "Return space"));
+		ps->o.bindings_keysExitSelectOnRelease = mstrdup(config_get(config, "bindings", "keysExitSelectOnRelease", "Super_L Super_R Alt_L Alt_R ISO_Level3_Shift"));
 		ps->o.bindings_keysReverseDirection = mstrdup(config_get(config, "bindings", "keysReverseDirection", "Tab"));
 		ps->o.bindings_modifierKeyMasksReverseDirection = mstrdup(config_get(config, "bindings", "modifierKeyMasksReverseDirection", "ShiftMask ControlMask"));
 
