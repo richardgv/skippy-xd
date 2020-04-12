@@ -163,17 +163,19 @@ tooltip_create(MainWin *mw) {
 }
 
 void
-tooltip_map(Tooltip *tt, int mini_width, int mouse_x, int mouse_y,
-		const FcChar8 *text, int len) {
+tooltip_map(Tooltip *tt, int mouse_x, int mouse_y,
+		const FcChar8 *text, int len)
+{
 	session_t * const ps = tt->mainwin->ps;
+	unsigned int max_width = tt->mainwin->width * 0.3;
 
 	XUnmapWindow(ps->dpy, tt->window);
 	
 	XftTextExtentsUtf8(ps->dpy, tt->font, text, len, &tt->extents);
 	
 	tt->width = tt->extents.width + 8;
-	if (tt->width > mini_width)
-		tt->width = mini_width;
+	if (tt->width > max_width)
+		tt->width = max_width;
 	tt->height = tt->font_height + 5 + (tt->shadow.pixel ? 2 : 0);
 	XResizeWindow(ps->dpy, tt->window, tt->width, tt->height);
 	tooltip_move(tt, mouse_x, mouse_y);
