@@ -110,7 +110,7 @@ int clientwin_validate_func(dlist *, void *);
 int clientwin_sort_func(dlist *, dlist *, void *);
 ClientWin *clientwin_create(MainWin *, Window);
 void clientwin_destroy(ClientWin *, bool destroyed);
-void clientwin_move(ClientWin *, float, int, int);
+void clientwin_move(ClientWin *, float, int, int, float);
 void clientwin_map(ClientWin *);
 void clientwin_unmap(ClientWin *);
 int clientwin_handle(ClientWin *, XEvent *);

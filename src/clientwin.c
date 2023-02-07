@@ -395,12 +395,12 @@ clientwin_schedule_repair(ClientWin *cw, XRectangle *area)
 }
 
 void
-clientwin_move(ClientWin *cw, float f, int x, int y)
+clientwin_move(ClientWin *cw, float f, int x, int y, float timeslice)
 {
 	/* int border = MAX(1, (double)DISTANCE(cw->mainwin) * f * 0.25); */
 	int border = 0;
 	XSetWindowBorderWidth(cw->mainwin->ps->dpy, cw->mini.window, border);
-	
+
 	cw->factor = f;
 	cw->mini.x = x + (int)cw->x * f;
 	cw->mini.y = y + (int)cw->y * f;
@@ -409,8 +409,19 @@ clientwin_move(ClientWin *cw, float f, int x, int y)
 		cw->mini.x += cw->mainwin->x;
 		cw->mini.y += cw->mainwin->y;
 	}
-	cw->mini.width = MAX(1, cw->src.width * f);
-	cw->mini.height = MAX(1, cw->src.height * f);
+
+	{
+		// animate window by changing these in time linearly:
+		// here, cw->mini has destination coordinates, cw->src has original coordinates
+
+		cw->mini.x = cw->src.x + (cw->mini.x - cw->src.x) * timeslice;
+		cw->mini.y = cw->src.y + (cw->mini.y - cw->src.y) * timeslice;
+
+		float ff = 1.0/f + timeslice * (1 - 1.0/f);
+		cw->mini.width = MAX(1, cw->src.width * f) * ff;
+		cw->mini.height = MAX(1, cw->src.height * f) * ff;
+	}
+
 	XMoveResizeWindow(cw->mainwin->ps->dpy, cw->mini.window, cw->mini.x - border, cw->mini.y - border, cw->mini.width, cw->mini.height);
 	
 	if(cw->pixmap)

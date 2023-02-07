@@ -3,7 +3,7 @@ BINDIR ?= ${PREFIX}/bin
 
 CC ?= gcc
 
-SRCS_RAW = skippy wm dlist mainwin clientwin layout focus config tooltip img img-xlib
+SRCS_RAW = skippy wm dlist mainwin clientwin layout focus config tooltip img img-xlib anime
 PACKAGES = x11 xft xrender xcomposite xdamage xfixes
 
 # === Options ===

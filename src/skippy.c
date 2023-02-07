@@ -18,6 +18,7 @@
  */
 
 #include "skippy.h"
+#include "anime.h"
 #include <errno.h>
 #include <locale.h>
 #include <getopt.h>
@@ -390,7 +391,7 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader) {
 		return clients;
 	
 	dlist_sort(mw->cod, clientwin_sort_func, 0);
-	
+
 	/* Move the mini windows around */
 	{
 		unsigned int width = 0, height = 0;
@@ -405,7 +406,7 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader) {
 		int yoff = (mw->height - (float) height * factor) / 2;
 		mainwin_transform(mw, factor);
 		foreach_dlist (mw->cod) {
-			clientwin_move((ClientWin *) iter->data, factor, xoff, yoff);
+			clientwin_move((ClientWin *) iter->data, factor, xoff, yoff, 1);
 		}
 	}
 
@@ -420,11 +421,6 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader) {
 			iter = mw->cod;
 		mw->focus = (ClientWin *) iter->data;
 		mw->focus->focused = 1;
-	}
-
-	// Map the client windows
-	foreach_dlist (mw->cod) {
-		clientwin_map((ClientWin*)iter->data);
 	}
 
 	// Unfortunately it does not work...
@@ -508,8 +504,8 @@ ev_window(session_t *ps, const XEvent *ev) {
 		case SelectionNotify: return ev->xselection.requestor;
 	}
 #undef T_SETWID
-    if (ps->xinfo.damage_ev_base + XDamageNotify == ev->type)
-      return ((XDamageNotifyEvent *) ev)->drawable;
+	if (ps->xinfo.damage_ev_base + XDamageNotify == ev->type)
+	  return ((XDamageNotifyEvent *) ev)->drawable;
 
 	printf("(): Failed to find window for event type %d. Troubles ahead.",
 			ev->type);
@@ -599,6 +595,9 @@ mainloop(session_t *ps, bool activate_on_start) {
 	bool refocus = false;
 	bool pending_damage = false;
 	long last_rendered = 0L;
+	bool animating = true;
+	long first_animated = 0L;
+	long last_animated = 0L;
 
 	struct pollfd r_fd[2] = {
 		{
@@ -620,11 +619,17 @@ mainloop(session_t *ps, bool activate_on_start) {
 		if (!mw && activate) {
 			assert(ps->mainwin);
 			activate = false;
+
 			if (skippy_run_init(ps->mainwin, None)) {
 				last_rendered = time_in_millis();
 				mw = ps->mainwin;
 				refocus = false;
 				pending_damage = false;
+			}
+
+			first_animated = time_in_millis();
+			if (ps->o.animationDuration <= 0) {
+				ps->o.animationDuration = 1;
 			}
 		}
 		if (mw)
@@ -667,6 +672,23 @@ mainloop(session_t *ps, bool activate_on_start) {
 			die = false;
 		if (activate_on_start && !mw)
 			return;
+
+		// animation!
+		if (animating) {
+			if(time_in_millis() - last_animated > mw->poll_time) {
+				last_animated = time_in_millis();
+				long timeslice = time_in_millis() - first_animated;
+				anime(ps->mainwin, ps->mainwin->clients,
+						((float)timeslice)/(float)ps->o.animationDuration);
+				if ( timeslice >= ps->o.animationDuration) {
+					XSync(ps->dpy, False);
+					animating = false;
+					last_rendered = time_in_millis();
+				}
+
+			}
+			continue; // while animating, do not allow user actions
+		}
 
 		// Poll for events
 		int timeout = (pending_damage && mw && mw->poll_time > 0 ?
@@ -1216,6 +1238,7 @@ int main(int argc, char *argv[]) {
 		config_get_bool_wrap(config, "general", "acceptOvRedir", &ps->o.acceptOvRedir);
 		config_get_bool_wrap(config, "general", "acceptWMWin", &ps->o.acceptWMWin);
 		config_get_double_wrap(config, "general", "updateFreq", &ps->o.updateFreq, -1000.0, 1000.0);
+		config_get_int_wrap(config, "general", "animationDuration", &ps->o.animationDuration, 0, 2000);
 		config_get_bool_wrap(config, "general", "lazyTrans", &ps->o.lazyTrans);
 		config_get_bool_wrap(config, "general", "useNameWindowPixmap", &ps->o.useNameWindowPixmap);
 		config_get_bool_wrap(config, "general", "forceNameWindowPixmap", &ps->o.forceNameWindowPixmap);

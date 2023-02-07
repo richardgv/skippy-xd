@@ -41,7 +41,8 @@
 distance = 50
 useNetWMFullscreen = true
 ignoreSkipTaskbar = true
-updateFreq = 10.0
+updateFreq = 60.0
+animationDuration = 200
 lazyTrans = false
 pipePath = /tmp/skippy-xd-fifo
 movePointerOnStart = true
