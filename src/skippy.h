@@ -215,6 +215,7 @@ typedef struct {
 	bool acceptOvRedir;
 	bool acceptWMWin;
 	double updateFreq;
+	int animationDuration;;
 	bool lazyTrans;
 	bool useNameWindowPixmap;
 	bool forceNameWindowPixmap;
@@ -283,7 +284,8 @@ typedef struct {
 	.ignoreSkipTaskbar = false, \
 	.acceptOvRedir = false, \
 	.acceptWMWin = false, \
-	.updateFreq = 10.0, \
+	.updateFreq = 60.0, \
+	.animationDuration = 200, \
 	.lazyTrans = false, \
 	.useNameWindowPixmap = false, \
 	.forceNameWindowPixmap = false, \

@@ -9,7 +9,7 @@ endif
 
 CPPFLAGS += -std=c99 -Wall -I/usr/include/freetype2
 
-SRCS_RAW = skippy wm dlist mainwin clientwin layout focus config tooltip img img-xlib
+SRCS_RAW = skippy wm dlist mainwin clientwin layout focus config tooltip img img-xlib anime
 PACKAGES = x11 xft xrender xcomposite xdamage xfixes
 
 # === Options ===
