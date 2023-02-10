@@ -22,6 +22,9 @@
 dlist *
 dlist_last(dlist *l)
 {
+	if (! l)
+		return NULL;
+
 	while(l && l->next)
 		l = l->next;
 	return l;
@@ -65,12 +68,204 @@ dlist_prepend(dlist *l, void *d)
 }
 
 dlist *
+dlist_insert_before(dlist *elem, dlist *new_elem)
+{
+	if (!elem)
+		return NULL;
+
+	dlist *first_elem = dlist_first(elem);
+
+	if (!new_elem)
+		return first_elem;
+
+	dlist *prev = elem->prev;
+	if (prev)
+	{
+		prev->next = new_elem;
+		new_elem->prev = prev;
+	}
+	else
+	{
+		new_elem->prev = 0;
+		first_elem = new_elem;
+	}
+	new_elem->next = elem;
+	elem->prev = new_elem;
+
+	return first_elem;
+}
+
+dlist *
+dlist_insert_after(dlist *elem, dlist *new_elem)
+{
+	if (!elem)
+		return NULL;
+
+	dlist *first_elem = dlist_first(elem);
+
+	if (!new_elem)
+		return first_elem;
+
+	dlist *next = elem->next;
+	if (next)
+	{
+		next->prev = new_elem;
+		new_elem->next = next;
+	}
+	else
+	{
+		new_elem->next = 0;
+	}
+	new_elem->prev = elem;
+	elem->next = new_elem;
+
+	return first_elem;
+}
+
+dlist *
+dlist_insert_nth(dlist *l, dlist *new_elem, unsigned int n)
+{
+	if (!l)
+		return NULL;
+
+	if (!new_elem)
+		return l;
+
+	dlist *first_elem = dlist_first(l);
+	dlist *nth = dlist_nth(l, n);
+
+	if (nth)
+	{
+		first_elem = dlist_insert_before(nth, new_elem);
+	}
+	else
+	{
+		// there is no nth element
+		printfef("(%p,%p,%i): list has fewer than %i elements. appending as the last element.", l, new_elem, n, n);
+		first_elem = dlist_insert_after( dlist_last(l), new_elem);
+	}
+
+	return first_elem;
+}
+
+dlist *
+dlist_cycle_prev(dlist *l)
+{
+	if (! l)
+		return NULL;
+
+	dlist *first_elem = dlist_first(l);
+	dlist *last_elem = dlist_last(l);
+	dlist *prev = last_elem->prev;
+
+	if (dlist_len(first_elem) == 1)
+		return first_elem;
+
+	if (prev)
+		prev->next = NULL;
+
+	first_elem->prev = last_elem;
+	last_elem->prev = NULL;
+	last_elem->next = first_elem;
+
+	first_elem = last_elem;
+	return first_elem;
+}
+
+dlist *
+dlist_cycle_next(dlist *l)
+{
+	if (! l)
+		return NULL;
+
+	dlist *first_elem = dlist_first(l);
+	dlist *last_elem = dlist_last(l);
+	dlist *next = first_elem->next;
+
+	if (dlist_len(first_elem) == 1)
+		return first_elem;
+
+	if (next)
+		next->prev = NULL;
+
+	last_elem->next = first_elem;
+	first_elem->prev = last_elem;
+	first_elem->next = NULL;
+
+	first_elem = next;
+	return first_elem;
+}
+
+dlist *
+dlist_cycle(dlist *l, int n)
+{
+	if (! l)
+		return NULL;
+
+	dlist *first_elem = dlist_first(l);
+
+	if (n < 0)
+	{
+		while (n != 0)
+		{
+			first_elem = dlist_cycle_prev(first_elem);
+			n++;
+		}
+	}
+
+	if (n > 0)
+	{
+		while (n != 0)
+		{
+			first_elem = dlist_cycle_next(first_elem);
+			n--;
+		}
+	}
+	return first_elem;
+}
+
+dlist *
+dlist_extract(dlist *elem)
+{
+	if (! elem)
+		return NULL;
+
+	dlist *first_elem = dlist_first(elem);
+
+	dlist *prev = elem->prev;
+	dlist *next = elem->next;
+
+	if (prev)
+	{
+		if (next)
+		{
+			prev->next = next;
+			next->prev = prev;
+		}
+		else
+		{
+			prev->next = NULL;
+		}
+	}
+	else if (next)
+	{
+		next->prev = NULL;
+		first_elem = next;
+	}
+
+	elem->prev = NULL;
+	elem->next = NULL;
+
+	return first_elem;
+}
+
+dlist *
 dlist_remove(dlist *l)
 {
 	dlist *n = 0;
 	
-	if(! l)
-		return 0;
+	if (! l)
+		return NULL;
 	
 	if(l->prev) {
 		n = l->prev;
@@ -107,6 +302,9 @@ dlist_remove_nth_free_data(dlist *l, unsigned int n)
 int
 dlist_same(dlist *l1, dlist *l2)
 {
+	if (! l2)
+		return 0;
+
 	l1 = dlist_first(l1);
 	while(l1) {
 		if(l1 == l2)
@@ -119,6 +317,9 @@ dlist_same(dlist *l1, dlist *l2)
 void
 dlist_reverse(dlist *l)
 {
+	if (! l)
+		return;
+
 	dlist *iter1 = dlist_first(l),
 		*iter2 = dlist_last(l);
 	
@@ -134,6 +335,9 @@ dlist_reverse(dlist *l)
 dlist *
 dlist_free(dlist *l)
 {
+	if (! l)
+		return NULL;
+
 	l = dlist_first(l);
 	
 	while(l) {
@@ -142,13 +346,16 @@ dlist_free(dlist *l)
 		free(c);
 	}
 	
-	return 0;
+	return NULL;
 }
 
 dlist *
 dlist_dup(dlist *l)
 {
-	dlist *n = 0;
+	if (! l)
+		return NULL;
+
+	dlist *n = NULL;
 	l = dlist_first(l);
 	
 	while(l) {
@@ -160,21 +367,87 @@ dlist_dup(dlist *l)
 }
 
 dlist *
+dlist_split_nth(dlist *l, unsigned int n)
+{
+	dlist *first_elem = dlist_first(l);
+	dlist *dlist_n = dlist_nth(first_elem, n);
+
+	if (! dlist_n)
+		return NULL;
+
+	dlist *prev = dlist_n->prev;
+	if (prev)
+	{
+		prev->next = NULL;
+		dlist_n->prev = NULL;
+	}
+
+	return dlist_n;
+}
+
+dlist *
 dlist_join(dlist *l, dlist *l2) {
 	if (!l) return l2;
 	if (!l2) return l;
+	if (l == l2) return NULL;
 
+	dlist *first = dlist_first(l);
 	dlist *last = dlist_last(l);
 	dlist *first2 = dlist_first(l2);
+
+
+	// check that no elements are the same
+	l = first; l2 = first2;
+	while (l)
+	{
+		while (l2)
+		{
+			if (l == l2)
+				return NULL;
+
+			l2 = l2->next;
+		}
+		l = l->next;
+	}
+
 	last->next = first2;
 	first2->prev = last;
+	return first;
+}
 
-	return l;
+int
+dlist_index_of(dlist *l, dlist *elem)
+{
+	if (! l)
+		return -1;
+
+	if (! elem)
+		return -1;
+
+	int n = 0;
+	dlist *nth_elem = dlist_first(l);
+
+	while ((nth_elem) && (nth_elem != elem))
+	{
+		nth_elem = nth_elem->next;
+		n++;
+	}
+
+	if (!nth_elem)
+		return -1;
+
+	return n;
 }
 
 dlist *
 dlist_find_all(dlist *l, dlist_match_func match, void *data)
 {
+	if (! l)
+		return NULL;
+
+	if (! data)
+		return NULL;
+
 	dlist *n = 0;
 	l = dlist_first(l);
 	
@@ -190,6 +463,12 @@ dlist_find_all(dlist *l, dlist_match_func match, void *data)
 dlist *
 dlist_find(dlist *l, dlist_match_func func, void *data)
 {
+	if (! l)
+		return NULL;
+
+	if (! data)
+		return NULL;
+
 	for(l = dlist_first(l); l; l = l->next)
 		if(func(l, data))
 			break;
@@ -231,7 +510,7 @@ dlist_free_with_data(dlist *l)
 		free(c);
 	}
 	
-	return 0;
+	return NULL;
 }
 
 dlist *
@@ -247,7 +526,7 @@ dlist_free_with_func(dlist *l, dlist_free_func func)
 		free(c);
 	}
 	
-	return 0;
+	return NULL;
 }
 
 unsigned int
@@ -280,6 +559,12 @@ dlist_nth(dlist *l, unsigned int n)
 void
 dlist_swap(dlist *l1, dlist *l2)
 {
+	if (! l1)
+		return;
+
+	if (! l2)
+		return;
+
 	void *tmp = l1->data;
 	l1->data = l2->data;
 	l2->data = tmp;

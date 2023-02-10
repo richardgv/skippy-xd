@@ -344,6 +344,12 @@ clientwin_repaint(ClientWin *cw, const XRectangle *pbound) {
 
 	// Tinting
 	{
+		// here the client window is being tinted
+		// if (cw->focused)
+		// 	printfef("(): *tint = &cw->mainwin->highlightTint");
+		// else
+		// 	printfef("(): *tint = &cw->mainwin->normalTint");
+
 		XRenderColor *tint = (cw->focused ? &cw->mainwin->highlightTint
 				: &cw->mainwin->normalTint);
 		if (tint->alpha)
@@ -483,10 +489,104 @@ childwin_focus(ClientWin *cw) {
 
 int
 clientwin_handle(ClientWin *cw, XEvent *ev) {
+	// printfef("(): ");
+
+	if (! cw)
+		return 1;
+
 	MainWin *mw = cw->mainwin;
 	session_t *ps = mw->ps;
+	XKeyEvent * const evk = &ev->xkey;
 
-	if (ev->type == ButtonRelease) {
+
+	if (ev->type == KeyPress)
+	{
+		report_key(ev);
+		report_key_modifiers(evk);
+		fputs("\n", stdout); fflush(stdout);
+
+		bool reverse_direction = false;
+
+		if (arr_modkeymasks_includes(cw->mainwin->modifierKeyMasks_ReverseDirection, evk->state))
+			if(arr_keycodes_includes(cw->mainwin->keycodes_ReverseDirection, evk->keycode))
+				reverse_direction = true;
+
+		if (arr_keycodes_includes(cw->mainwin->keycodes_Right, evk->keycode))
+		{
+			if(reverse_direction)
+				focus_miniw_prev(ps, cw);
+			else
+				focus_miniw_next(ps, cw);
+		}
+
+		else if (arr_keycodes_includes(cw->mainwin->keycodes_Left, evk->keycode))
+		{
+			if(reverse_direction)
+				focus_miniw_next(ps, cw);
+			else
+				focus_miniw_prev(ps, cw);
+		}
+
+		else if (arr_keycodes_includes(cw->mainwin->keycodes_Down, evk->keycode))
+		{
+			if(reverse_direction)
+				focus_up(cw);
+			else
+				focus_down(cw);
+		}
+
+		else if (arr_keycodes_includes(cw->mainwin->keycodes_Up, evk->keycode))
+		{
+			if(reverse_direction)
+				focus_down(cw);
+			else
+				focus_up(cw);
+		}
+
+		else if (arr_keycodes_includes(cw->mainwin->keycodes_ExitCancelOnPress, evk->keycode))
+		{
+			printfef("(): Quitting.");
+			mw->client_to_focus = NULL;
+			return 1;
+		}
+
+		else if (arr_keycodes_includes(cw->mainwin->keycodes_ExitSelectOnPress, evk->keycode))
+		{
+			mw->client_to_focus = cw;
+			return 1;
+		}
+	}
+	else if (ev->type == KeyRelease)
+	{
+		// report_key(ev);
+
+		report_key(ev);
+		report_key_modifiers(evk);
+		// fputs("\n", stdout); fflush(stdout);
+
+		if (arr_keycodes_includes(cw->mainwin->keycodes_ExitSelectOnRelease, evk->keycode))
+		{
+			// printfef("(): if (arr_keycodes_includes(cw->mainwin->keycodes_ExitSelectOnRelease, evk->keycode))");
+			// printfef("(): client_to_focus = %p", (uintptr_t)ps->mainwin->client_to_focus);
+			// mw->client_to_focus = cw;
+			// printfef("(): client_to_focus = %p", (uintptr_t)ps->mainwin->client_to_focus);
+			return 1;
+		}
+
+		else if (arr_keycodes_includes(cw->mainwin->keycodes_ExitCancelOnRelease, evk->keycode))
+		{
+			printfef("(): Quitting.");
+			return 1;
+		}
+	}
+
+	else if (ev->type == ButtonPress) {
+		cw->mainwin->pressed_mouse = true;
+		/* if (ev->xbutton.button == 1)
+			cw->mainwin->pressed = cw; */
+	}
+	else if (ev->type == ButtonRelease) {
+		// printfef("(): else if (ev->type == ButtonRelease) {");
 		const unsigned button = ev->xbutton.button;
 		if (cw->mainwin->pressed_mouse) {
 			if (button < MAX_MOUSE_BUTTONS) {
@@ -500,66 +600,56 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 		}
 		else
 			printfef("(): ButtonRelease %u ignored.", button);
-	} else if (ev->type == KeyRelease) {
-		XKeyEvent * const evk = &ev->xkey;
-		if (cw->mainwin->pressed_key) {
-			const keydef_t KEY_NEXT = {
-				.key = XKeysymToKeycode(ps->dpy, XK_Tab),
-				.mod = KEYMOD_CTRL,
-			};
-			const keydef_t KEY_PREV = {
-				.key = XKeysymToKeycode(ps->dpy, XK_Tab),
-				.mod = KEYMOD_CTRL | KEYMOD_SHIFT,
-			};
+	}
 
-			if (evk->keycode == cw->mainwin->key_up ||
-					evk->keycode == cw->mainwin->key_k)
-				focus_up(cw);
-			else if (evk->keycode == cw->mainwin->key_down ||
-					evk->keycode == cw->mainwin->key_j)
-				focus_down(cw);
-			else if (evk->keycode == cw->mainwin->key_left ||
-					evk->keycode == cw->mainwin->key_h)
-				focus_left(cw);
-			else if (evk->keycode == cw->mainwin->key_right ||
-					evk->keycode == cw->mainwin->key_l)
-				focus_right(cw);
-			else if (evk->keycode == cw->mainwin->key_enter
-					|| evk->keycode == cw->mainwin->key_space) {
-				mw->client_to_focus = cw;
-				return 1;
-			}
-			else if (ev_iskey(evk, &KEY_NEXT)) {
-				focus_miniw_next(ps, cw);
-			}
-			else if (ev_iskey(evk, &KEY_PREV)) {
-				focus_miniw_prev(ps, cw);
-			}
-			else
-				report_key_unbinded(ev);
-		}
-		else
-			report_key_ignored(ev);
-	}
-	else if (ev->type == ButtonPress) {
-		cw->mainwin->pressed_mouse = true;
-		/* if (ev->xbutton.button == 1)
-			cw->mainwin->pressed = cw; */
-	}
-	else if (KeyPress == ev->type) {
-		cw->mainwin->pressed_key = true;
-	}
 	else if (ev->type == FocusIn) {
-		cw->focused = true;
+		printfef("(): else if (ev->type == FocusIn) {");
+		XFocusChangeEvent *evf = &ev->xfocus;
+
+		// for debugging XEvents
+		// see: https://tronche.com/gui/x/xlib/events/input-focus/normal-and-grabbed.html
+		printfef("(): main window id = %#010lx", cw->mainwin->window);
+		printfefWindowName(ps, "(): client window = ", cw->mainwin->window);
+		printfef("(): client window id = %#010lx", cw->wid_client);
+		printfefXFocusChangeEvent(ps, evf);
+
+		// printfef("(): usleep(10000);");
+		// usleep(10000);
+
+		// if (evf->detail == NotifyWhileGrabbed)
+		if (evf->detail == NotifyNonlinear)
+			cw->focused = true;
+
 		clientwin_render(cw);
+		fputs("\n", stdout);
 		XFlush(ps->dpy);
+
 	} else if (ev->type == FocusOut) {
-		cw->focused = false;
+		printfef("(): else if (ev->type == FocusOut) {");
+		XFocusChangeEvent *evf = &ev->xfocus;
+
+		// for debugging XEvents
+		// see: https://tronche.com/gui/x/xlib/events/input-focus/normal-and-grabbed.html
+		printfef("(): main window id = %#010lx", cw->mainwin->window);
+		printfefWindowName(ps, "(): client window = ", cw->mainwin->window);
+		printfef("(): client window id = %#010lx", cw->wid_client);
+		printfefXFocusChangeEvent(ps, evf);
+
+		// printfef("(): usleep(10000);");
+		// usleep(10000);
+
+		// if (evf->detail == NotifyWhileGrabbed)
+		if (evf->detail == NotifyNonlinear)
+			cw->focused = false;
+
 		clientwin_render(cw);
+		fputs("\n", stdout);
 		XFlush(ps->dpy);
+
 	} else if(ev->type == EnterNotify) {
 		XSetInputFocus(ps->dpy, cw->mini.window, RevertToParent, CurrentTime);
 		if (cw->mainwin->tooltip) {
+			cw->mainwin->cw_tooltip = cw;
 			int win_title_len = 0;
 			FcChar8 *win_title = wm_get_window_title(ps, cw->wid_client, &win_title_len);
 			if (win_title) {
@@ -571,6 +661,7 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 		}
 	} else if(ev->type == LeaveNotify) {
 		// XSetInputFocus(ps->dpy, mw->window, RevertToParent, CurrentTime);
+		cw->mainwin->cw_tooltip = NULL;
 		if(cw->mainwin->tooltip)
 			tooltip_unmap(cw->mainwin->tooltip);
 	}
@@ -587,6 +678,7 @@ clientwin_action(ClientWin *cw, enum cliop action) {
 		case CLIENTOP_NO:
 			break;
 		case CLIENTOP_FOCUS:
+			printfef("(): case CLIENTOP_FOCUS:");
 			mw->client_to_focus = cw;
 			return 1;
 		case CLIENTOP_ICONIFY:

@@ -164,13 +164,26 @@ tooltip_create(MainWin *mw) {
 
 void
 tooltip_map(Tooltip *tt, int mouse_x, int mouse_y,
-		const FcChar8 *text, int len) {
+		FcChar8 *text, int len)
+{
 	session_t * const ps = tt->mainwin->ps;
+	unsigned int max_width = tt->mainwin->width * 0.3;
+	FcChar8 *ptr;
 
 	XUnmapWindow(ps->dpy, tt->window);
 	
 	XftTextExtentsUtf8(ps->dpy, tt->font, text, len, &tt->extents);
 	
+	while (tt->extents.width > max_width) {
+		ptr = text + len - 1;
+		*ptr-- = '\0';
+		*ptr-- = '.';
+		*ptr-- = '.';
+		*ptr-- = '.';
+		len--;
+		XftTextExtentsUtf8(ps->dpy, tt->font, text, len, &tt->extents);
+	}
+
 	tt->width = tt->extents.width + 8;
 	tt->height = tt->font_height + 5 + (tt->shadow.pixel ? 2 : 0);
 	XResizeWindow(ps->dpy, tt->window, tt->width, tt->height);
@@ -190,6 +203,9 @@ tooltip_map(Tooltip *tt, int mouse_x, int mouse_y,
 
 void
 tooltip_move(Tooltip *tt, int mouse_x, int mouse_y) {
+
+	// printfdf("(): x=%i y=%i",mouse_x,mouse_y);
+
 	session_t *ps = tt->mainwin->ps;
 	int x = ps->o.tooltip_offsetX, y = ps->o.tooltip_offsetY;
 	if (ps->o.tooltip_followsMouse) {

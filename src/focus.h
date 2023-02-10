@@ -20,18 +20,92 @@
 #ifndef SKIPPY_FOCUS_H
 #define SKIPPY_FOCUS_H
 
+static inline void
+printfefXFocusChangeEvent(session_t *ps, XFocusChangeEvent *evf)
+{
+	printfefWindowName(ps, "(): event window = ", evf->window);
+	printfef("(): event window id = %#010lx", evf->window);
+
+	if(evf->mode == NotifyNormal)
+		printfef("(): evf->mode = NotifyNormal");
+	else if(evf->mode == NotifyGrab)
+		printfef("(): evf->mode = NotifyGrab");
+	else if(evf->mode == NotifyUngrab)
+		printfef("(): evf->mode = NotifyUngrab");
+	else if(evf->mode == NotifyWhileGrabbed)
+		printfef("(): evf->mode = NotifyWhileGrabbed");
+	else
+		printfef("(): evf->mode = %i (not recognized)", evf->mode);
+
+	if(evf->detail == NotifyAncestor)
+		printfef("(): evf->detail = NotifyAncestor");
+	else if(evf->detail == NotifyVirtual)
+		printfef("(): evf->detail = NotifyVirtual");
+	else if(evf->detail == NotifyInferior)
+		printfef("(): evf->detail = NotifyInferior");
+	else if(evf->detail == NotifyNonlinear)
+		printfef("(): evf->detail = NotifyNonlinear");
+	else if(evf->detail == NotifyNonlinearVirtual)
+		printfef("(): evf->detail = NotifyNonlinearVirtual");
+	else if(evf->detail == NotifyPointer)
+		printfef("(): evf->detail = NotifyPointer");
+	else if(evf->detail == NotifyPointerRoot)
+		printfef("(): evf->detail = NotifyPointerRoot");
+	else if(evf->detail == NotifyDetailNone)
+		printfef("(): evf->detail = NotifyDetailNone");
+	else
+		printfef("(): evf->detail = %i (not recognized)", evf->detail);
+}
+
+static inline void
+clear_focus_all(dlist *cod)
+{
+	dlist *elem = dlist_first(cod);
+	while (elem)
+	{
+		ClientWin *cw = (ClientWin *)elem->data;
+		if (cw)
+			cw->focused = 0;
+		elem = elem->next;
+	}
+}
+
 /**
  * @brief Focus the mini window of a client window.
  */
 static inline void
 focus_miniw_adv(session_t *ps, ClientWin *cw, bool move_ptr) {
-	if (unlikely(!cw))
+	// printfef("(): ");
+
+	if (!cw || !ps)
 		return;
+
+	clear_focus_all(cw->mainwin->cod);
+
+	printfefWindowName(ps, "(): window = ", cw->wid_client);
+
+	if (unlikely(!cw))
+	{
+		// printfef("(): if (unlikely(!cw))");
+		return;
+	}
 	assert(cw->mini.window);
+
+	clientwin_render(cw);
+
 	if (move_ptr)
+	{
+		// printfef("(): if (move_ptr)");
 		XWarpPointer(ps->dpy, None, cw->mini.window, 0, 0, 0, 0, cw->mini.width / 2, cw->mini.height / 2);
+	}
 	XSetInputFocus(ps->dpy, cw->mini.window, RevertToParent, CurrentTime);
 	XFlush(ps->dpy);
+
+	ps->mainwin->client_to_focus = cw;
+	ps->mainwin->client_to_focus->focused = 1;
+
+	// printfef("(): ");
+	// printfef("(): client_to_focus = %p", (uintptr_t)ps->mainwin->client_to_focus);
 }
 
 static inline void

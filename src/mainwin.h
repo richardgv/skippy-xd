@@ -51,10 +51,30 @@ struct _mainwin_t {
 	dlist *cod;
 	struct _Tooltip *tooltip;
 	
-	KeyCode key_act, key_up, key_down, key_left, key_right,
-		key_h, key_j, key_k, key_l,
-		key_enter, key_space, key_q, key_escape;
-	
+	KeySym *keysyms_Up;
+	KeySym *keysyms_Down;
+	KeySym *keysyms_Left;
+	KeySym *keysyms_Right;
+	KeySym *keysyms_ExitCancelOnPress;
+	KeySym *keysyms_ExitCancelOnRelease;
+	KeySym *keysyms_ExitSelectOnPress;
+	KeySym *keysyms_ExitSelectOnRelease;
+	KeySym *keysyms_ReverseDirection;
+
+	int *modifierKeyMasks_ReverseDirection;
+
+	KeyCode *keycodes_Up;
+	KeyCode *keycodes_Down;
+	KeyCode *keycodes_Left;
+	KeyCode *keycodes_Right;
+	KeyCode *keycodes_ExitCancelOnPress;
+	KeyCode *keycodes_ExitCancelOnRelease;
+	KeyCode *keycodes_ExitSelectOnPress;
+	KeyCode *keycodes_ExitSelectOnRelease;
+	KeyCode *keycodes_ReverseDirection;
+
+	bool mapped;
+
 #ifdef CFG_XINERAMA
 	int xin_screens;
 	XineramaScreenInfo *xin_info, *xin_active;
@@ -64,6 +84,8 @@ struct _mainwin_t {
 	Window revert_focus_win;
 	/// @brief The client window to eventually focus.
 	ClientWin *client_to_focus;
+	// int ignore_next_refocus;
+	ClientWin *cw_tooltip;
 };
 
 MainWin *mainwin_create(session_t *ps);

@@ -22,7 +22,7 @@
 void
 layout_run(MainWin *mw, dlist *windows,
 		unsigned int *total_width, unsigned int *total_height) {
-	session_t *ps = mw->ps;
+	// session_t *ps = mw->ps;
 
 	int sum_w = 0, max_h = 0, max_w = 0;
 

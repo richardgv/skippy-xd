@@ -88,22 +88,66 @@ mainwin_create(session_t *ps) {
 	mw->xin_screens = 0;
 #endif /* CFG_XINERAMA */
 	
-	mw->pressed = mw->focus = 0;
+	// mw->pressed = mw->focus = 0;
+	mw->pressed = mw->client_to_focus = 0;
 	mw->tooltip = 0;
 	mw->cod = 0;
-	mw->key_up = XKeysymToKeycode(dpy, XK_Up);
-	mw->key_down = XKeysymToKeycode(dpy, XK_Down);
-	mw->key_left = XKeysymToKeycode(dpy, XK_Left);
-	mw->key_right = XKeysymToKeycode(dpy, XK_Right);
-	mw->key_h = XKeysymToKeycode(dpy, XK_h);
-	mw->key_j = XKeysymToKeycode(dpy, XK_j);
-	mw->key_k = XKeysymToKeycode(dpy, XK_k);
-	mw->key_l = XKeysymToKeycode(dpy, XK_l);
-	mw->key_enter = XKeysymToKeycode(dpy, XK_Return);
-	mw->key_space = XKeysymToKeycode(dpy, XK_space);
-	mw->key_escape = XKeysymToKeycode(dpy, XK_Escape);
-	mw->key_q = XKeysymToKeycode(dpy, XK_q);
-	
+
+	// convert the keybindings settings strings into arrays of KeySyms
+	keys_str_syms(ps->o.bindings_keysUp, &mw->keysyms_Up);
+	keys_str_syms(ps->o.bindings_keysDown, &mw->keysyms_Down);
+	keys_str_syms(ps->o.bindings_keysLeft, &mw->keysyms_Left);
+	keys_str_syms(ps->o.bindings_keysRight, &mw->keysyms_Right);
+	keys_str_syms(ps->o.bindings_keysExitCancelOnPress, &mw->keysyms_ExitCancelOnPress);
+	keys_str_syms(ps->o.bindings_keysExitCancelOnRelease, &mw->keysyms_ExitCancelOnRelease);
+	keys_str_syms(ps->o.bindings_keysExitSelectOnPress, &mw->keysyms_ExitSelectOnPress);
+	keys_str_syms(ps->o.bindings_keysExitSelectOnRelease, &mw->keysyms_ExitSelectOnRelease);
+	keys_str_syms(ps->o.bindings_keysReverseDirection, &mw->keysyms_ReverseDirection);
+
+	// convert the modifier key masks settings strings into arrays of enums
+	modkeymasks_str_enums(ps->o.bindings_modifierKeyMasksReverseDirection, &mw->modifierKeyMasks_ReverseDirection);
+
+	// convert the arrays of KeySyms into arrays of KeyCodes, for this specific Display
+	keysyms_arr_keycodes(dpy, mw->keysyms_Up, &mw->keycodes_Up);
+	keysyms_arr_keycodes(dpy, mw->keysyms_Down, &mw->keycodes_Down);
+	keysyms_arr_keycodes(dpy, mw->keysyms_Left, &mw->keycodes_Left);
+	keysyms_arr_keycodes(dpy, mw->keysyms_Right, &mw->keycodes_Right);
+	keysyms_arr_keycodes(dpy, mw->keysyms_ExitCancelOnPress, &mw->keycodes_ExitCancelOnPress);
+	keysyms_arr_keycodes(dpy, mw->keysyms_ExitCancelOnRelease, &mw->keycodes_ExitCancelOnRelease);
+	keysyms_arr_keycodes(dpy, mw->keysyms_ExitSelectOnPress, &mw->keycodes_ExitSelectOnPress);
+	keysyms_arr_keycodes(dpy, mw->keysyms_ExitSelectOnRelease, &mw->keycodes_ExitSelectOnRelease);
+	keysyms_arr_keycodes(dpy, mw->keysyms_ReverseDirection, &mw->keycodes_ReverseDirection);
+
+	// we check all possible pairs, one pair at a time. This is in a specific order, to give a more helpful error msg
+	check_keybindings_conflict(ps->o.config_path, "keysUp", mw->keysyms_Up, "keysDown", mw->keysyms_Down);
+	check_keybindings_conflict(ps->o.config_path, "keysUp", mw->keysyms_Up, "keysLeft", mw->keysyms_Left);
+	check_keybindings_conflict(ps->o.config_path, "keysUp", mw->keysyms_Up, "keysRight", mw->keysyms_Right);
+	check_keybindings_conflict(ps->o.config_path, "keysUp", mw->keysyms_Up, "keysExitCancelOnPress", mw->keysyms_ExitCancelOnPress);
+	check_keybindings_conflict(ps->o.config_path, "keysUp", mw->keysyms_Up, "keysExitCancelOnRelease", mw->keysyms_ExitCancelOnRelease);
+	check_keybindings_conflict(ps->o.config_path, "keysUp", mw->keysyms_Up, "keysExitSelectOnPress", mw->keysyms_ExitSelectOnPress);
+	check_keybindings_conflict(ps->o.config_path, "keysUp", mw->keysyms_Up, "keysExitSelectOnRelease", mw->keysyms_ExitSelectOnRelease);
+	check_keybindings_conflict(ps->o.config_path, "keysDown", mw->keysyms_Down, "keysLeft", mw->keysyms_Left);
+	check_keybindings_conflict(ps->o.config_path, "keysDown", mw->keysyms_Down, "keysRight", mw->keysyms_Right);
+	check_keybindings_conflict(ps->o.config_path, "keysDown", mw->keysyms_Down, "keysExitCancelOnPress", mw->keysyms_ExitCancelOnPress);
+	check_keybindings_conflict(ps->o.config_path, "keysDown", mw->keysyms_Down, "keysExitCancelOnRelease", mw->keysyms_ExitCancelOnRelease);
+	check_keybindings_conflict(ps->o.config_path, "keysDown", mw->keysyms_Down, "keysExitSelectOnPress", mw->keysyms_ExitSelectOnPress);
+	check_keybindings_conflict(ps->o.config_path, "keysDown", mw->keysyms_Down, "keysExitSelectOnRelease", mw->keysyms_ExitSelectOnRelease);
+	check_keybindings_conflict(ps->o.config_path, "keysLeft", mw->keysyms_Left, "keysRight", mw->keysyms_Right);
+	check_keybindings_conflict(ps->o.config_path, "keysLeft", mw->keysyms_Left, "keysExitCancelOnPress", mw->keysyms_ExitCancelOnPress);
+	check_keybindings_conflict(ps->o.config_path, "keysLeft", mw->keysyms_Left, "keysExitCancelOnRelease", mw->keysyms_ExitCancelOnRelease);
+	check_keybindings_conflict(ps->o.config_path, "keysLeft", mw->keysyms_Left, "keysExitSelectOnPress", mw->keysyms_ExitSelectOnPress);
+	check_keybindings_conflict(ps->o.config_path, "keysLeft", mw->keysyms_Left, "keysExitSelectOnRelease", mw->keysyms_ExitSelectOnRelease);
+	check_keybindings_conflict(ps->o.config_path, "keysRight", mw->keysyms_Right, "keysExitCancelOnPress", mw->keysyms_ExitCancelOnPress);
+	check_keybindings_conflict(ps->o.config_path, "keysRight", mw->keysyms_Right, "keysExitCancelOnRelease", mw->keysyms_ExitCancelOnRelease);
+	check_keybindings_conflict(ps->o.config_path, "keysRight", mw->keysyms_Right, "keysExitSelectOnPress", mw->keysyms_ExitSelectOnPress);
+	check_keybindings_conflict(ps->o.config_path, "keysRight", mw->keysyms_Right, "keysExitSelectOnRelease", mw->keysyms_ExitSelectOnRelease);
+	check_keybindings_conflict(ps->o.config_path, "keysExitCancelOnPress", mw->keysyms_ExitCancelOnPress, "keysExitCancelOnRelease", mw->keysyms_ExitCancelOnRelease);
+	check_keybindings_conflict(ps->o.config_path, "keysExitCancelOnPress", mw->keysyms_ExitCancelOnPress, "keysExitSelectOnPress", mw->keysyms_ExitSelectOnPress);
+	check_keybindings_conflict(ps->o.config_path, "keysExitCancelOnPress", mw->keysyms_ExitCancelOnPress, "keysExitSelectOnRelease", mw->keysyms_ExitSelectOnRelease);
+	check_keybindings_conflict(ps->o.config_path, "keysExitCancelOnRelease", mw->keysyms_ExitCancelOnRelease, "keysExitSelectOnPress", mw->keysyms_ExitSelectOnPress);
+	check_keybindings_conflict(ps->o.config_path, "keysExitCancelOnRelease", mw->keysyms_ExitCancelOnRelease, "keysExitSelectOnRelease", mw->keysyms_ExitSelectOnRelease);
+	check_keybindings_conflict(ps->o.config_path, "keysExitSelectOnPress", mw->keysyms_ExitSelectOnPress, "keysExitSelectOnRelease", mw->keysyms_ExitSelectOnRelease);
+
 	XGetWindowAttributes(dpy, ps->root, &rootattr);
 	mw->x = mw->y = 0;
 	mw->width = rootattr.width;
@@ -303,6 +347,7 @@ mainwin_map(MainWin *mw) {
 		if (Success != ret)
 			printfef("(): Failed to grab keyboard (%d), troubles ahead.", ret);
 	} */
+	mw->mapped = true;
 }
 
 void
@@ -317,6 +362,7 @@ mainwin_unmap(MainWin *mw)
 	}
 	XUngrabKeyboard(mw->ps->dpy, CurrentTime);
 	XUnmapWindow(mw->ps->dpy, mw->window);
+	mw->mapped = false;
 }
 
 void
@@ -354,6 +400,28 @@ mainwin_destroy(MainWin *mw) {
 		XFree(mw->xin_info);
 #endif /* CFG_XINERAMA */
 	
+	free(mw->keysyms_Up);
+	free(mw->keysyms_Down);
+	free(mw->keysyms_Left);
+	free(mw->keysyms_Right);
+	free(mw->keysyms_ExitCancelOnPress);
+	free(mw->keysyms_ExitCancelOnRelease);
+	free(mw->keysyms_ExitSelectOnPress);
+	free(mw->keysyms_ExitSelectOnRelease);
+	free(mw->keysyms_ReverseDirection);
+
+	free(mw->modifierKeyMasks_ReverseDirection);
+
+	free(mw->keycodes_Up);
+	free(mw->keycodes_Down);
+	free(mw->keycodes_Left);
+	free(mw->keycodes_Right);
+	free(mw->keycodes_ExitCancelOnPress);
+	free(mw->keycodes_ExitCancelOnRelease);
+	free(mw->keycodes_ExitSelectOnPress);
+	free(mw->keycodes_ExitSelectOnRelease);
+	free(mw->keycodes_ReverseDirection);
+
 	free(mw);
 }
 
@@ -373,6 +441,7 @@ mainwin_transform(MainWin *mw, float f)
 
 int
 mainwin_handle(MainWin *mw, XEvent *ev) {
+	// printfef("(): ");
 	session_t *ps = mw->ps;
 
 	switch(ev->type) {
@@ -380,13 +449,19 @@ mainwin_handle(MainWin *mw, XEvent *ev) {
 			XSetInputFocus(ps->dpy, mw->window, RevertToParent, CurrentTime);
 			break;
 		case KeyPress:
-			mw->pressed_key = true;
-			break;
 		case KeyRelease:
-			if (mw->pressed_key)
-				report_key_unbinded(ev);
-			else
-				report_key_ignored(ev);
+			// printfef("(): KeyPress or KeyRelease");
+			// if(mw->client_to_focus)
+			// {
+				// printfef("(): clientwin_handle(mw->client_to_focus, ev);");
+			if(clientwin_handle(mw->client_to_focus, ev))
+				return 1;
+
+			// }
+			// else
+			// {
+			// 	printfef("(): mw->client_to_focus == NULL");				
+			// }
 			break;
 		case ButtonPress:
 			mw->pressed_mouse = true;
