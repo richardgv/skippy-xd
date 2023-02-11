@@ -38,8 +38,10 @@ struct _mainwin_t {
 	Window window;
 	Picture background;
 	Pixmap bg_pixmap;
-	int x, y;
-	unsigned int width, height, distance;
+	int x, y, xoff, yoff;
+	unsigned int width, height, newwidth, newheight, distance;
+	float multiplier;
+
 	XRenderPictFormat *format;
 	XTransform transform;
 	

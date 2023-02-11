@@ -422,10 +422,8 @@ clientwin_move(ClientWin *cw, float f, int x, int y, float timeslice)
 
 		cw->mini.x = cw->src.x + (cw->mini.x - cw->src.x) * timeslice;
 		cw->mini.y = cw->src.y + (cw->mini.y - cw->src.y) * timeslice;
-
-		float ff = 1.0/f + timeslice * (1 - 1.0/f);
-		cw->mini.width = MAX(1, cw->src.width * f) * ff;
-		cw->mini.height = MAX(1, cw->src.height * f) * ff;
+		cw->mini.width = cw->src.width * f;
+		cw->mini.height = cw->src.height * f;
 	}
 
 	XMoveResizeWindow(cw->mainwin->ps->dpy, cw->mini.window, cw->mini.x - border, cw->mini.y - border, cw->mini.width, cw->mini.height);
