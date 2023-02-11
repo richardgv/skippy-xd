@@ -27,7 +27,5 @@
  */
 
 void anime(MainWin *mw, dlist *clients, float timeslice);
-int* get_window_positions(MainWin *mw);
-dlist * animate_layout(MainWin *mw, dlist *clients, Window focus, Window leader, float fudge);
 
 #endif /* ANIME_H */

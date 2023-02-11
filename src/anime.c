@@ -26,33 +26,15 @@ void anime(
 	float timeslice
 ) {
 	clients = dlist_first(clients);
-	mw->clients = animate_layout(mw, mw->clients, mw->revert_focus_win, None, timeslice);
+	wm_get_current_desktop(mw->ps);
+	float multiplier = 1.0 + timeslice * (mw->multiplier - 1.0);
+	mainwin_transform(mw, multiplier);
+	foreach_dlist (mw->cod) {
+		clientwin_move((ClientWin *) iter->data, multiplier, mw->xoff, mw->yoff, timeslice);
+		clientwin_map((ClientWin*)iter->data);
+	}
 	if (!mw->cod) {
 		printfef("(): Failed to build layout.");
 		return;
 	}
-}
-
-dlist *
-animate_layout(MainWin *mw, dlist *clients, Window focus, Window leader, float timeslice) {
-	wm_get_current_desktop(mw->ps);
-	
-	unsigned int width = 0, height = 0;
-	layout_run(mw, mw->cod, &width, &height);
-	float factor = (float) (mw->width - (2 * mw->distance)) / width;
-	if (factor * height > mw->height - (2 * mw->distance))
-		factor = (float) (mw->height - (2 * mw->distance)) / height;
-	if (!mw->ps->o.allowUpscale)
-		factor = MIN(factor, 1.0f);
-
-	int xoff = (mw->width - (float) width * factor) / 2;
-	int yoff = (mw->height - (float) height * factor) / 2;
-	float modified_factor = 1.0 + timeslice * (factor - 1.0);
-	mainwin_transform(mw, modified_factor);
-	foreach_dlist (mw->cod) {
-		clientwin_move((ClientWin *) iter->data, factor, xoff, yoff, timeslice);
-		clientwin_map((ClientWin*)iter->data);
-	}
-
-	return clients;
 }

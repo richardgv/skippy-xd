@@ -360,7 +360,6 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader) {
 	session_t * const ps = mw->ps;
 
 	long desktop = wm_get_current_desktop(ps);
-	float factor;
 	
 	/* Update the client table, pick the ones we want and sort them */
 	// printfef("(): updating dl list of clients");
@@ -397,19 +396,26 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader) {
 
 	/* Move the mini windows around */
 	{
-		unsigned int width = 0, height = 0;
-		layout_run(mw, mw->cod, &width, &height);
-		factor = (float) (mw->width - 100) / width;
-		if (factor * height > mw->height - 100)
-			factor = (float) (mw->height - 100) / height;
+		unsigned int newwidth = 0, newheight = 0;
+		layout_run(mw, mw->cod, &newwidth, &newheight);
+		float multiplier = (float) (mw->width - 100) / newwidth;
+		if (multiplier * newheight > mw->height - 100)
+			multiplier = (float) (mw->height - 100) / newheight;
 		if (!ps->o.allowUpscale)
-			factor = MIN(factor, 1.0f);
+			multiplier = MIN(multiplier, 1.0f);
 
-		int xoff = (mw->width - (float) width * factor) / 2;
-		int yoff = (mw->height - (float) height * factor) / 2;
-		mainwin_transform(mw, factor);
+		int xoff = (mw->width - (float) newwidth * multiplier) / 2;
+		int yoff = (mw->height - (float) newheight * multiplier) / 2;
+
+		mw->multiplier = multiplier;
+		mw->xoff = xoff;
+		mw->yoff = yoff;
+		mw->newwidth = newwidth;
+		mw->newheight = newheight;
+
+		mainwin_transform(mw, multiplier);
 		foreach_dlist (mw->cod) {
-			clientwin_move((ClientWin *) iter->data, factor, xoff, yoff, 1);
+			clientwin_move((ClientWin *) iter->data, multiplier, xoff, yoff, 0);
 		}
 	}
 
