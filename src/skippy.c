@@ -398,9 +398,9 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader) {
 	{
 		unsigned int newwidth = 0, newheight = 0;
 		layout_run(mw, mw->cod, &newwidth, &newheight);
-		float multiplier = (float) (mw->width - 100) / newwidth;
-		if (multiplier * newheight > mw->height - 100)
-			multiplier = (float) (mw->height - 100) / newheight;
+		float multiplier = (float) (mw->width - 2 * mw->distance) / newwidth;
+		if (multiplier * newheight > mw->height - 2 * mw->distance)
+			multiplier = (float) (mw->height - 2 * mw->distance) / newheight;
 		if (!ps->o.allowUpscale)
 			multiplier = MIN(multiplier, 1.0f);
 
