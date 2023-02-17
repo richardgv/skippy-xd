@@ -146,26 +146,12 @@ layout_xd(MainWin *mw, dlist *windows,
 //    the windows orignal total occupied screen space aspect ratio,
 //    (and windows may be overlapping or hold identical spaces,
 //    and the final occupied screen aspect ratio
-//    do not have to be the same
+//    do not have to be identical
 // 6. boxy layout slots are more screen efficient,
 //    as well as being easier for user's eyes
 //
-// algorithmic concept:
-//
-// 1. find smallest window size as slot size,
-//    although rounder aspect ratio is preferred to dramatic aspect ratios
-//    ( windows are naturally wider than taller)
-// 2. form slots that the windows occupy
-//    *. windows with dramatic aspect ratio are excluded from this
-// 3. for all slots with collision,
-//    if there exists neighbouring empty slot, move it there
-//       otherwise, insert new row/columns based on screen aspect ratio
-// 4. insert to begin/end row/column for dramatic aspect ratio windows
-//    
-//
 // algorithm:
 //
-// 0. exclude windows with dramatic aspect ratios
 // 1. scan through windows to find the smallest window size,
 //    this forms the slot size
 // 2. LOOP:
@@ -185,16 +171,8 @@ layout_xd(MainWin *mw, dlist *windows,
 //       compare window below, window rightside, window below and right side
 //       to current slot, sorted by affinity,
 //       and whether current slots can fit the window
-//
-//
-//
-//
-//
-//
-// 4. move windows to slots, to calculate new used screen aspect ratio
-// 5. END LOOP when no windows have been moved
-// 4. insert begin/end row/column for dramatic aspect ratio windows
-// 5. remove empty rows/columns
+// 4. END LOOP when no windows have been moved
+// 5. move windows to slots
 //
 //
 // normal window has aspect ratio around (2.5,1)
@@ -205,16 +183,13 @@ void
 layout_boxy(MainWin *mw, dlist *windows,
 		unsigned int *total_width, unsigned int *total_height)
 {
-	// ignore dramatic aspect ratioed window for now
-	// for all desktop searches,
-	// need to first offset windows by their virtual desktop id
-
     // find screen aspect ratio
     //
     float screen_aspect = (float) mw->width / (float) mw->height;
 
     // find slot size
-    // also initialize destination position as source position
+    // offset window positions by virtual desktop
+    // initialize destination position as source position
     //
 	int slot_width=INT_MAX, slot_height=INT_MAX;
 	foreach_dlist (windows) {
@@ -223,6 +198,10 @@ layout_boxy(MainWin *mw, dlist *windows,
 
 		slot_width  = MIN(slot_width,  cw->src.width);
 		slot_height = MIN(slot_height, cw->src.height);
+
+        CARD32 desktop = wm_get_window_desktop(mw->ps, cw->wid_client)
+            - wm_get_current_desktop(mw->ps);
+        cw->src.x += desktop * mw->width;
 
         cw->x = cw->src.x;
         cw->y = cw->src.y;
@@ -525,32 +504,39 @@ move_window:
                             bool colliding = false;
                             if (l==0) { // e
                                 for (int yy=j+1; window_at_ij && !colliding
-                                        && yy<slot_maxy && yy<=slotyy; yy++) {
-                                    printfdf("(): E free slot in (%d,%d,%d,%d)?",k,l,i,yy);
-                                    if (slot2n[(yy-slot_miny) * (slot_maxx - slot_minx) + i-slot_minx] == 1)
+                                        && yy<slot_maxy && yy<slotyy; yy++) {
+                                    if (slot2n[(yy-slot_miny) * (slot_maxx - slot_minx) + i-slot_minx] == 1){
                                         colliding = true;
+                                    printfdf("(): Shift candidate collided at (%d,%d) while trying shifting direction %d",i,yy,l);
+                                    }
                                 }
                             }
                             else if (l==1) { // s
                                 for (int xx=i+1; window_at_ij && !colliding
-                                        && xx<slot_maxx && xx<=slotxx; xx++) {
+                                        && xx<slot_maxx && xx<slotxx; xx++) {
                                     printfdf("(): S free slot in (%d,%d)?",xx,j);
-                                    if (slot2n[(j-slot_miny) * (slot_maxx - slot_minx) + xx-slot_minx] == 1)
+                                    if (slot2n[(j-slot_miny) * (slot_maxx - slot_minx) + xx-slot_minx] == 1){
                                         colliding = true;
+                                    printfdf("(): Shift candidate collided at (%d,%d) while trying shifting direction %d",xx,j,l);
+                                    }
                                 }
                             }
                             else if (l==2) { // se
                                 for (int yy=j+1; window_at_ij && !colliding
-                                        && yy<slot_maxy && yy<=slotyy; yy++) {
+                                        && yy<slot_maxy && yy<slotyy; yy++) {
                                     printfdf("(): SEE free slot in (%d,%d)?",i,yy);
-                                    if (slot2n[(yy-slot_miny) * (slot_maxx - slot_minx) + i-slot_minx] == 1)
+                                    if (slot2n[(yy-slot_miny) * (slot_maxx - slot_minx) + i-slot_minx] == 1){
                                         colliding = true;
+                                    printfdf("(): Shift candidate collided at (%d,%d) while trying shifting direction %d",i,yy,l);
+                                    }
                                 }
                                 for (int xx=i+1; window_at_ij && !colliding
-                                        && xx<slot_maxx && xx<=slotxx; xx++) {
+                                        && xx<slot_maxx && xx<slotxx; xx++) {
                                     printfdf("(): SES free slot in (%d,%d)?",xx,j);
-                                    if (slot2n[(j-slot_miny) * (slot_maxx - slot_minx) + xx-slot_minx] == 1)
+                                    if (slot2n[(j-slot_miny) * (slot_maxx - slot_minx) + xx-slot_minx] == 1){
                                         colliding = true;
+                                    printfdf("(): Shift candidate collided at (%d,%d) while trying shifting direction %d",xx,j,l);
+                                    }
                                 }
                             }
 
