@@ -464,6 +464,7 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader) {
 
 		// mw->focus = (ClientWin *) iter->data;
 		mw->client_to_focus = (ClientWin *) iter->data;
+		mw->client_to_focus_on_cancel = (ClientWin *) iter->data;
 		// mw->focus->focused = 1;
 
 
