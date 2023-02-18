@@ -57,6 +57,8 @@ struct _mainwin_t {
 	KeySym *keysyms_Down;
 	KeySym *keysyms_Left;
 	KeySym *keysyms_Right;
+	KeySym *keysyms_Prev;
+	KeySym *keysyms_Next;
 	KeySym *keysyms_ExitCancelOnPress;
 	KeySym *keysyms_ExitCancelOnRelease;
 	KeySym *keysyms_ExitSelectOnPress;
@@ -69,6 +71,8 @@ struct _mainwin_t {
 	KeyCode *keycodes_Down;
 	KeyCode *keycodes_Left;
 	KeyCode *keycodes_Right;
+	KeyCode *keycodes_Prev;
+	KeyCode *keycodes_Next;
 	KeyCode *keycodes_ExitCancelOnPress;
 	KeyCode *keycodes_ExitCancelOnRelease;
 	KeyCode *keycodes_ExitSelectOnPress;
