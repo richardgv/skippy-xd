@@ -509,20 +509,12 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 			if(arr_keycodes_includes(cw->mainwin->keycodes_ReverseDirection, evk->keycode))
 				reverse_direction = true;
 
-		if (arr_keycodes_includes(cw->mainwin->keycodes_Right, evk->keycode))
+		if (arr_keycodes_includes(cw->mainwin->keycodes_Up, evk->keycode))
 		{
 			if(reverse_direction)
-				focus_miniw_prev(ps, cw);
+				focus_down(cw);
 			else
-				focus_miniw_next(ps, cw);
-		}
-
-		else if (arr_keycodes_includes(cw->mainwin->keycodes_Left, evk->keycode))
-		{
-			if(reverse_direction)
-				focus_miniw_next(ps, cw);
-			else
-				focus_miniw_prev(ps, cw);
+				focus_up(cw);
 		}
 
 		else if (arr_keycodes_includes(cw->mainwin->keycodes_Down, evk->keycode))
@@ -533,12 +525,36 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 				focus_down(cw);
 		}
 
-		else if (arr_keycodes_includes(cw->mainwin->keycodes_Up, evk->keycode))
+		else if (arr_keycodes_includes(cw->mainwin->keycodes_Left, evk->keycode))
 		{
 			if(reverse_direction)
-				focus_down(cw);
+				focus_right(cw);
 			else
-				focus_up(cw);
+				focus_left(cw);
+		}
+
+		else if (arr_keycodes_includes(cw->mainwin->keycodes_Right, evk->keycode))
+		{
+			if(reverse_direction)
+				focus_left(cw);
+			else
+				focus_right(cw);
+		}
+
+		else if (arr_keycodes_includes(cw->mainwin->keycodes_Prev, evk->keycode))
+		{
+			if(reverse_direction)
+				focus_miniw_next(ps, cw);
+			else
+				focus_miniw_prev(ps, cw);
+		}
+
+		else if (arr_keycodes_includes(cw->mainwin->keycodes_Next, evk->keycode))
+		{
+			if(reverse_direction)
+				focus_miniw_prev(ps, cw);
+			else
+				focus_miniw_next(ps, cw);
 		}
 
 		else if (arr_keycodes_includes(cw->mainwin->keycodes_ExitCancelOnPress, evk->keycode))
