@@ -738,9 +738,9 @@ mainloop(session_t *ps, bool activate_on_start) {
 				anime(ps->mainwin, ps->mainwin->clients,
 						((float)timeslice)/(float)ps->o.animationDuration);
 				if ( timeslice >= ps->o.animationDuration) {
-					XSync(ps->dpy, False);
 					animating = false;
 					last_rendered = time_in_millis();
+                    focus_miniw_adv(ps, mw->client_to_focus, ps->o.movePointerOnStart);
 				}
 
 			}
