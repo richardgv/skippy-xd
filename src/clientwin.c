@@ -560,7 +560,7 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 		else if (arr_keycodes_includes(cw->mainwin->keycodes_ExitCancelOnPress, evk->keycode))
 		{
 			printfef("(): Quitting.");
-			mw->client_to_focus = NULL;
+			mw->client_to_focus = mw->client_to_focus_on_cancel;
 			return 1;
 		}
 
