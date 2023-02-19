@@ -469,6 +469,7 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader) {
 
 		// mw->focus = (ClientWin *) iter->data;
 		mw->client_to_focus = (ClientWin *) iter->data;
+		mw->client_to_focus_on_cancel = (ClientWin *) iter->data;
 		// mw->focus->focused = 1;
 
 
@@ -745,7 +746,8 @@ mainloop(session_t *ps, bool activate_on_start) {
 				if ( timeslice >= ps->o.animationDuration) {
 					animating = false;
 					last_rendered = time_in_millis();
-                    focus_miniw_adv(ps, mw->client_to_focus, ps->o.movePointerOnStart);
+					focus_miniw_adv(ps, mw->client_to_focus,
+							ps->o.movePointerOnStart);
 				}
 
 			}
@@ -1451,8 +1453,10 @@ int main(int argc, char *argv[]) {
 		// load keybindings settings
 		ps->o.bindings_keysUp = mstrdup(config_get(config, "bindings", "keysUp", "Up w"));
 		ps->o.bindings_keysDown = mstrdup(config_get(config, "bindings", "keysDown", "Down s"));
-		ps->o.bindings_keysLeft = mstrdup(config_get(config, "bindings", "keysLeft", "Left b a"));
-		ps->o.bindings_keysRight = mstrdup(config_get(config, "bindings", "keysRight", "Right Tab f d"));
+		ps->o.bindings_keysLeft = mstrdup(config_get(config, "bindings", "keysLeft", "Left a"));
+		ps->o.bindings_keysRight = mstrdup(config_get(config, "bindings", "keysRight", "Right Tab d"));
+		ps->o.bindings_keysPrev = mstrdup(config_get(config, "bindings", "keysPrev", "p b"));
+		ps->o.bindings_keysNext = mstrdup(config_get(config, "bindings", "keysNext", "n f"));
 		ps->o.bindings_keysExitCancelOnPress = mstrdup(config_get(config, "bindings", "keysExitCancelOnPress", "Escape BackSpace x q"));
 		ps->o.bindings_keysExitCancelOnRelease = mstrdup(config_get(config, "bindings", "keysExitCancelOnRelease", ""));
 		ps->o.bindings_keysExitSelectOnPress = mstrdup(config_get(config, "bindings", "keysExitSelectOnPress", "Return space"));
@@ -1465,6 +1469,8 @@ int main(int argc, char *argv[]) {
 		check_keysyms(ps->o.config_path, ": [bindings] keysDown =", ps->o.bindings_keysDown);
 		check_keysyms(ps->o.config_path, ": [bindings] keysLeft =", ps->o.bindings_keysLeft);
 		check_keysyms(ps->o.config_path, ": [bindings] keysRight =", ps->o.bindings_keysRight);
+		check_keysyms(ps->o.config_path, ": [bindings] keysPrev =", ps->o.bindings_keysPrev);
+		check_keysyms(ps->o.config_path, ": [bindings] keysNext =", ps->o.bindings_keysNext);
 		check_keysyms(ps->o.config_path, ": [bindings] keysExitCancelOnPress =", ps->o.bindings_keysExitCancelOnPress);
 		check_keysyms(ps->o.config_path, ": [bindings] keysExitCancelOnRelease =", ps->o.bindings_keysExitCancelOnRelease);
 		check_keysyms(ps->o.config_path, ": [bindings] keysExitSelectOnPress =", ps->o.bindings_keysExitSelectOnPress);
@@ -1686,6 +1692,8 @@ main_end:
 			free(ps->o.bindings_keysDown);
 			free(ps->o.bindings_keysLeft);
 			free(ps->o.bindings_keysRight);
+			free(ps->o.bindings_keysPrev);
+			free(ps->o.bindings_keysNext);
 			free(ps->o.bindings_keysExitCancelOnPress);
 			free(ps->o.bindings_keysExitCancelOnRelease);
 			free(ps->o.bindings_keysExitSelectOnPress);
