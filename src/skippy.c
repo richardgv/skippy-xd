@@ -398,6 +398,11 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader) {
 	{
 		unsigned int newwidth = 0, newheight = 0;
 		layout_run(mw, mw->cod, &newwidth, &newheight);
+
+		// ordering of client windows list
+		// is important for prev/next window selection
+		dlist_sort(mw->cod, sort_cw_by_pos, 0);
+
 		float multiplier = (float) (mw->width - 100) / newwidth;
 		if (multiplier * newheight > mw->height - 100)
 			multiplier = (float) (mw->height - 100) / newheight;
