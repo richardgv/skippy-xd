@@ -31,3 +31,6 @@ man/*.1
 doxygen/
 .clang_complete
 /src/backtrace-symbols.[ch]
+
+# User config override
+skippy-xd.rc*
