@@ -39,7 +39,7 @@ struct _mainwin_t {
 	Picture background;
 	Pixmap bg_pixmap;
 	int x, y, xoff, yoff;
-	unsigned int width, height, newwidth, newheight, distance;
+	int width, height, newwidth, newheight, distance;
 	float multiplier;
 
 	XRenderPictFormat *format;
