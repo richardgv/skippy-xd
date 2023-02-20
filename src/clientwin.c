@@ -425,7 +425,6 @@ clientwin_move(ClientWin *cw, float f, int x, int y, float timeslice)
 		cw->mini.width = (float) cw->src.width * f;
 		cw->mini.height = (float) cw->src.height * f;
 	}
-	printfdf("(): window %p coord: (%d,%d) (%d,%d)", cw, cw->mini.x, cw->mini.y, cw->mini.width, cw->mini.height);
 
 	XMoveResizeWindow(cw->mainwin->ps->dpy, cw->mini.window, cw->mini.x - border, cw->mini.y - border, cw->mini.width, cw->mini.height);
 	
