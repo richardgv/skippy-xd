@@ -1345,13 +1345,13 @@ sort_cw_by_pos(dlist* dlist1, dlist* dlist2, void* data)
 {
 	ClientWin *cw1 = (ClientWin *) dlist1->data;
 	ClientWin *cw2 = (ClientWin *) dlist2->data;
-	if (cw1->y < cw2->y)
-		return -1;
-	else if (cw1->y > cw2->y)
-		return 1;
-	else if (cw1->x < cw2->x)
+	if (cw1->x < cw2->x)
 		return -1;
 	else if (cw1->x > cw2->x)
+		return 1;
+	else if (cw1->y < cw2->y)
+		return -1;
+	else if (cw1->y > cw2->y)
 		return 1;
 	else
 		return 0;
