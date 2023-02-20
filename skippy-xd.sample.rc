@@ -27,6 +27,14 @@
 #   [WIDTHxHEIGHT] [orig|scale|scalek|tile] [left|mid|right] [left|mid|right]
 #   [COLOR|#FFFFFFFF] [PATH]
 #
+# - keysUp, keywDown, eysLeft, keysRight:
+#   selects the window in the direction compared to the current selected window,
+#   without wrapping
+#
+# - keysPrev, keysNext:
+#   selects window previous or next to current one, in up->down, left->right
+#   ordering, wrapping per column and per row
+#   
 #   Examples:
 #   background = 500x400 tile right mid #FF0000 /home/richard/screenshots/256.png
 #   background = orig mid mid #FF000080
