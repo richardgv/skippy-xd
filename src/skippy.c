@@ -453,9 +453,9 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader) {
 		// is important for prev/next window selection
 		dlist_sort(mw->cod, sort_cw_by_pos, 0);
 
-		float multiplier = (float) (mw->width - 100) / newwidth;
-		if (multiplier * newheight > mw->height - 100)
-			multiplier = (float) (mw->height - 100) / newheight;
+		float multiplier = (float) (mw->width - 2 * mw->distance) / newwidth;
+		if (multiplier * newheight > mw->height - 2 * mw->distance)
+			multiplier = (float) (mw->height - 2 * mw->distance) / newheight;
 		if (!ps->o.allowUpscale)
 			multiplier = MIN(multiplier, 1.0f);
 
@@ -477,11 +477,6 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader) {
 	foreach_dlist(mw->cod) {
 		clientwin_update2((ClientWin *) iter->data);
 	}
-
-	// Unfortunately it does not work...
-	// focus_miniw_adv(ps, mw->focus, ps->o.movePointerOnStart);
-	focus_miniw_adv(ps, mw->client_to_focus, ps->o.movePointerOnStart);
-	// clientwin_render(mw->client_to_focus);
 
 	return clients;
 }
