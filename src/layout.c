@@ -19,6 +19,24 @@
 
 #include "skippy.h"
 
+// this is the "abstract" function to determine exposd window layout
+// if you want to introduce new layout algorithm/implementation,
+// do it here
+// by introducing new function and hook here
+//
+// here, ((ClientWin*) windows)->src.x, ((ClientWin*) windows)->src.y
+// hold the original coordinates
+// ((ClientWin*) windows)->src.width, ((ClientWin*) windows)->src.height
+// hold the window size
+// ((ClientWin*) windows)->x, ((ClientWin*) windows)->y
+// hold the final window position
+// better NOT to change the final window size...
+// which is implicitly handled by MainWin transformation
+//
+// in summary, use this function to implement the exposed layout
+// by controlling the windows position
+// and calculating the final screen width and height
+// = total windows width and height + minimal distance between windows
 void layout_run(MainWin *mw, dlist *windows,
 		unsigned int *total_width, unsigned int *total_height) {
     layout_boxy(mw, windows, total_width, total_height);
@@ -245,14 +263,14 @@ do
 		ClientWin *cw = (ClientWin *) iter->data;
 		if (!cw->mode) continue;
 
-		int slotx  = round((float) cw->x / (float) slot_width);
-		int sloty  = round((float) cw->y / (float) slot_height);
-		int slotxx = round((float) (cw->x + cw->src.width)  / (float) slot_width);
-		int slotyy = round((float) (cw->y + cw->src.height) / (float) slot_height);
-        if (slotxx == slotx)
+		int slotx  = floor((float) cw->x / (float) slot_width);
+		int sloty  = floor((float) cw->y / (float) slot_height);
+		int slotxx = slotx + ceil((float) cw->src.width / (float) slot_width);
+		int slotyy = sloty + ceil((float) cw->src.height / (float) slot_height);
+        /*if (slotxx == slotx)
             slotxx++;
         if (slotyy == sloty)
-            slotyy++;
+            slotyy++;*/
 
 		printfdf("(): window %p coord: (%d,%d) (%d,%d)", cw, cw->x, cw->y, cw->src.width, cw->src.height);
 		printfdf("(): window %p slot: (%d,%d) (%d,%d)", cw, slotx, sloty, slotxx, slotyy);
@@ -292,10 +310,10 @@ do
 
         cw->slots = 0; // reset
 
-		int slotx  = round((float) cw->x / (float) slot_width);
-		int sloty  = round((float) cw->y / (float) slot_height);
-		int slotxx = round((float) (cw->x + (float) cw->src.width)  / (float) slot_width);
-		int slotyy = round((float) (cw->y + (float) cw->src.height) / (float) slot_height);
+		int slotx  = floor((float) cw->x / (float) slot_width);
+		int sloty  = floor((float) cw->y / (float) slot_height);
+		int slotxx = slotx + ceil((float) cw->src.width / (float) slot_width);
+		int slotyy = sloty + ceil((float) cw->src.height / (float) slot_height);
         if (slotxx == slotx)
             slotxx++;
         if (slotyy == sloty)
@@ -344,7 +362,7 @@ do
             printfdf("(): prune row %d",j);
             foreach_dlist (windows) {
                 ClientWin *cw = iter->data;
-                int sloty  = round((float) cw->y / (float) slot_height);
+                int sloty  = floor((float) cw->y / (float) slot_height);
                 if (sloty >= j)
                     cw->y -= slot_height;
             }
@@ -360,7 +378,7 @@ do
             printfdf("(): prune column %d",i);
             foreach_dlist (windows) {
                 ClientWin *cw = iter->data;
-                int slotx  = round((float) cw->x / (float) slot_width);
+                int slotx  = floor((float) cw->x / (float) slot_width);
                 if (slotx >= i)
                     cw->x -= slot_width;
             }
@@ -420,8 +438,8 @@ move_window:
                 // move all windows right/down of move_window
                 foreach_dlist (windows) {
                     ClientWin *cw = (ClientWin*) iter->data;
-                    int cw_slotx = round((float) cw->x / (float) slot_width);
-                    int cw_sloty = round((float) cw->y / (float) slot_height);
+                    int cw_slotx = floor((float) cw->x / (float) slot_width);
+                    int cw_sloty = floor((float) cw->y / (float) slot_height);
                     if (cw != moving_window) {
 
                         if (ii > i && cw_slotx > i) {
@@ -495,10 +513,10 @@ move_window:
                             if (ii[l]==0 && jj[l]==0)
                                 continue;
 
-                            int slotx  = round((float) cw[l]->x / (float) slot_width);
-                            int sloty  = round((float) cw[l]->y / (float) slot_height);
-                            int slotxx = round((float) (cw[l]->x + (float) cw[l]->src.width)  / (float) slot_width);
-                            int slotyy = round((float) (cw[l]->y + (float) cw[l]->src.height) / (float) slot_height);
+                            int slotx  = floor((float) cw[l]->x / (float) slot_width);
+                            int sloty  = floor((float) cw[l]->y / (float) slot_height);
+                            int slotxx = slotx + ceil((float) cw[l]->src.width / (float) slot_width);
+                            int slotyy = sloty + ceil((float) cw[l]->src.height / (float) slot_height);
                             bool window_at_ij = slotx==i+ii[l] && sloty==j+jj[l];
 
                             bool colliding = false;
@@ -580,6 +598,38 @@ move_window:
 		}
 	}
 
+	// arrange windows ordering by left->right, top->bottom
+	// so we can put in windows offset,
+	// rather than having overlapping windows
+	// which is not desirable for user experience,
+	// nor allowable for focus_left() focus_right() etc
+    /*dlist_sort(windows, sort_cw_by_pos, 0);
+
+	int row_y = INT_MIN;
+    foreach_dlist (windows) {
+		while (iter->prev == NULL) {
+			iter = iter->next;
+		}
+        ClientWin *cw = (ClientWin *) iter->data;
+
+        ClientWin *prev = (ClientWin *) iter->prev->data;
+        if (!cw->mode) continue;
+		if (cw->x <= prev->x) { // new row
+			if (cw->y <= prev->y + prev->src.height + mw->distance) {
+printfdf("() AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+				cw->y = MAX(cw->y,
+						prev->y + prev->src.height + mw->distance);
+				row_y = cw->y + cw->src.height;
+			}
+		}
+		else { // new column
+			if (cw->x <= prev->x + prev->src.width + mw->distance) {
+printfdf("() BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB (%d,%d)",cw->x,cw->y);
+				cw->x = prev->x + prev->src.width + mw->distance;
+			}
+		}
+    }*/
+
 	// and finally, calculate new total used screen dimension
 	//
 	int minx=INT_MAX, miny=INT_MAX, maxx=INT_MIN, maxy=INT_MIN;
@@ -628,10 +678,10 @@ int boxy_affinity(
         )
 {
     // cw->src.x cw->src.y should be taken into account also
-    int slotx  = round((float) cw->x / (float) slot_width);
-    int sloty  = round((float) cw->y / (float) slot_height);
-    int slotxx = round((float) (cw->x + cw->src.width)  / (float) slot_width);
-    int slotyy = round((float) (cw->y + cw->src.height) / (float) slot_height);
+    int slotx  = floor((float) cw->x / (float) slot_width);
+    int sloty  = floor((float) cw->y / (float) slot_height);
+    int slotxx = slotx + ceil((float) cw->src.width / (float) slot_width);
+    int slotyy = sloty + ceil((float) cw->src.height / (float) slot_height);
 
     /*if (ii!=0 && ii * slotx < x)
         return INT_MIN;
