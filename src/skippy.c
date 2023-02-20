@@ -478,11 +478,6 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader) {
 
 	}
 
-	// Unfortunately it does not work...
-	// focus_miniw_adv(ps, mw->focus, ps->o.movePointerOnStart);
-	focus_miniw_adv(ps, mw->client_to_focus, ps->o.movePointerOnStart);
-	// clientwin_render(mw->client_to_focus);
-
 	return clients;
 }
 
