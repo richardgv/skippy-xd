@@ -347,14 +347,14 @@ wm_get_stack_sub(session_t *ps, Window root) {
 		// EWMH
 		l = wm_get_stack_fromprop(ps, root, _NET_CLIENT_LIST);
 		if (l) {
-			printfdf("(): Retrieved window stack from _NET_CLIENT_LIST.");
+			//printfef("(): Retrieved window stack from _NET_CLIENT_LIST.");
 			return l;
 		}
 
 		// GNOME WM
 		l = wm_get_stack_fromprop(ps, root, _WIN_CLIENT_LIST);
 		if (l) {
-			printfdf("(): Retrieved window stack from _WIN_CLIENT_LIST.");
+			//printfef("(): Retrieved window stack from _WIN_CLIENT_LIST.");
 			return l;
 		}
 	}
@@ -384,7 +384,7 @@ wm_get_stack_sub(session_t *ps, Window root) {
 			}
 		}
 		sxfree(children);
-		printfdf("(): Retrieved window stack by querying all children.");
+		//printfef("(): Retrieved window stack by querying all children.");
 	}
 
 	return l;

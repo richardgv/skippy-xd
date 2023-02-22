@@ -93,11 +93,13 @@ clientwin_create(MainWin *mw, Window client) {
 
 	cw->mainwin = mw;
 	cw->wid_client = client;
+	cw->origin = None;
 	if (ps->o.includeFrame)
 		cw->src.window = wm_find_frame(ps, client);
 	if (!cw->src.window)
 		cw->src.window = client;
 	cw->mini.format = mw->format;
+
 	{
 		XSetWindowAttributes sattr = {
 			.border_pixel = 0,
@@ -125,6 +127,8 @@ clientwin_create(MainWin *mw, Window client) {
 		free(str);
 	}
 
+	cw->cpixmap = None;
+
 	// Listen to events on the window. We don't want to miss any changes so
 	// this is to be done as early as possible
 	XSelectInput(cw->mainwin->ps->dpy, cw->src.window, SubstructureNotifyMask | StructureNotifyMask);
@@ -143,9 +147,7 @@ clientwin_create_err:
  */
 bool
 clientwin_update(ClientWin *cw) {
-	MainWin *mw = cw->mainwin;
-	session_t *ps = mw->ps;
-
+	session_t *ps = cw->mainwin->ps;
 	clientwin_free_res2(ps, cw);
 
 	// Get window attributes
@@ -164,28 +166,36 @@ clientwin_update(ClientWin *cw) {
 		cw->src.format = XRenderFindVisualFormat(ps->dpy, wattr.visual);
 	}
 
+	cw->zombie = wattr.map_state != IsViewable;
+
 	if (IsViewable == wattr.map_state
 			&& !(ps->o.includeAllScreens && ps->o.avoidThumbnailsFromOtherScreens && ps->root != wattr.root)) {
+	//if (cw->mode == CLIDISP_THUMBNAIL || cw->mode == CLIDISP_THUMBNAIL_ICON) {
+
+		// Create window picture
+//		if (!(ps->o.useNameWindowPixmap && ps->o.forceNameWindowPixmap
+//					&& !cw->cpixmap)) {
+			Drawable draw = cw->cpixmap;
+			if (!draw) draw = cw->src.window;
+
+			static XRenderPictureAttributes pa = { .subwindow_mode = IncludeInferiors };
+			cw->origin = XRenderCreatePicture(ps->dpy,
+					cw->src.window, cw->src.format, CPSubwindowMode, &pa);
+//		}
+		if (cw->origin) {
+			XRenderSetPictureFilter(ps->dpy, cw->origin, FilterBest, 0, 0);
+		}
+
 		// Get window pixmap
-		if (ps->o.useNameWindowPixmap) {
+		//if (ps->o.useNameWindowPixmap) {
 			XCompositeRedirectWindow(ps->dpy, cw->src.window,
 					CompositeRedirectAutomatic);
 			cw->redirected = true;
 			cw->cpixmap = XCompositeNameWindowPixmap(ps->dpy, cw->src.window);
-		}
 
-		// Create window picture
-		if (!(ps->o.useNameWindowPixmap && ps->o.forceNameWindowPixmap
-					&& !cw->cpixmap)) {
-			Drawable draw = cw->cpixmap;
-			if (!draw) draw = cw->src.window;
-			static XRenderPictureAttributes pa = { .subwindow_mode = IncludeInferiors };
-			cw->origin = XRenderCreatePicture(ps->dpy,
-					draw, cw->src.format, CPSubwindowMode, &pa);
-		}
-		if (cw->origin) {
-			XRenderSetPictureFilter(ps->dpy, cw->origin, FilterBest, 0, 0);
-		}
+			cw->shadow = XRenderCreatePicture(ps->dpy,
+					cw->cpixmap, cw->src.format, CPSubwindowMode, &pa);
+		//}
 	}
 
 	// Get window icon
@@ -197,8 +207,17 @@ clientwin_update(ClientWin *cw) {
 	cw->mini.x = cw->mini.y = 0;
 	cw->mini.width = cw->mini.height = 1;
 
+	// modes are CLIDISP_THUMBNAIL_ICON, CLIDISP_THUMBNAIL, CLIDISP_ZOMBIE,
+	// CLIDISP_ICON, CLIDISP_FILLED, CLIDISP_NONE
+	// if we ever got a thumbnail for the window,
+	// the mode for that window always will be thumbnail
+	//
+	// FUTURE: when config is reloaded with less modes,
+	// then clientwin_get_disp_mode() may get different result,
+	// so that clientwin_update() needs to be called
+	// after reloading config file
 	cw->mode = clientwin_get_disp_mode(ps, cw);
-	// printfdf("(%#010lx): %d", cw->wid_client, cw->mode);
+	//printfdf("(%#010lx): %d", cw->wid_client, cw->mode);
 
 	return true;
 }
@@ -241,6 +260,7 @@ clientwin_update2(ClientWin *cw) {
 		case CLIDISP_ICON:
 			clientwin_update2_icon(ps, mw, cw);
 			break;
+		case CLIDISP_ZOMBIE:
 		case CLIDISP_THUMBNAIL:
 		case CLIDISP_THUMBNAIL_ICON:
 			break;
@@ -283,7 +303,8 @@ clientwin_destroy(ClientWin *cw, bool destroyed) {
 }
 
 static void
-clientwin_repaint(ClientWin *cw, const XRectangle *pbound) {
+clientwin_repaint(ClientWin *cw, const XRectangle *pbound)
+{
 	session_t *ps = cw->mainwin->ps;
 	Picture source = None;
 	int s_x = 0, s_y = 0, s_w = cw->mini.width, s_h = cw->mini.height;
@@ -294,8 +315,7 @@ clientwin_repaint(ClientWin *cw, const XRectangle *pbound) {
 		s_h = pbound->height;
 	}
 
-	// printfdf("(%#010lx): %d, %d, %d, %d", cw->wid_client, s_x, s_y, s_w, s_h);
-
+            clientwin_update2(cw);
 	switch (cw->mode) {
 		case CLIDISP_NONE:
 			break;
@@ -305,6 +325,9 @@ clientwin_repaint(ClientWin *cw, const XRectangle *pbound) {
 		case CLIDISP_ICON:
 			source = cw->icon_pict_filled->pict;
 			break;
+		case CLIDISP_ZOMBIE:
+			source = cw->shadow;
+			break;
 		case CLIDISP_THUMBNAIL:
 		// We will draw the icon later
 		case CLIDISP_THUMBNAIL_ICON:
@@ -312,13 +335,14 @@ clientwin_repaint(ClientWin *cw, const XRectangle *pbound) {
 			break;
 	}
 
-
 	if (!source) return;
 
 	// Drawing main picture
+	//if (!cw->zombie) //if(IsViewable == wattr.map_state)
 	{
 		const Picture mask = (cw->focused ? cw->mainwin->highlightPicture :
 				cw->mainwin->normalPicture);
+
 		if (ps->o.lazyTrans) {
 			XRenderComposite(ps->dpy, PictOpSrc, source, mask,
 					cw->destination, s_x, s_y, 0, 0, s_x, s_y, s_w, s_h);
@@ -343,19 +367,20 @@ clientwin_repaint(ClientWin *cw, const XRectangle *pbound) {
 	}
 
 	// Tinting
+	if (cw->mode >= CLIDISP_ZOMBIE) // tint only thumbnail
 	{
 		// here the client window is being tinted
-		// if (cw->focused)
-		// 	printfef("(): *tint = &cw->mainwin->highlightTint");
-		// else
-		// 	printfef("(): *tint = &cw->mainwin->normalTint");
+		XRenderColor *tint = &cw->mainwin->normalTint;
+		if (cw->focused)
+			tint = &cw->mainwin->highlightTint;
+		else if (cw->zombie)
+			tint = &cw->mainwin->shadowTint;
 
-		XRenderColor *tint = (cw->focused ? &cw->mainwin->highlightTint
-				: &cw->mainwin->normalTint);
 		if (tint->alpha)
 			XRenderFillRectangle(cw->mainwin->ps->dpy, PictOpOver, cw->destination, tint, s_x, s_y, s_w, s_h);
 	}
 
+	//if (!cw->zombie) //if(IsViewable == wattr.map_state)
 	XClearArea(cw->mainwin->ps->dpy, cw->mini.window, s_x, s_y, s_w, s_h, False);
 }
 
@@ -374,7 +399,7 @@ clientwin_repair(ClientWin *cw) {
 	{
 		XserverRegion rgn = XFixesCreateRegion(ps->dpy, 0, 0);
 		XDamageSubtract(ps->dpy, cw->damage, None, rgn);
-		if (CLIDISP_THUMBNAIL == cw->mode || CLIDISP_THUMBNAIL_ICON == cw->mode)
+		if (cw->mode >= CLIDISP_ZOMBIE)
 			rects = XFixesFetchRegion(ps->dpy, rgn, &nrects);
 		XFixesDestroyRegion(ps->dpy, rgn);
 	}
@@ -427,16 +452,16 @@ clientwin_move(ClientWin *cw, float f, int x, int y, float timeslice)
 	}
 
 	XMoveResizeWindow(cw->mainwin->ps->dpy, cw->mini.window, cw->mini.x - border, cw->mini.y - border, cw->mini.width, cw->mini.height);
-	
+
 	if(cw->pixmap)
 		XFreePixmap(cw->mainwin->ps->dpy, cw->pixmap);
-	
+
 	if(cw->destination)
 		XRenderFreePicture(cw->mainwin->ps->dpy, cw->destination);
-	
+
 	cw->pixmap = XCreatePixmap(cw->mainwin->ps->dpy, cw->mini.window, cw->mini.width, cw->mini.height, cw->mainwin->depth);
 	XSetWindowBackgroundPixmap(cw->mainwin->ps->dpy, cw->mini.window, cw->pixmap);
-	
+
 	cw->destination = XRenderCreatePicture(cw->mainwin->ps->dpy, cw->pixmap, cw->mini.format, 0, 0);
 }
 
@@ -451,6 +476,11 @@ clientwin_map(ClientWin *cw) {
 	if (cw->origin) {
 		cw->damage = XDamageCreate(ps->dpy, cw->src.window, XDamageReportDeltaRectangles);
 		XRenderSetPictureTransform(ps->dpy, cw->origin, &cw->mainwin->transform);
+	}
+
+	if (cw->shadow) {
+		cw->damage = XDamageCreate(ps->dpy, cw->src.window, XDamageReportDeltaRectangles);
+		XRenderSetPictureTransform(ps->dpy, cw->shadow, &cw->mainwin->transform);
 	}
 
 	clientwin_render(cw);
@@ -499,8 +529,8 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 
 	if (ev->type == KeyPress)
 	{
-		report_key(ev);
-		report_key_modifiers(evk);
+		//report_key(ev);
+		//report_key_modifiers(evk);
 		fputs("\n", stdout); fflush(stdout);
 
 		bool reverse_direction = false;
@@ -559,7 +589,7 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 
 		else if (arr_keycodes_includes(cw->mainwin->keycodes_ExitCancelOnPress, evk->keycode))
 		{
-			printfef("(): Quitting.");
+			//printfef("(): Quitting.");
 			mw->client_to_focus = mw->client_to_focus_on_cancel;
 			return 1;
 		}
@@ -574,8 +604,8 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 	{
 		// report_key(ev);
 
-		report_key(ev);
-		report_key_modifiers(evk);
+		//report_key(ev);
+		//report_key_modifiers(evk);
 		// fputs("\n", stdout); fflush(stdout);
 
 		if (arr_keycodes_includes(cw->mainwin->keycodes_ExitSelectOnRelease, evk->keycode))
@@ -589,7 +619,7 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 
 		else if (arr_keycodes_includes(cw->mainwin->keycodes_ExitCancelOnRelease, evk->keycode))
 		{
-			printfef("(): Quitting.");
+			//printfef("(): Quitting.");
 			return 1;
 		}
 	}
@@ -607,25 +637,25 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 				int ret = clientwin_action(cw,
 						ps->o.bindings_miwMouse[button]);
 				if (ret) {
-					printfef("(): Quitting.");
+					//printfef("(): Quitting.");
 					return ret;
 				}
 			}
 		}
-		else
-			printfef("(): ButtonRelease %u ignored.", button);
+		//else
+			//printfef("(): ButtonRelease %u ignored.", button);
 	}
 
 	else if (ev->type == FocusIn) {
-		printfef("(): else if (ev->type == FocusIn) {");
+		//printfef("(): else if (ev->type == FocusIn) {");
 		XFocusChangeEvent *evf = &ev->xfocus;
 
 		// for debugging XEvents
 		// see: https://tronche.com/gui/x/xlib/events/input-focus/normal-and-grabbed.html
-		printfef("(): main window id = %#010lx", cw->mainwin->window);
-		printfefWindowName(ps, "(): client window = ", cw->mainwin->window);
-		printfef("(): client window id = %#010lx", cw->wid_client);
-		printfefXFocusChangeEvent(ps, evf);
+		//printfef("(): main window id = %#010lx", cw->mainwin->window);
+		//printfefWindowName(ps, "(): client window = ", cw->mainwin->window);
+		//printfef("(): client window id = %#010lx", cw->wid_client);
+		//printfefXFocusChangeEvent(ps, evf);
 
 		// printfef("(): usleep(10000);");
 		// usleep(10000);
@@ -639,15 +669,15 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 		XFlush(ps->dpy);
 
 	} else if (ev->type == FocusOut) {
-		printfef("(): else if (ev->type == FocusOut) {");
+		//printfef("(): else if (ev->type == FocusOut) {");
 		XFocusChangeEvent *evf = &ev->xfocus;
 
 		// for debugging XEvents
 		// see: https://tronche.com/gui/x/xlib/events/input-focus/normal-and-grabbed.html
-		printfef("(): main window id = %#010lx", cw->mainwin->window);
-		printfefWindowName(ps, "(): client window = ", cw->mainwin->window);
-		printfef("(): client window id = %#010lx", cw->wid_client);
-		printfefXFocusChangeEvent(ps, evf);
+		//printfef("(): main window id = %#010lx", cw->mainwin->window);
+		//printfefWindowName(ps, "(): client window = ", cw->mainwin->window);
+		//printfef("(): client window id = %#010lx", cw->wid_client);
+		//printfefXFocusChangeEvent(ps, evf);
 
 		// printfef("(): usleep(10000);");
 		// usleep(10000);
@@ -692,7 +722,7 @@ clientwin_action(ClientWin *cw, enum cliop action) {
 		case CLIENTOP_NO:
 			break;
 		case CLIENTOP_FOCUS:
-			printfef("(): case CLIENTOP_FOCUS:");
+			//printfef("(): case CLIENTOP_FOCUS:");
 			mw->client_to_focus = cw;
 			return 1;
 		case CLIENTOP_ICONIFY:

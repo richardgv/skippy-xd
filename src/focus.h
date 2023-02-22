@@ -82,7 +82,7 @@ focus_miniw_adv(session_t *ps, ClientWin *cw, bool move_ptr) {
 
 	clear_focus_all(cw->mainwin->cod);
 
-	printfefWindowName(ps, "(): window = ", cw->wid_client);
+	//printfefWindowName(ps, "(): window = ", cw->wid_client);
 
 	if (unlikely(!cw))
 	{

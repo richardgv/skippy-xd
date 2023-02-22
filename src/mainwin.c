@@ -197,7 +197,7 @@ mainwin_create(session_t *ps) {
 	if(tmp_d != 0.0)
 		mw->poll_time = (1.0 / tmp_d) * 1000.0;
 	else
-		mw->poll_time = 0;
+		mw->poll_time = (1.0 / 60.0) * 1000.0;
 	
 	if(!XParseColor(ps->dpy, mw->colormap, ps->o.normal_tint, &exact_color)) {
 		printfef("(): Couldn't look up color '%s', reverting to black.", ps->o.normal_tint);
@@ -226,6 +226,20 @@ mainwin_create(session_t *ps) {
 	}
 	mw->highlightTint.alpha = alphaconv(ps->o.highlight_tintOpacity);
 	
+	tmp = ps->o.shadow_tint;
+	if(! XParseColor(ps->dpy, mw->colormap, tmp, &exact_color))
+	{
+		fprintf(stderr, "Couldn't look up color '%s', reverting to #010101", tmp);
+		mw->shadowTint.red = mw->shadowTint.green =	mw->shadowTint.blue = 0x01;
+	}
+	else
+	{
+		mw->shadowTint.red = exact_color.red;
+		mw->shadowTint.green = exact_color.green;
+		mw->shadowTint.blue = exact_color.blue;
+	}
+	mw->shadowTint.alpha = alphaconv(ps->o.shadow_tintOpacity);
+
 	pa.repeat = True;
 	clear.alpha = alphaconv(ps->o.normal_opacity);
 	mw->normalPixmap = XCreatePixmap(ps->dpy, mw->window, 1, 1, 8);
@@ -237,6 +251,11 @@ mainwin_create(session_t *ps) {
 	mw->highlightPicture = XRenderCreatePicture(ps->dpy, mw->highlightPixmap, XRenderFindStandardFormat(ps->dpy, PictStandardA8), CPRepeat, &pa);
 	XRenderFillRectangle(ps->dpy, PictOpSrc, mw->highlightPicture, &clear, 0, 0, 1, 1);
 	
+	clear.alpha = alphaconv(ps->o.shadow_opacity);
+	mw->shadowPixmap = XCreatePixmap(ps->dpy, mw->window, 1, 1, 8);
+	mw->shadowPicture = XRenderCreatePicture(ps->dpy, mw->shadowPixmap, XRenderFindStandardFormat(ps->dpy, PictStandardA8), CPRepeat, &pa);
+	XRenderFillRectangle(ps->dpy, PictOpSrc, mw->shadowPicture, &clear, 0, 0, 1, 1);
+
 	mw->distance = ps->o.distance;
 	
 	if (ps->o.tooltip_show)

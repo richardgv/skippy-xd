@@ -18,7 +18,6 @@
  */
 
 #include "skippy.h"
-#include "anime.h"
 #include <errno.h>
 #include <locale.h>
 #include <getopt.h>
@@ -268,6 +267,7 @@ parse_client_disp_mode(session_t *ps, const char *s) {
 		{ CLIDISP_NONE, "none" },
 		{ CLIDISP_FILLED, "filled" },
 		{ CLIDISP_ICON, "icon" },
+		{ CLIDISP_ZOMBIE, "zombie" },
 		{ CLIDISP_THUMBNAIL, "thumbnail" },
 		{ CLIDISP_THUMBNAIL_ICON, "thumbnail-icon" },
 	};
@@ -310,25 +310,44 @@ parse_client_disp_mode(session_t *ps, const char *s) {
 	return ret;
 }
 
-static dlist *
-update_clients(MainWin *mw, dlist *clients, Bool *touched) {
-	dlist *stack = dlist_first(wm_get_stack(mw->ps));
+static void
+anime(
+	MainWin *mw,
+	dlist *clients,
+	float timeslice
+)
+{
 	clients = dlist_first(clients);
+	wm_get_current_desktop(mw->ps);
+	float multiplier = 1.0 + timeslice * (mw->multiplier - 1.0);
+	mainwin_transform(mw, multiplier);
+	foreach_dlist (mw->cod) {
+		clientwin_move((ClientWin *) iter->data, multiplier, mw->xoff, mw->yoff, timeslice);
+		clientwin_map((ClientWin*)iter->data);
+	}
+}
+
+static void
+update_clients(MainWin *mw, Bool *touched)
+{
+	// Update the client table, pick the ones we want and sort them
+	dlist *stack = dlist_first(wm_get_stack(mw->ps));
+	mw->clients = dlist_first(mw->clients);
 
 	if (touched)
 		*touched = False;
 	
-	// Terminate clients that are no longer managed
-	for (dlist *iter = clients; iter; ) {
+	// Terminate mw->clients that are no longer managed
+	for (dlist *iter = mw->clients; iter; ) {
 		ClientWin *cw = (ClientWin *) iter->data;
-		if (dlist_find_data(stack, (void *) cw->src.window)
-				&& clientwin_update(cw)) {
+		if (dlist_find_data(stack, (void *) cw->wid_client)
+				/*&& clientwin_update(cw)*/) {
 			iter = iter->next;
 		}
 		else {
 			dlist *tmp = iter->next;
 			clientwin_destroy((ClientWin *) iter->data, True);
-			clients = dlist_remove(iter);
+			mw->clients = dlist_remove(iter);
 			iter = tmp;
 			if (touched)
 				*touched = True;
@@ -336,48 +355,51 @@ update_clients(MainWin *mw, dlist *clients, Bool *touched) {
 	}
 	XFlush(mw->ps->dpy);
 
-	// Add new clients
+	// Add new mw->clients
 	foreach_dlist (stack) {
 		ClientWin *cw = (ClientWin *)
-			dlist_find(clients, clientwin_cmp_func, iter->data);
+			dlist_find(mw->clients, clientwin_cmp_func, iter->data);
 		if (!cw && ((Window) iter->data) != mw->window) {
 			cw = clientwin_create(mw, (Window)iter->data);
 			if (!cw) continue;
-			clients = dlist_add(clients, cw);
-			clientwin_update(cw);
+			mw->clients = dlist_add(mw->clients, cw);
+			/*clientwin_update(cw)*/;
 			if (touched)
 				*touched = True;
 		}
 	}
 
 	dlist_free(stack);
-
-	return clients;
 }
 
-static dlist *
-do_layout(MainWin *mw, dlist *clients, Window focus, Window leader) {
-	session_t * const ps = mw->ps;
+static void
+daemon_count_clients(MainWin *mw, Bool *touched, Window leader)
+{
+	// given the client table, update the cod
+	// the difference between mw->clients and mw->cod
+	// is that mw->clients is all the client windows 
+	// while mw->cod is only those in current virtual desktop
+	// if that option is user supplied
 
-	long desktop = wm_get_current_desktop(ps);
-	
-	/* Update the client table, pick the ones we want and sort them */
 	// printfef("(): updating dl list of clients");
-	clients = update_clients(mw, clients, 0);
-	if (!clients) {
+	update_clients(mw, 0);
+	if (!mw->clients) {
 		printfef("(): No client windows found.");
-		return clients;
+		return;
 	}
 
 	dlist_free(mw->cod);
 	mw->cod = NULL;
 
 	{
-		dlist *tmp = dlist_first(dlist_find_all(clients,
+        session_t * const ps = mw->ps;
+        long desktop = wm_get_current_desktop(ps);
+
+		dlist *tmp = dlist_first(dlist_find_all(mw->clients,
 					(dlist_match_func) clientwin_validate_func, &desktop));
 		if (!tmp) {
 			printfef("(): No client window on current desktop found.");
-			return clients;
+			return;
 		}
 
 		if (leader) {
@@ -388,25 +410,31 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader) {
 			mw->cod = tmp;
 		}
 	}
-	
+
+	return;
+}
+
+static dlist *
+init_layout(MainWin *mw, Window focus, Window leader)
+{
 	if (!mw->cod)
-		return clients;
+		return;
 	
 	dlist_sort(mw->cod, clientwin_sort_func, 0);
 
-	/* Move the mini windows around */
+	/* set up the windows layout */
 	{
-		unsigned int newwidth = 0, newheight = 0;
+		int newwidth = 0, newheight = 0;
 		layout_run(mw, mw->cod, &newwidth, &newheight);
 
 		// ordering of client windows list
 		// is important for prev/next window selection
 		dlist_sort(mw->cod, sort_cw_by_pos, 0);
 
-		float multiplier = (float) (mw->width - 100) / newwidth;
-		if (multiplier * newheight > mw->height - 100)
-			multiplier = (float) (mw->height - 100) / newheight;
-		if (!ps->o.allowUpscale)
+		float multiplier = (float) (mw->width - 2 * mw->distance) / newwidth;
+		if (multiplier * newheight > mw->height - 2 * mw->distance)
+			multiplier = (float) (mw->height - 2 * mw->distance) / newheight;
+		if (!mw->ps->o.allowUpscale)
 			multiplier = MIN(multiplier, 1.0f);
 
 		int xoff = (mw->width - (float) newwidth * multiplier) / 2;
@@ -417,68 +445,9 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader) {
 		mw->yoff = yoff;
 		mw->newwidth = newwidth;
 		mw->newheight = newheight;
-
-		mainwin_transform(mw, multiplier);
-		foreach_dlist (mw->cod) {
-			clientwin_move((ClientWin *) iter->data, multiplier, xoff, yoff, 0);
-		}
 	}
 
-	foreach_dlist(mw->cod) {
-		clientwin_update2((ClientWin *) iter->data);
-	}
-
-	// Get the currently focused window and select which mini-window to focus
-	{
-		dlist *iter = dlist_find(mw->cod, clientwin_cmp_func, (void *) focus);
-
-		// check if the user specified --prev or --next on the cmdline
-		if(ps->o.focus_initial)
-		{
-
-			// ps->mainwin->ignore_next_refocus = 1;
-			// ps->mainwin->ignore_next_refocus = 2;
-			// ps->mainwin->ignore_next_refocus = 4;
-
-
-			if(ps->o.focus_initial == FI_PREV)
-			{
-				// here, mw->cod is the first (dlist*) item in the list
-				if (iter == mw->cod)
-					iter = dlist_last(mw->cod);
-				else
-				{
-					dlist *i = mw->cod;
-					for (; i != NULL; i = i->next)
-						if (i->next && i->next == iter)
-							break;
-					iter = i;
-				}
-			}
-			else if(ps->o.focus_initial == FI_NEXT)
-				iter = iter->next;
-
-		}
-
-
-		// then clear this flag, so daemon not remember on its next activation
-		ps->o.focus_initial = 0;
-
-		if (!iter)
-			iter = mw->cod;
-
-		// mw->focus = (ClientWin *) iter->data;
-		mw->client_to_focus = (ClientWin *) iter->data;
-		mw->client_to_focus_on_cancel = (ClientWin *) iter->data;
-		// mw->focus->focused = 1;
-
-
-		mw->client_to_focus->focused = 1;
-		// focus_miniw(ps, mw->client_to_focus);
-
-	}
-
-	return clients;
+	return;
 }
 
 static inline const char *
@@ -582,7 +551,8 @@ ev_dump(session_t *ps, const MainWin *mw, const XEvent *ev) {
 }
 
 static bool
-skippy_run_init(MainWin *mw, Window leader) {
+skippy_activate(MainWin *mw, Window leader)
+{
 	session_t *ps = mw->ps;
 
 	// Do this window before main window gets mapped
@@ -596,23 +566,72 @@ skippy_run_init(MainWin *mw, Window leader) {
 #endif /* CFG_XINERAMA */
 
 	// Map the main window and run our event loop
-	if (ps->o.lazyTrans) {
+	/*if (ps->o.lazyTrans) {
 		mainwin_map(mw);
 		XFlush(ps->dpy);
-	}
+	}*/
 
 	mw->client_to_focus = NULL;
 
-	mw->clients = do_layout(mw, mw->clients, mw->revert_focus_win, leader);
+	daemon_count_clients(mw, 0, leader);
+	foreach_dlist(mw->clients) {
+		clientwin_update((ClientWin *) iter->data);
+		clientwin_update2((ClientWin *) iter->data);
+	}
+
+	init_layout(mw, mw->revert_focus_win, leader);
 	if (!mw->cod) {
 		printfef("(): Failed to build layout.");
 		return false;
 	}
 
-	/* Map the main window and run our event loop */
-	if (!ps->o.lazyTrans)
-		mainwin_map(mw);
-	XFlush(ps->dpy);
+	// Get the currently focused window and select which mini-window to focus
+	{
+		dlist *iter = dlist_find(mw->cod, clientwin_cmp_func, (void *) mw->revert_focus_win);
+
+		// check if the user specified --prev or --next on the cmdline
+		if(ps->o.focus_initial)
+		{
+
+			// ps->mainwin->ignore_next_refocus = 1;
+			// ps->mainwin->ignore_next_refocus = 2;
+			// ps->mainwin->ignore_next_refocus = 4;
+
+
+			if(ps->o.focus_initial == FI_PREV)
+			{
+				// here, mw->cod is the first (dlist*) item in the list
+				if (iter == mw->cod)
+					iter = dlist_last(mw->cod);
+				else
+				{
+					dlist *i = mw->cod;
+					for (; i != NULL; i = i->next)
+						if (i->next && i->next == iter)
+							break;
+					iter = i;
+				}
+			}
+			else if(ps->o.focus_initial == FI_NEXT)
+				iter = iter->next;
+
+		}
+
+		// then clear this flag, so daemon not remember on its next activation
+		ps->o.focus_initial = 0;
+
+		if (!iter)
+			iter = mw->cod;
+
+		// mw->focus = (ClientWin *) iter->data;
+		mw->client_to_focus = (ClientWin *) iter->data;
+		mw->client_to_focus_on_cancel = (ClientWin *) iter->data;
+		// mw->focus->focused = 1;
+
+
+		mw->client_to_focus->focused = 1;
+		// focus_miniw(ps, mw->client_to_focus);
+	}
 
 	return true;
 }
@@ -647,9 +666,8 @@ mainloop(session_t *ps, bool activate_on_start) {
 	bool refocus = false;
 	bool pending_damage = false;
 	long last_rendered = 0L;
-	bool animating = true;
+	bool animating = activate;
 	long first_animated = 0L;
-	long last_animated = 0L;
 
 	struct pollfd r_fd[2] = {
 		{
@@ -674,18 +692,14 @@ mainloop(session_t *ps, bool activate_on_start) {
 			assert(ps->mainwin);
 			activate = false;
 
-			if (skippy_run_init(ps->mainwin, None)) {
-                // printfef("(): if (skippy_run_init(ps->mainwin, None)) {");
-                // printfef("(): was in skippy_run_init");
+			if (skippy_activate(ps->mainwin, None)) {
+                // printfef("(): if (skippy_activate(ps->mainwin, None)) {");
+                // printfef("(): was in skippy_activate");
 				last_rendered = time_in_millis();
 				mw = ps->mainwin;
 				refocus = false;
 				pending_damage = false;
-			}
-
-			first_animated = time_in_millis();
-			if (ps->o.animationDuration <= 0) {
-				ps->o.animationDuration = 1;
+				first_animated = time_in_millis();
 			}
 		}
 		if (mw)
@@ -731,13 +745,23 @@ mainloop(session_t *ps, bool activate_on_start) {
 		if (activate_on_start && !mw)
 			return;
 
-		// animation!
-		if (animating) {
-			if(time_in_millis() - last_animated > mw->poll_time) {
-				last_animated = time_in_millis();
+		// Poll for events
+		int timeout = ps->mainwin->poll_time;
+		int time_offset = last_rendered - time_in_millis();
+		timeout -= time_offset;
+		if (timeout < 0)
+			timeout = 0;
+		if (pending_damage)
+			timeout = 0;
+		poll(r_fd, (r_fd[1].fd >= 0 ? 2: 1), timeout);
+
+		{
+			// animation!
+			if (animating) {
+				last_rendered = time_in_millis();
 				long timeslice = time_in_millis() - first_animated;
 				anime(ps->mainwin, ps->mainwin->clients,
-						((float)timeslice)/(float)ps->o.animationDuration);
+					((float)timeslice)/(float)ps->o.animationDuration);
 				if ( timeslice >= ps->o.animationDuration) {
 					anime(ps->mainwin, ps->mainwin->clients, 1);
 					animating = false;
@@ -746,16 +770,14 @@ mainloop(session_t *ps, bool activate_on_start) {
 							ps->o.movePointerOnStart);
 				}
 
+				/* Map the main window and run our event loop */
+				if (!ps->o.lazyTrans && !mw->mapped)
+					mainwin_map(mw);
+				XFlush(ps->dpy);
+
+				continue; // while animating, do not allow user actions
 			}
-			continue; // while animating, do not allow user actions
-		}
 
-		// Poll for events
-		int timeout = (pending_damage && mw && mw->poll_time > 0 ?
-				MAX(0, mw->poll_time + last_rendered - time_in_millis()): -1);
-		poll(r_fd, (r_fd[1].fd >= 0 ? 2: 1), timeout);
-
-		if (mw) {
 			// Process X events
 			int num_events = 0;
 			XEvent ev = { };
@@ -767,8 +789,9 @@ mainloop(session_t *ps, bool activate_on_start) {
 				ev_dump(ps, mw, &ev);
 #endif
 				Window wid = ev_window(ps, &ev);
+//printfdf("(): Event!);
 
-				if (MotionNotify == ev.type)
+				if (mw && MotionNotify == ev.type)
 				{
 					// Speed up responsiveness when the user is moving the mouse around
 					// The queue gets filled up with consquetive MotionNotify events
@@ -804,15 +827,14 @@ mainloop(session_t *ps, bool activate_on_start) {
 						tooltip_move(mw->tooltip,
 								ev.xmotion.x_root, ev.xmotion.y_root);
 				}
-				else if (ev.type == DestroyNotify || ev.type == UnmapNotify) {
-					// printfef("(): else if (ev.type == DestroyNotify || ev.type == UnmapNotify) {");
+				else if (mw && ev.type == DestroyNotify) {
+					// printfef("(): else if (ev.type == DestroyNotify) {");
+					daemon_count_clients(ps->mainwin, 0, None);
 					dlist *iter = (wid ? dlist_find(mw->clients, clientwin_cmp_func, (void *) wid): NULL);
 					if (iter) {
 						// printfef("(): if (iter) {");
 						ClientWin *cw = (ClientWin *) iter->data;
-						if (DestroyNotify != ev.type)
-							cw->mode = clientwin_get_disp_mode(ps, cw);
-						if (DestroyNotify == ev.type || !cw->mode) {
+						if (!cw->mode) {
 							mw->clients = dlist_first(dlist_remove(iter));
 							iter = dlist_find(mw->cod, clientwin_cmp_func, (void *) wid);
 							if (iter)
@@ -835,25 +857,31 @@ mainloop(session_t *ps, bool activate_on_start) {
 						}
 					}
 				}
-				else if (ps->xinfo.damage_ev_base + XDamageNotify == ev.type) {
+				else if (ev.type == MapNotify || ev.type == UnmapNotify) {
+					//printfef("(): else if (ev.type == MapNotify || ev.type == UnmapNotify) {");
+					daemon_count_clients(ps->mainwin, 0, None);
+					dlist *iter = (wid ? dlist_find(ps->mainwin->clients, clientwin_cmp_func, (void *) wid): NULL);
+					if (iter) {
+						ClientWin *cw = (ClientWin *) iter->data;
+						clientwin_update(cw);
+						clientwin_update2(cw);
+						clientwin_render(cw);
+					}
+				}
+				else if (mw && (ps->xinfo.damage_ev_base + XDamageNotify == ev.type)) {
+					//printfef("(): else if (ev.type == XDamageNotify) {");
 					// XDamageNotifyEvent *d_ev = (XDamageNotifyEvent *) &ev;
-					dlist *iter = dlist_find(mw->cod, clientwin_cmp_func,
+					dlist *iter = dlist_find(ps->mainwin->clients, clientwin_cmp_func,
 							(void *) wid);
 					pending_damage = true;
 					if (iter) {
-						if (!mw->poll_time)
-						{
-							// printfef("(): if (!mw->poll_time)");
-							clientwin_repair((ClientWin *)iter->data);
-						}
-						else
-							((ClientWin *)iter->data)->damaged = true;
+						((ClientWin *)iter->data)->damaged = true;
 					}
-
 				}
-				else if (wid == mw->window)
+				else if (mw && wid == mw->window)
 					die = mainwin_handle(mw, &ev);
-				else if (PropertyNotify == ev.type) {
+				else if (mw && PropertyNotify == ev.type) {
+					printfef("(): else if (ev.type == PropertyNotify) {");
 
 					// printfef("(): else if (PropertyNotify == ev.type) {");
 
@@ -869,9 +897,9 @@ mainloop(session_t *ps, bool activate_on_start) {
 						REDUCE(clientwin_render((ClientWin *)iter->data), mw->cod);
 					}
 				}
-				else if (mw->tooltip && wid == mw->tooltip->window)
+				else if (mw && mw->tooltip && wid == mw->tooltip->window)
 					tooltip_handle(mw->tooltip, &ev);
-				else if (wid) {
+				else if (mw && wid) {
 					for (dlist *iter = mw->cod; iter; iter = iter->next) {
 						ClientWin *cw = (ClientWin *) iter->data;
 						if (cw->mini.window == wid) {
@@ -888,28 +916,26 @@ mainloop(session_t *ps, bool activate_on_start) {
 			}
 
 			// Do delayed painting if it's active
-			if (mw->poll_time && pending_damage && !die) {
-				long now = time_in_millis();
-				if (now >= last_rendered + mw->poll_time) {
-					pending_damage = false;
-					foreach_dlist(mw->cod) {
-						if (((ClientWin *) iter->data)->damaged)
-						{
-							// printfef("(): if (((ClientWin *) iter->data)->damaged)");
-							clientwin_repair(iter->data);
-							// fputs("\n", stdout);
-						}
+			if (mw && pending_damage && !die) {
+				//printfdf("(): delayed painting");
+				pending_damage = false;
+				foreach_dlist(mw->cod) {
+					if (((ClientWin *) iter->data)->damaged)
+					{
+						// printfef("(): if (((ClientWin *) iter->data)->damaged)");
+						clientwin_repair(iter->data);
+						// fputs("\n", stdout);
 					}
-					last_rendered = now;
 				}
+				last_rendered = time_in_millis();
 			}
 
-			XFlush(ps->dpy);
-		}
-		else {
 			// Discards all events so that poll() won't constantly hit data to read
-			XSync(ps->dpy, True);
-			assert(!XEventsQueued(ps->dpy, QueuedAfterReading));
+			//XSync(ps->dpy, True);
+			//assert(!XEventsQueued(ps->dpy, QueuedAfterReading));
+
+			last_rendered = time_in_millis();
+			XFlush(ps->dpy);
 		}
 
 		// Handle daemon commands
@@ -968,7 +994,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 						else
 						{
 							printfef("(): activate = true;");
-							activate = true;
+							animating = activate = true;
 						}
 						break;
 					case PIPECMD_DEACTIVATE_WINDOW_PICKER:
@@ -979,7 +1005,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 						if (mw)
 							die = true;
 						else
-							activate = true;
+							animating = activate = true;
 						break;
 					case PIPECMD_EXIT_RUNNING_DAEMON:
 						printfdf("(): Exit command received, killing daemon...");
@@ -1113,7 +1139,7 @@ xerror(Display *dpy, XErrorEvent *ev) {
 	{
 		char buf[BUF_LEN] = "";
 		XGetErrorText(ps->dpy, ev->error_code, buf, BUF_LEN);
-		printf("error %d (%s) request %d minor %d serial %lu (\"%s\")\n",
+		printfef("error %d (%s) request %d minor %d serial %lu (\"%s\")\n",
 				ev->error_code, name, ev->request_code,
 				ev->minor_code, ev->serial, buf);
 	}
@@ -1440,6 +1466,7 @@ int main(int argc, char *argv[]) {
 		ps->o.pipePath = mstrdup(config_get(config, "general", "pipePath", "/tmp/skippy-xd-fifo"));
 		ps->o.normal_tint = mstrdup(config_get(config, "normal", "tint", "black"));
 		ps->o.highlight_tint = mstrdup(config_get(config, "highlight", "tint", "#101020"));
+		ps->o.shadow_tint = mstrdup(config_get(config, "shadow", "tint", "#010101"));
 		ps->o.tooltip_border = mstrdup(config_get(config, "tooltip", "border", "#e0e0e0"));
 		ps->o.tooltip_background = mstrdup(config_get(config, "tooltip", "background", "#404040"));
 		ps->o.tooltip_text = mstrdup(config_get(config, "tooltip", "text", "#e0e0e0"));
@@ -1504,6 +1531,8 @@ int main(int argc, char *argv[]) {
 		config_get_int_wrap(config, "normal", "opacity", &ps->o.normal_opacity, 0, 256);
 		config_get_int_wrap(config, "highlight", "tintOpacity", &ps->o.highlight_tintOpacity, 0, 256);
 		config_get_int_wrap(config, "highlight", "opacity", &ps->o.highlight_opacity, 0, 256);
+		config_get_int_wrap(config, "shadow", "tintOpacity", &ps->o.shadow_tintOpacity, 0, 256);
+		config_get_int_wrap(config, "shadow", "opacity", &ps->o.shadow_opacity, 0, 256);
 		config_get_bool_wrap(config, "tooltip", "show", &ps->o.tooltip_show);
 		config_get_bool_wrap(config, "tooltip", "followsMouse", &ps->o.tooltip_followsMouse);
 		config_get_int_wrap(config, "tooltip", "offsetX", &ps->o.tooltip_offsetX, INT_MIN, INT_MAX);
@@ -1518,7 +1547,7 @@ int main(int argc, char *argv[]) {
 				return RET_BADARG;
 			if (!ps->o.clientDisplayModes) {
 				static const client_disp_mode_t DEF_CLIDISPM[] = {
-					CLIDISP_THUMBNAIL_ICON, CLIDISP_THUMBNAIL, CLIDISP_ICON, CLIDISP_FILLED, CLIDISP_NONE
+					CLIDISP_THUMBNAIL_ICON, CLIDISP_THUMBNAIL, CLIDISP_ZOMBIE, CLIDISP_ICON, CLIDISP_FILLED, CLIDISP_NONE
 				};
 				ps->o.clientDisplayModes = allocchk(malloc(sizeof(DEF_CLIDISPM)));
 				memcpy(ps->o.clientDisplayModes, &DEF_CLIDISPM, sizeof(DEF_CLIDISPM));
@@ -1656,6 +1685,13 @@ int main(int argc, char *argv[]) {
 			while (read(ps->fd_pipe, buf, sizeof(buf)) > 0)
 				continue;
 			printfdf("(): Finished flushing pipe \"%s\".", pipePath);
+		}
+
+		daemon_count_clients(mw, 0, None);
+
+		foreach_dlist(mw->clients) {
+			clientwin_update((ClientWin *) iter->data);
+			clientwin_update2((ClientWin *) iter->data);
 		}
 
 		mainloop(ps, false);

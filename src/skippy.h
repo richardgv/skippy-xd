@@ -191,6 +191,7 @@ typedef enum {
 	CLIDISP_NONE,
 	CLIDISP_FILLED,
 	CLIDISP_ICON,
+	CLIDISP_ZOMBIE,
 	CLIDISP_THUMBNAIL,
 	CLIDISP_THUMBNAIL_ICON,
 } client_disp_mode_t;
@@ -247,6 +248,10 @@ typedef struct {
 	char *highlight_tint;
 	int highlight_tintOpacity;
 	int highlight_opacity;
+
+	char *shadow_tint;
+	int shadow_tintOpacity;
+	int shadow_opacity;
 
 	bool tooltip_show;
 	bool tooltip_followsMouse;

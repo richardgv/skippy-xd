@@ -44,13 +44,15 @@ struct _clientwin_t {
 	SkippyWindow mini;
 
 	Pixmap pixmap;
-	Picture origin, destination;
+	Picture origin, destination, shadow;
 	Damage damage;
 	float factor;
 
 	bool focused;
 
 	bool damaged;
+
+	bool zombie;
 	/* XserverRegion repair; */
 	
 	/* These are virtual positions set by the layout routine */
@@ -79,6 +81,9 @@ clientwin_get_disp_mode(session_t *ps, ClientWin *cw) {
 				break;
 			case CLIDISP_THUMBNAIL:
 				if (IsViewable == wattr.map_state && cw->origin) return *p;
+				break;
+			case CLIDISP_ZOMBIE:
+				if (cw->shadow) return *p;
 				break;
 			case CLIDISP_ICON:
 				if (cw->icon_pict) return *p;
