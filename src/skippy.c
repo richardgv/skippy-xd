@@ -478,11 +478,6 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader) {
 
 	}
 
-	// Unfortunately it does not work...
-	// focus_miniw_adv(ps, mw->focus, ps->o.movePointerOnStart);
-	focus_miniw_adv(ps, mw->client_to_focus, ps->o.movePointerOnStart);
-	// clientwin_render(mw->client_to_focus);
-
 	return clients;
 }
 
@@ -744,6 +739,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 				anime(ps->mainwin, ps->mainwin->clients,
 						((float)timeslice)/(float)ps->o.animationDuration);
 				if ( timeslice >= ps->o.animationDuration) {
+					anime(ps->mainwin, ps->mainwin->clients, 1);
 					animating = false;
 					last_rendered = time_in_millis();
 					focus_miniw_adv(ps, mw->client_to_focus,

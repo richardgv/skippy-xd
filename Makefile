@@ -83,12 +83,23 @@ install-check:
 	@echo "'make install' target folders:"
 	@echo "PREFIX=${PREFIX} DESTDIR=${DESTDIR} BINDIR=${BINDIR}"
 	@echo "skippy executables will be installed into: ${DESTDIR}${BINDIR}"
-	@echo "skippy's config file will be installed to: ${DESTDIR}/etc/xdg/skippy-xd.rc"
 
 install: ${BINS} skippy-xd.sample.rc
 	install -d "${DESTDIR}${BINDIR}/" "${DESTDIR}/etc/xdg/"
 	install -m 755 ${BINS} "${DESTDIR}${BINDIR}/"
+
+ifneq ("$(wildcard skippy-xd.rc)","")
+	@echo "your custom skippy config file will be installed to: ${DESTDIR}/etc/xdg/skippy-xd.rc"
+	install -m 644 skippy-xd.rc "${DESTDIR}/etc/xdg/skippy-xd.rc"
+
+	@echo "skippy's sample config file will be installed to: ${DESTDIR}/etc/xdg/skippy-xd.sample.rc"
+	install -m 644 skippy-xd.sample.rc "${DESTDIR}/etc/xdg/skippy-xd.sample.rc"
+else
+	@echo "skippy's default config file will be installed to: ${DESTDIR}/etc/xdg/skippy-xd.rc"
 	install -m 644 skippy-xd.sample.rc "${DESTDIR}/etc/xdg/skippy-xd.rc"
+	install -m 644 skippy-xd.sample.rc "${DESTDIR}/etc/xdg/skippy-xd.sample.rc"
+endif
+
 	install -m 755 skippy-xd-runner "${DESTDIR}${BINDIR}/"
 
 uninstall:
