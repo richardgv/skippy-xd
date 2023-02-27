@@ -617,7 +617,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 	bool refocus = false;
 	bool pending_damage = false;
 	long last_rendered = 0L;
-	bool animating = activate;
+	bool animating = true;
 	long first_animated = 0L;
 
 	struct pollfd r_fd[2] = {
@@ -949,7 +949,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 						else
 						{
 							printfef("(): activate = true;");
-							animating = activate = true;
+							activate = true;
 						}
 						break;
 					case PIPECMD_DEACTIVATE_WINDOW_PICKER:
@@ -960,7 +960,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 						if (mw)
 							die = true;
 						else
-							animating = activate = true;
+							activate = true;
 						break;
 					case PIPECMD_EXIT_RUNNING_DAEMON:
 						printfdf("(): Exit command received, killing daemon...");
