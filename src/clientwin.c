@@ -80,11 +80,6 @@ clientwin_create(MainWin *mw, Window client) {
 	XWindowAttributes attr = { };
 	XGetWindowAttributes(ps->dpy, client, &attr);
 
-	// Check if window is mapped
-	// TODO: Move to validate function?
-	if (!ps->o.showUnmapped && IsViewable != attr.map_state)
-		goto clientwin_create_err;
-
 	cw = smalloc(1, ClientWin);
 	{
 		static const ClientWin CLIENTWT_DEF = CLIENTWT_INIT;
@@ -170,32 +165,23 @@ clientwin_update(ClientWin *cw) {
 
 	if (IsViewable == wattr.map_state
 			&& !(ps->o.includeAllScreens && ps->o.avoidThumbnailsFromOtherScreens && ps->root != wattr.root)) {
-	//if (cw->mode == CLIDISP_THUMBNAIL || cw->mode == CLIDISP_THUMBNAIL_ICON) {
-
 		// Create window picture
-//		if (!(ps->o.useNameWindowPixmap && ps->o.forceNameWindowPixmap
-//					&& !cw->cpixmap)) {
-			Drawable draw = cw->cpixmap;
-			if (!draw) draw = cw->src.window;
+        Drawable draw = cw->cpixmap;
+        if (!draw) draw = cw->src.window;
 
-			static XRenderPictureAttributes pa = { .subwindow_mode = IncludeInferiors };
-			cw->origin = XRenderCreatePicture(ps->dpy,
-					cw->src.window, cw->src.format, CPSubwindowMode, &pa);
-//		}
-		if (cw->origin) {
-			XRenderSetPictureFilter(ps->dpy, cw->origin, FilterBest, 0, 0);
-		}
+        static XRenderPictureAttributes pa = { .subwindow_mode = IncludeInferiors };
+        cw->origin = XRenderCreatePicture(ps->dpy,
+                cw->src.window, cw->src.format, CPSubwindowMode, &pa);
+        XRenderSetPictureFilter(ps->dpy, cw->origin, FilterBest, 0, 0);
 
 		// Get window pixmap
-		//if (ps->o.useNameWindowPixmap) {
-			XCompositeRedirectWindow(ps->dpy, cw->src.window,
-					CompositeRedirectAutomatic);
-			cw->redirected = true;
-			cw->cpixmap = XCompositeNameWindowPixmap(ps->dpy, cw->src.window);
+        XCompositeRedirectWindow(ps->dpy, cw->src.window,
+                CompositeRedirectAutomatic);
+        cw->redirected = true;
+        cw->cpixmap = XCompositeNameWindowPixmap(ps->dpy, cw->src.window);
 
-			cw->shadow = XRenderCreatePicture(ps->dpy,
-					cw->cpixmap, cw->src.format, CPSubwindowMode, &pa);
-		//}
+        cw->shadow = XRenderCreatePicture(ps->dpy,
+                cw->cpixmap, cw->src.format, CPSubwindowMode, &pa);
 	}
 
 	// Get window icon
@@ -315,7 +301,6 @@ clientwin_repaint(ClientWin *cw, const XRectangle *pbound)
 		s_h = pbound->height;
 	}
 
-            clientwin_update2(cw);
 	switch (cw->mode) {
 		case CLIDISP_NONE:
 			break;
@@ -338,7 +323,6 @@ clientwin_repaint(ClientWin *cw, const XRectangle *pbound)
 	if (!source) return;
 
 	// Drawing main picture
-	//if (!cw->zombie) //if(IsViewable == wattr.map_state)
 	{
 		const Picture mask = (cw->focused ? cw->mainwin->highlightPicture :
 				cw->mainwin->normalPicture);
@@ -380,7 +364,6 @@ clientwin_repaint(ClientWin *cw, const XRectangle *pbound)
 			XRenderFillRectangle(cw->mainwin->ps->dpy, PictOpOver, cw->destination, tint, s_x, s_y, s_w, s_h);
 	}
 
-	//if (!cw->zombie) //if(IsViewable == wattr.map_state)
 	XClearArea(cw->mainwin->ps->dpy, cw->mini.window, s_x, s_y, s_w, s_h, False);
 }
 

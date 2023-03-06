@@ -63,12 +63,9 @@ movePointerOnStart = true
 movePointerOnSelect = true
 movePointerOnRaise = true
 switchDesktopOnActivate = false
-useNameWindowPixmap = false
-forceNameWindowPixmap = false
 includeFrame = true
 allowUpscale = true
 showAllDesktops = false
-showUnmapped = true
 preferredIconSize = 48
 clientDisplayModes = thumbnail-icon thumbnail zombie icon filled none
 iconFillSpec = orig mid mid #00FFFF
@@ -90,7 +87,7 @@ opacity = 255
 
 [shadow]
 tint = #040404
-tintOpacity = 64
+tintOpacity = 164
 opacity = 255
 
 [tooltip]

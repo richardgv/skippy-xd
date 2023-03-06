@@ -572,9 +572,9 @@ wm_validate_window(session_t *ps, Window wid) {
 		prop = wid_get_prop(ps, wid, _NET_WM_STATE, 8192, XA_ATOM, 32);
 		for (int i = 0; result && i < prop.nitems; i++) {
 			long v = prop.data32[i];
-			if (!ps->o.showUnmapped && _NET_WM_STATE_HIDDEN == v)
+			/*if (!ps->o.showUnmapped && _NET_WM_STATE_HIDDEN == v)
 				result = false;
-			else if (ps->o.ignoreSkipTaskbar
+			else*/ if (ps->o.ignoreSkipTaskbar
 					&& _NET_WM_STATE_SKIP_TASKBAR == v)
 				result = false;
 			else if (_NET_WM_STATE_SHADED == v)
@@ -585,11 +585,11 @@ wm_validate_window(session_t *ps, Window wid) {
 	}
 	else if (WMPSN_GNOME == ps->wmpsn) {
 		// Check _WIN_STATE
-		prop = wid_get_prop(ps, wid, _WIN_STATE, 1, XA_CARDINAL, 0);
+		/*prop = wid_get_prop(ps, wid, _WIN_STATE, 1, XA_CARDINAL, 0);
 		if (!ps->o.showUnmapped && winprop_get_int(&prop)
 				& (WIN_STATE_MINIMIZED | WIN_STATE_SHADED | WIN_STATE_HIDDEN))
 			result = false;
-		free_winprop(&prop);
+		free_winprop(&prop);*/
 
 		if (result && ps->o.ignoreSkipTaskbar) {
 			prop = wid_get_prop(ps, wid, _WIN_HINTS, 1, XA_CARDINAL, 0);

@@ -218,8 +218,6 @@ typedef struct {
 	double updateFreq;
 	int animationDuration;;
 	bool lazyTrans;
-	bool useNameWindowPixmap;
-	bool forceNameWindowPixmap;
 	bool includeFrame;
 	char *pipePath;
 	bool movePointerOnStart;
@@ -230,7 +228,6 @@ typedef struct {
 	bool includeAllScreens;
 	bool avoidThumbnailsFromOtherScreens;
 	bool showAllDesktops;
-	bool showUnmapped;
 	int preferredIconSize;
 	client_disp_mode_t *clientDisplayModes;
 	pictspec_t iconFillSpec;
@@ -294,8 +291,6 @@ typedef struct {
 	.updateFreq = 60.0, \
 	.animationDuration = 200, \
 	.lazyTrans = false, \
-	.useNameWindowPixmap = false, \
-	.forceNameWindowPixmap = false, \
 	.includeFrame = false, \
 	.pipePath = NULL, \
 	.movePointerOnStart = true, \
@@ -310,7 +305,6 @@ typedef struct {
 	.iconFillSpec = PICTSPECT_INIT, \
 	.fillSpec = PICTSPECT_INIT, \
 	.showAllDesktops = false, \
-	.showUnmapped = true, \
 	.buttonImgs = { NULL }, \
 	.background = NULL, \
 	.xinerama_showAll = true, \

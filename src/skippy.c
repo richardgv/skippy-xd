@@ -322,8 +322,10 @@ anime(
 	float multiplier = 1.0 + timeslice * (mw->multiplier - 1.0);
 	mainwin_transform(mw, multiplier);
 	foreach_dlist (mw->cod) {
-		clientwin_move((ClientWin *) iter->data, multiplier, mw->xoff, mw->yoff, timeslice);
-		clientwin_map((ClientWin*)iter->data);
+		ClientWin *cw = (ClientWin *) iter->data;
+		clientwin_update2(cw);
+		clientwin_move(cw, multiplier, mw->xoff, mw->yoff, timeslice);
+		clientwin_map(cw);
 	}
 }
 
@@ -414,7 +416,7 @@ daemon_count_clients(MainWin *mw, Bool *touched, Window leader)
 	return;
 }
 
-static dlist *
+static void
 init_layout(MainWin *mw, Window focus, Window leader)
 {
 	if (!mw->cod)
@@ -424,7 +426,7 @@ init_layout(MainWin *mw, Window focus, Window leader)
 
 	/* set up the windows layout */
 	{
-		int newwidth = 0, newheight = 0;
+		unsigned int newwidth = 0, newheight = 0;
 		layout_run(mw, mw->cod, &newwidth, &newheight);
 
 		// ordering of client windows list
@@ -1513,15 +1515,12 @@ int main(int argc, char *argv[]) {
 		config_get_double_wrap(config, "general", "updateFreq", &ps->o.updateFreq, -1000.0, 1000.0);
 		config_get_int_wrap(config, "general", "animationDuration", &ps->o.animationDuration, 0, 2000);
 		config_get_bool_wrap(config, "general", "lazyTrans", &ps->o.lazyTrans);
-		config_get_bool_wrap(config, "general", "useNameWindowPixmap", &ps->o.useNameWindowPixmap);
-		config_get_bool_wrap(config, "general", "forceNameWindowPixmap", &ps->o.forceNameWindowPixmap);
 		config_get_bool_wrap(config, "general", "includeFrame", &ps->o.includeFrame);
 		config_get_bool_wrap(config, "general", "allowUpscale", &ps->o.allowUpscale);
 		config_get_int_wrap(config, "general", "preferredIconSize", &ps->o.preferredIconSize, 1, INT_MAX);
 		config_get_bool_wrap(config, "general", "includeAllScreens", &ps->o.includeAllScreens);
 		config_get_bool_wrap(config, "general", "avoidThumbnailsFromOtherScreens", &ps->o.avoidThumbnailsFromOtherScreens);
 		config_get_bool_wrap(config, "general", "showAllDesktops", &ps->o.showAllDesktops);
-		config_get_bool_wrap(config, "general", "showUnmapped", &ps->o.showUnmapped);
 		config_get_bool_wrap(config, "general", "movePointerOnStart", &ps->o.movePointerOnStart);
 		config_get_bool_wrap(config, "general", "movePointerOnSelect", &ps->o.movePointerOnSelect);
 		config_get_bool_wrap(config, "general", "movePointerOnRaise", &ps->o.movePointerOnRaise);
