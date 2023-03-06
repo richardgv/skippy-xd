@@ -180,8 +180,10 @@ clientwin_update(ClientWin *cw) {
         cw->redirected = true;
         cw->cpixmap = XCompositeNameWindowPixmap(ps->dpy, cw->src.window);
 
-        cw->shadow = XRenderCreatePicture(ps->dpy,
-                cw->cpixmap, cw->src.format, CPSubwindowMode, &pa);
+			if (cw->shadow)
+				free_picture(ps, &cw->shadow);
+			cw->shadow = XRenderCreatePicture(ps->dpy,
+					cw->cpixmap, cw->src.format, CPSubwindowMode, &pa);
 	}
 
 	// Get window icon
@@ -262,6 +264,7 @@ clientwin_destroy(ClientWin *cw, bool destroyed) {
 
 	free_picture(ps, &cw->origin);
 	free_picture(ps, &cw->destination);
+	free_picture(ps, &cw->shadow);
 	free_pixmap(ps, &cw->pixmap);
 	free_pixmap(ps, &cw->cpixmap);
 	free_pictw(ps, &cw->icon_pict);
