@@ -394,40 +394,6 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader) {
 	
 	dlist_sort(mw->cod, clientwin_sort_func, 0);
 
-	/* Move the mini windows around */
-	{
-		unsigned int newwidth = 0, newheight = 0;
-		layout_run(mw, mw->cod, &newwidth, &newheight);
-
-		// ordering of client windows list
-		// is important for prev/next window selection
-		dlist_sort(mw->cod, sort_cw_by_pos, 0);
-
-		float multiplier = (float) (mw->width - 2 * mw->distance) / newwidth;
-		if (multiplier * newheight > mw->height - 2 * mw->distance)
-			multiplier = (float) (mw->height - 2 * mw->distance) / newheight;
-		if (!ps->o.allowUpscale)
-			multiplier = MIN(multiplier, 1.0f);
-
-		int xoff = (mw->width - (float) newwidth * multiplier) / 2;
-		int yoff = (mw->height - (float) newheight * multiplier) / 2;
-
-		mw->multiplier = multiplier;
-		mw->xoff = xoff;
-		mw->yoff = yoff;
-		mw->newwidth = newwidth;
-		mw->newheight = newheight;
-
-		mainwin_transform(mw, multiplier);
-		foreach_dlist (mw->cod) {
-			clientwin_move((ClientWin *) iter->data, multiplier, xoff, yoff, 0);
-		}
-	}
-
-	foreach_dlist(mw->cod) {
-		clientwin_update2((ClientWin *) iter->data);
-	}
-
 	// Get the currently focused window and select which mini-window to focus
 	{
 		dlist *iter = dlist_find(mw->cod, clientwin_cmp_func, (void *) focus);
@@ -476,6 +442,40 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader) {
 		mw->client_to_focus->focused = 1;
 		// focus_miniw(ps, mw->client_to_focus);
 
+	}
+
+	/* Move the mini windows around */
+	{
+		unsigned int newwidth = 0, newheight = 0;
+		layout_run(mw, mw->cod, &newwidth, &newheight);
+
+		// ordering of client windows list
+		// is important for prev/next window selection
+		dlist_sort(mw->cod, sort_cw_by_pos, 0);
+
+		float multiplier = (float) (mw->width - 2 * mw->distance) / newwidth;
+		if (multiplier * newheight > mw->height - 2 * mw->distance)
+			multiplier = (float) (mw->height - 2 * mw->distance) / newheight;
+		if (!ps->o.allowUpscale)
+			multiplier = MIN(multiplier, 1.0f);
+
+		int xoff = (mw->width - (float) newwidth * multiplier) / 2;
+		int yoff = (mw->height - (float) newheight * multiplier) / 2;
+
+		mw->multiplier = multiplier;
+		mw->xoff = xoff;
+		mw->yoff = yoff;
+		mw->newwidth = newwidth;
+		mw->newheight = newheight;
+
+		mainwin_transform(mw, multiplier);
+		foreach_dlist (mw->cod) {
+			clientwin_move((ClientWin *) iter->data, multiplier, xoff, yoff, 0);
+		}
+	}
+
+	foreach_dlist(mw->cod) {
+		clientwin_update2((ClientWin *) iter->data);
 	}
 
 	return clients;
