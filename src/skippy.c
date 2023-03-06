@@ -759,7 +759,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 
 		{
 			// animation!
-			if (animating) {
+			if (mw && animating) {
 				last_rendered = time_in_millis();
 				long timeslice = time_in_millis() - first_animated;
 				anime(ps->mainwin, ps->mainwin->clients,
