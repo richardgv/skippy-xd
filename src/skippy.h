@@ -225,8 +225,6 @@ typedef struct {
 	bool movePointerOnRaise;
 	bool switchDesktopOnActivate;
 	bool allowUpscale;
-	bool includeAllScreens;
-	bool avoidThumbnailsFromOtherScreens;
 	bool showAllDesktops;
 	int preferredIconSize;
 	client_disp_mode_t *clientDisplayModes;
@@ -298,8 +296,6 @@ typedef struct {
 	.movePointerOnRaise = true, \
 	.switchDesktopOnActivate = false, \
 	.allowUpscale = true, \
-	.includeAllScreens = false, \
-	.avoidThumbnailsFromOtherScreens = true, \
 	.preferredIconSize = 48, \
 	.clientDisplayModes = NULL, \
 	.iconFillSpec = PICTSPECT_INIT, \

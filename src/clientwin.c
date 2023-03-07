@@ -163,8 +163,7 @@ clientwin_update(ClientWin *cw) {
 
 	cw->zombie = wattr.map_state != IsViewable;
 
-	if (IsViewable == wattr.map_state
-			&& !(ps->o.includeAllScreens && ps->o.avoidThumbnailsFromOtherScreens && ps->root != wattr.root)) {
+	if (IsViewable == wattr.map_state) {
 		// Create window picture
         Drawable draw = cw->cpixmap;
         if (!draw) draw = cw->src.window;

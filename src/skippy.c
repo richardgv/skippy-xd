@@ -1518,8 +1518,6 @@ int main(int argc, char *argv[]) {
 		config_get_bool_wrap(config, "general", "includeFrame", &ps->o.includeFrame);
 		config_get_bool_wrap(config, "general", "allowUpscale", &ps->o.allowUpscale);
 		config_get_int_wrap(config, "general", "preferredIconSize", &ps->o.preferredIconSize, 1, INT_MAX);
-		config_get_bool_wrap(config, "general", "includeAllScreens", &ps->o.includeAllScreens);
-		config_get_bool_wrap(config, "general", "avoidThumbnailsFromOtherScreens", &ps->o.avoidThumbnailsFromOtherScreens);
 		config_get_bool_wrap(config, "general", "showAllDesktops", &ps->o.showAllDesktops);
 		config_get_bool_wrap(config, "general", "movePointerOnStart", &ps->o.movePointerOnStart);
 		config_get_bool_wrap(config, "general", "movePointerOnSelect", &ps->o.movePointerOnSelect);
