@@ -394,40 +394,6 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader) {
 	
 	dlist_sort(mw->cod, clientwin_sort_func, 0);
 
-	/* Move the mini windows around */
-	{
-		unsigned int newwidth = 0, newheight = 0;
-		layout_run(mw, mw->cod, &newwidth, &newheight);
-
-		// ordering of client windows list
-		// is important for prev/next window selection
-		dlist_sort(mw->cod, sort_cw_by_pos, 0);
-
-		float multiplier = (float) (mw->width - 2 * mw->distance) / newwidth;
-		if (multiplier * newheight > mw->height - 2 * mw->distance)
-			multiplier = (float) (mw->height - 2 * mw->distance) / newheight;
-		if (!ps->o.allowUpscale)
-			multiplier = MIN(multiplier, 1.0f);
-
-		int xoff = (mw->width - (float) newwidth * multiplier) / 2;
-		int yoff = (mw->height - (float) newheight * multiplier) / 2;
-
-		mw->multiplier = multiplier;
-		mw->xoff = xoff;
-		mw->yoff = yoff;
-		mw->newwidth = newwidth;
-		mw->newheight = newheight;
-
-		mainwin_transform(mw, multiplier);
-		foreach_dlist (mw->cod) {
-			clientwin_move((ClientWin *) iter->data, multiplier, xoff, yoff, 0);
-		}
-	}
-
-	foreach_dlist(mw->cod) {
-		clientwin_update2((ClientWin *) iter->data);
-	}
-
 	// Get the currently focused window and select which mini-window to focus
 	{
 		dlist *iter = dlist_find(mw->cod, clientwin_cmp_func, (void *) focus);
@@ -478,10 +444,39 @@ do_layout(MainWin *mw, dlist *clients, Window focus, Window leader) {
 
 	}
 
-	// Unfortunately it does not work...
-	// focus_miniw_adv(ps, mw->focus, ps->o.movePointerOnStart);
-	focus_miniw_adv(ps, mw->client_to_focus, ps->o.movePointerOnStart);
-	// clientwin_render(mw->client_to_focus);
+	/* Move the mini windows around */
+	{
+		unsigned int newwidth = 0, newheight = 0;
+		layout_run(mw, mw->cod, &newwidth, &newheight);
+
+		// ordering of client windows list
+		// is important for prev/next window selection
+		dlist_sort(mw->cod, sort_cw_by_pos, 0);
+
+		float multiplier = (float) (mw->width - 2 * mw->distance) / newwidth;
+		if (multiplier * newheight > mw->height - 2 * mw->distance)
+			multiplier = (float) (mw->height - 2 * mw->distance) / newheight;
+		if (!ps->o.allowUpscale)
+			multiplier = MIN(multiplier, 1.0f);
+
+		int xoff = (mw->width - (float) newwidth * multiplier) / 2;
+		int yoff = (mw->height - (float) newheight * multiplier) / 2;
+
+		mw->multiplier = multiplier;
+		mw->xoff = xoff;
+		mw->yoff = yoff;
+		mw->newwidth = newwidth;
+		mw->newheight = newheight;
+
+		mainwin_transform(mw, multiplier);
+		foreach_dlist (mw->cod) {
+			clientwin_move((ClientWin *) iter->data, multiplier, xoff, yoff, 0);
+		}
+	}
+
+	foreach_dlist(mw->cod) {
+		clientwin_update2((ClientWin *) iter->data);
+	}
 
 	return clients;
 }
@@ -652,7 +647,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 	bool refocus = false;
 	bool pending_damage = false;
 	long last_rendered = 0L;
-	bool animating = true;
+	bool animating = activate;
 	long first_animated = 0L;
 	long last_animated = 0L;
 
@@ -744,6 +739,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 				anime(ps->mainwin, ps->mainwin->clients,
 						((float)timeslice)/(float)ps->o.animationDuration);
 				if ( timeslice >= ps->o.animationDuration) {
+					anime(ps->mainwin, ps->mainwin->clients, 1);
 					animating = false;
 					last_rendered = time_in_millis();
 					focus_miniw_adv(ps, mw->client_to_focus,
@@ -972,7 +968,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 						else
 						{
 							printfef("(): activate = true;");
-							activate = true;
+							animating = activate = true;
 						}
 						break;
 					case PIPECMD_DEACTIVATE_WINDOW_PICKER:
@@ -983,7 +979,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 						if (mw)
 							die = true;
 						else
-							activate = true;
+							animating = activate = true;
 						break;
 					case PIPECMD_EXIT_RUNNING_DAEMON:
 						printfdf("(): Exit command received, killing daemon...");
