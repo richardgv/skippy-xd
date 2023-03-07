@@ -39,7 +39,10 @@
 // = total windows width and height + minimal distance between windows
 void layout_run(MainWin *mw, dlist *windows,
 		unsigned int *total_width, unsigned int *total_height) {
-	layout_boxy(mw, windows, total_width, total_height);
+	if (mw->ps->o.layout == LAYOUT_BOXY)
+		layout_boxy(mw, windows, total_width, total_height);
+	else if (mw->ps->o.layout == LAYOUT_XD)
+		layout_xd(mw, windows, total_width, total_height);
 }
 
 // original legacy layout
