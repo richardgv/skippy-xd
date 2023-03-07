@@ -86,6 +86,7 @@ clientwin_create(MainWin *mw, Window client) {
 		memcpy(cw, &CLIENTWT_DEF, sizeof(ClientWin));
 	}
 
+    cw->slots = 0;
 	cw->mainwin = mw;
 	cw->wid_client = client;
 	cw->origin = None;

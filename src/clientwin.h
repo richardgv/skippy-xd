@@ -57,6 +57,7 @@ struct _clientwin_t {
 	
 	/* These are virtual positions set by the layout routine */
 	int x, y;
+    int slots;
 };
 
 #define CLIENTWT_INIT { \

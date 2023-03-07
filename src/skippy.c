@@ -1507,6 +1507,20 @@ int main(int argc, char *argv[]) {
 				|| !parse_cliop(ps, config_get(config, "bindings", "miwMouse2", "close-ewmh"), &ps->o.bindings_miwMouse[2])
 				|| !parse_cliop(ps, config_get(config, "bindings", "miwMouse3", "iconify"), &ps->o.bindings_miwMouse[3]))
 			return RET_BADARG;
+		{
+			const char *s = config_get(config, "general", "layout", NULL);
+			if (s) {
+			   if (strcmp(s,"boxy") == 0) {
+				   ps->o.layout = LAYOUT_BOXY;
+			   }
+			   else if (strcmp(s,"xd") == 0) {
+				   ps->o.layout = LAYOUT_XD;
+			   }
+			   else {
+				   ps->o.layout = LAYOUT_BOXY;
+			   }
+			}
+		}
 		config_get_int_wrap(config, "general", "distance", &ps->o.distance, 1, INT_MAX);
 		config_get_bool_wrap(config, "general", "useNetWMFullscreen", &ps->o.useNetWMFullscreen);
 		config_get_bool_wrap(config, "general", "ignoreSkipTaskbar", &ps->o.ignoreSkipTaskbar);

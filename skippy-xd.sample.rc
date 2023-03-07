@@ -52,6 +52,7 @@
 #
 
 [general]
+layout = boxy
 distance = 50
 useNetWMFullscreen = true
 ignoreSkipTaskbar = true
