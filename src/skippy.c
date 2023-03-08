@@ -908,6 +908,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 				switch (piped_input) {
 					case PIPECMD_RELOAD_CONFIG:
 						load_config_file(ps);
+						mainwin_reload(ps, ps->mainwin);
 						break;
 					case PIPECMD_QUEUE_FI_PREV:
 						ps->o.focus_initial = FI_PREV;
@@ -1704,6 +1705,7 @@ main_end:
 			free(ps->o.clientDisplayModes);
 			free(ps->o.normal_tint);
 			free(ps->o.highlight_tint);
+			free(ps->o.shadow_tint);
 			free(ps->o.tooltip_border);
 			free(ps->o.tooltip_background);
 			free(ps->o.tooltip_text);

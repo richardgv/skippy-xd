@@ -165,10 +165,6 @@ clientwin_update(ClientWin *cw) {
 	cw->zombie = wattr.map_state != IsViewable;
 
 	if (IsViewable == wattr.map_state) {
-		// Create window picture
-        Drawable draw = cw->cpixmap;
-        if (!draw) draw = cw->src.window;
-
         static XRenderPictureAttributes pa = { .subwindow_mode = IncludeInferiors };
         cw->origin = XRenderCreatePicture(ps->dpy,
                 cw->src.window, cw->src.format, CPSubwindowMode, &pa);
@@ -180,10 +176,10 @@ clientwin_update(ClientWin *cw) {
         cw->redirected = true;
         cw->cpixmap = XCompositeNameWindowPixmap(ps->dpy, cw->src.window);
 
-			if (cw->shadow)
-				free_picture(ps, &cw->shadow);
-			cw->shadow = XRenderCreatePicture(ps->dpy,
-					cw->cpixmap, cw->src.format, CPSubwindowMode, &pa);
+		if (cw->shadow)
+			free_picture(ps, &cw->shadow);
+		cw->shadow = XRenderCreatePicture(ps->dpy,
+			cw->cpixmap, cw->src.format, CPSubwindowMode, &pa);
 	}
 
 	// Get window icon

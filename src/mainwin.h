@@ -97,6 +97,7 @@ struct _mainwin_t {
 };
 
 MainWin *mainwin_create(session_t *ps);
+MainWin *mainwin_reload(session_t *ps, MainWin *mw);
 void mainwin_destroy(MainWin *);
 void mainwin_map(MainWin *);
 void mainwin_unmap(MainWin *);

@@ -50,14 +50,6 @@ MainWin *
 mainwin_create(session_t *ps) {
 	Display * const dpy = ps->dpy;
 
-	const char *tmp;
-	double tmp_d;
-	XColor exact_color;
-	XSetWindowAttributes wattr;
-	XWindowAttributes rootattr;
-	XRenderPictureAttributes pa;
-	XRenderColor clear;
-
 	// Get ARGB visual.
 	// FIXME: Move this to skippy.c?
 	if (!ps->argb_visual)
@@ -67,22 +59,9 @@ mainwin_create(session_t *ps) {
 	MainWin *mw = allocchk(calloc(1, sizeof(MainWin)));
 
 	mw->ps = ps;
-	if (ps->o.lazyTrans) {
-		mw->depth  = 32;
-		mw->visual = ps->argb_visual;
-		if (!mw->visual) {
-			printfef("(): Couldn't find ARGB visual, lazy transparency can't work.");
-			goto mainwin_create_err;
-		}
-	}
-	if (!ps->o.lazyTrans) {
-		mw->depth = DefaultDepth(dpy, ps->screen);
-		mw->visual = DefaultVisual(dpy, ps->screen);
-	}
-	mw->colormap = XCreateColormap(dpy, ps->root, mw->visual, AllocNone);
 	mw->bg_pixmap = None;
 	mw->background = None;
-	mw->format = XRenderFindVisualFormat(dpy, mw->visual);
+
 #ifdef CFG_XINERAMA
 	mw->xin_info = mw->xin_active = 0;
 	mw->xin_screens = 0;
@@ -92,6 +71,54 @@ mainwin_create(session_t *ps) {
 	mw->pressed = mw->client_to_focus = 0;
 	mw->tooltip = 0;
 	mw->cod = 0;
+
+	XWindowAttributes rootattr;
+	XGetWindowAttributes(dpy, ps->root, &rootattr);
+	mw->x = mw->y = 0;
+	mw->width = rootattr.width;
+	mw->height = rootattr.height;
+
+	XSetWindowAttributes wattr;
+	wattr.colormap = mw->colormap;
+	wattr.background_pixel = wattr.border_pixel = 0;
+	wattr.override_redirect = True;
+	// I have no idea why, but seemingly without ButtonPressMask, we can't
+	// receive ButtonRelease events in some cases
+	wattr.event_mask = VisibilityChangeMask | ButtonPressMask
+		| ButtonReleaseMask | KeyPressMask | KeyReleaseMask;
+	
+	mw->window = XCreateWindow(dpy, ps->root, 0, 0, mw->width, mw->height, 0,
+			mw->depth, InputOutput, mw->visual,
+			CWBackPixel | CWBorderPixel | CWColormap | CWEventMask | CWOverrideRedirect, &wattr);
+	if (!mw->window) {
+		free(mw);
+		return 0;
+	}
+	wm_wid_set_info(ps, mw->window, "main window", None);
+
+#ifdef CFG_XINERAMA
+	if (ps->xinfo.xinerama_exist && XineramaIsActive(dpy)) {
+		mw->xin_info = XineramaQueryScreens(ps->dpy, &mw->xin_screens);
+# ifdef DEBUG_XINERAMA
+		printfef("(): Xinerama is enabled (%d screens).", mw->xin_screens);
+# endif /* DEBUG_XINERAMA */
+	}
+#endif /* CFG_XINERAMA */
+
+	XCompositeRedirectSubwindows (ps->dpy, ps->root, CompositeRedirectAutomatic);
+
+	return mainwin_reload(ps, mw);
+}
+
+MainWin *
+mainwin_reload(session_t *ps, MainWin *mw) {
+	Display * const dpy = ps->dpy;
+
+	const char *tmp;
+	double tmp_d;
+	XColor exact_color;
+	XRenderPictureAttributes pa;
+	XRenderColor clear;
 
 	// convert the keybindings settings strings into arrays of KeySyms
 	keys_str_syms(ps->o.bindings_keysUp, &mw->keysyms_Up);
@@ -159,46 +186,29 @@ mainwin_create(session_t *ps) {
 	check_keybindings_conflict(ps->o.config_path, "keysExitCancelOnRelease", mw->keysyms_ExitCancelOnRelease, "keysExitSelectOnPress", mw->keysyms_ExitSelectOnPress);
 	check_keybindings_conflict(ps->o.config_path, "keysExitCancelOnRelease", mw->keysyms_ExitCancelOnRelease, "keysExitSelectOnRelease", mw->keysyms_ExitSelectOnRelease);
 	check_keybindings_conflict(ps->o.config_path, "keysExitSelectOnPress", mw->keysyms_ExitSelectOnPress, "keysExitSelectOnRelease", mw->keysyms_ExitSelectOnRelease);
-
-	XGetWindowAttributes(dpy, ps->root, &rootattr);
-	mw->x = mw->y = 0;
-	mw->width = rootattr.width;
-	mw->height = rootattr.height;
-	
-	wattr.colormap = mw->colormap;
-	wattr.background_pixel = wattr.border_pixel = 0;
-	wattr.override_redirect = True;
-	// I have no idea why, but seemingly without ButtonPressMask, we can't
-	// receive ButtonRelease events in some cases
-	wattr.event_mask = VisibilityChangeMask | ButtonPressMask
-		| ButtonReleaseMask | KeyPressMask | KeyReleaseMask;
-	
-	mw->window = XCreateWindow(dpy, ps->root, 0, 0, mw->width, mw->height, 0,
-			mw->depth, InputOutput, mw->visual,
-			CWBackPixel | CWBorderPixel | CWColormap | CWEventMask | CWOverrideRedirect, &wattr);
-	if (!mw->window) {
-		free(mw);
-		return 0;
-	}
-	wm_wid_set_info(ps, mw->window, "main window", None);
-
-#ifdef CFG_XINERAMA
-	if (ps->xinfo.xinerama_exist && XineramaIsActive(dpy)) {
-		mw->xin_info = XineramaQueryScreens(ps->dpy, &mw->xin_screens);
-# ifdef DEBUG_XINERAMA
-		printfef("(): Xinerama is enabled (%d screens).", mw->xin_screens);
-# endif /* DEBUG_XINERAMA */
-	}
-#endif /* CFG_XINERAMA */
-
-	XCompositeRedirectSubwindows (ps->dpy, ps->root, CompositeRedirectAutomatic);
 	
 	tmp_d = ps->o.updateFreq;
 	if(tmp_d != 0.0)
 		mw->poll_time = (1.0 / tmp_d) * 1000.0;
 	else
-		mw->poll_time = (1.0 / 60.0) * 1000.0;
-	
+		mw->poll_time = (1.0 / 200.0) * 1000.0;
+
+	if (ps->o.lazyTrans) {
+		mw->depth  = 32;
+		mw->visual = ps->argb_visual;
+		if (!mw->visual) {
+			printfef("(): Couldn't find ARGB visual, lazy transparency can't work.");
+			goto mainwin_create_err;
+		}
+	}
+	if (!ps->o.lazyTrans) {
+		mw->depth = DefaultDepth(dpy, ps->screen);
+		mw->visual = DefaultVisual(dpy, ps->screen);
+	}
+
+	mw->colormap = XCreateColormap(dpy, ps->root, mw->visual, AllocNone);
+	mw->format = XRenderFindVisualFormat(dpy, mw->visual);
+
 	if(!XParseColor(ps->dpy, mw->colormap, ps->o.normal_tint, &exact_color)) {
 		printfef("(): Couldn't look up color '%s', reverting to black.", ps->o.normal_tint);
 		mw->normalTint.red = mw->normalTint.green = mw->normalTint.blue = 0;
@@ -229,8 +239,8 @@ mainwin_create(session_t *ps) {
 	tmp = ps->o.shadow_tint;
 	if(! XParseColor(ps->dpy, mw->colormap, tmp, &exact_color))
 	{
-		fprintf(stderr, "Couldn't look up color '%s', reverting to #010101", tmp);
-		mw->shadowTint.red = mw->shadowTint.green =	mw->shadowTint.blue = 0x01;
+		fprintf(stderr, "Couldn't look up color '%s', reverting to #040404", tmp);
+		mw->shadowTint.red = mw->shadowTint.green =	mw->shadowTint.blue = 0x04;
 	}
 	else
 	{
@@ -242,24 +252,32 @@ mainwin_create(session_t *ps) {
 
 	pa.repeat = True;
 	clear.alpha = alphaconv(ps->o.normal_opacity);
+	if(mw->normalPixmap != None)
+		XFreePixmap(ps->dpy, mw->normalPixmap);
 	mw->normalPixmap = XCreatePixmap(ps->dpy, mw->window, 1, 1, 8);
-	mw->normalPicture = XRenderCreatePicture(ps->dpy, mw->normalPixmap, XRenderFindStandardFormat(ps->dpy, PictStandardA8), CPRepeat, &pa);
+	if(mw->normalPicture != None)
+		XRenderFreePicture(ps->dpy, mw->normalPicture);
+	mw->normalPicture = XRenderCreatePicture(ps->dpy, mw->normalPixmap,
+			XRenderFindStandardFormat(ps->dpy, PictStandardA8), CPRepeat, &pa);
 	XRenderFillRectangle(ps->dpy, PictOpSrc, mw->normalPicture, &clear, 0, 0, 1, 1);
 	
 	clear.alpha = alphaconv(ps->o.highlight_opacity);
+	if(mw->highlightPixmap != None)
+		XFreePixmap(ps->dpy, mw->highlightPixmap);
 	mw->highlightPixmap = XCreatePixmap(ps->dpy, mw->window, 1, 1, 8);
-	mw->highlightPicture = XRenderCreatePicture(ps->dpy, mw->highlightPixmap, XRenderFindStandardFormat(ps->dpy, PictStandardA8), CPRepeat, &pa);
+	if(mw->highlightPicture != None)
+		XRenderFreePicture(ps->dpy, mw->highlightPicture);
+	mw->highlightPicture = XRenderCreatePicture(ps->dpy, mw->highlightPixmap,
+			XRenderFindStandardFormat(ps->dpy, PictStandardA8), CPRepeat, &pa);
 	XRenderFillRectangle(ps->dpy, PictOpSrc, mw->highlightPicture, &clear, 0, 0, 1, 1);
-	
-	clear.alpha = alphaconv(ps->o.shadow_opacity);
-	mw->shadowPixmap = XCreatePixmap(ps->dpy, mw->window, 1, 1, 8);
-	mw->shadowPicture = XRenderCreatePicture(ps->dpy, mw->shadowPixmap, XRenderFindStandardFormat(ps->dpy, PictStandardA8), CPRepeat, &pa);
-	XRenderFillRectangle(ps->dpy, PictOpSrc, mw->shadowPicture, &clear, 0, 0, 1, 1);
 
 	mw->distance = ps->o.distance;
 	
-	if (ps->o.tooltip_show)
+	if (ps->o.tooltip_show) {
+		if(mw->tooltip)
+			tooltip_destroy(mw->tooltip);
 		mw->tooltip = tooltip_create(mw);
+	}
 	
 	return mw;
 
