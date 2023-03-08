@@ -80,6 +80,9 @@ clientwin_get_disp_mode(session_t *ps, ClientWin *cw) {
 			case CLIDISP_THUMBNAIL:
 				if (IsViewable == wattr.map_state && cw->origin) return *p;
 				break;
+			case CLIDISP_ZOMBIE_ICON:
+				if (cw->shadow && cw->icon_pict != NULL) return *p;
+				break;
 			case CLIDISP_ZOMBIE:
 				if (cw->shadow) return *p;
 				break;

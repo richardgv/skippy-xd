@@ -196,16 +196,11 @@ clientwin_update(ClientWin *cw) {
 	cw->mini.width = cw->mini.height = 1;
 
 	// modes are CLIDISP_THUMBNAIL_ICON, CLIDISP_THUMBNAIL, CLIDISP_ZOMBIE,
-	// CLIDISP_ICON, CLIDISP_FILLED, CLIDISP_NONE
+	// CLIDISP_ZOMBIE_ICON, CLIDISP_ICON, CLIDISP_FILLED, CLIDISP_NONE
 	// if we ever got a thumbnail for the window,
 	// the mode for that window always will be thumbnail
-	//
-	// FUTURE: when config is reloaded with less modes,
-	// then clientwin_get_disp_mode() may get different result,
-	// so that clientwin_update() needs to be called
-	// after reloading config file
 	cw->mode = clientwin_get_disp_mode(ps, cw);
-	//printfdf("(%#010lx): %d", cw->wid_client, cw->mode);
+	// printfdf("(%#010lx): %d", cw->wid_client, cw->mode);
 
 	return true;
 }
@@ -249,6 +244,7 @@ clientwin_update2(ClientWin *cw) {
 			clientwin_update2_icon(ps, mw, cw);
 			break;
 		case CLIDISP_ZOMBIE:
+		case CLIDISP_ZOMBIE_ICON:
 		case CLIDISP_THUMBNAIL:
 		case CLIDISP_THUMBNAIL_ICON:
 			break;
@@ -314,6 +310,8 @@ clientwin_repaint(ClientWin *cw, const XRectangle *pbound)
 			source = cw->icon_pict_filled->pict;
 			break;
 		case CLIDISP_ZOMBIE:
+		// We will draw the icon later
+		case CLIDISP_ZOMBIE_ICON:
 			source = cw->shadow;
 			break;
 		case CLIDISP_THUMBNAIL:
@@ -341,7 +339,7 @@ clientwin_repaint(ClientWin *cw, const XRectangle *pbound)
 			XRenderComposite(ps->dpy, PictOpOver, source, mask,
 					cw->destination, s_x, s_y, 0, 0, s_x, s_y, s_w, s_h);
 		}
-		if (CLIDISP_THUMBNAIL_ICON == cw->mode) {
+		if (CLIDISP_ZOMBIE_ICON == cw->mode || CLIDISP_THUMBNAIL_ICON == cw->mode) {
 			assert(cw->icon_pict && cw->icon_pict->pict);
 			img_composite_params_t params = IMG_COMPOSITE_PARAMS_INIT;
 			simg_get_composite_params(cw->icon_pict,
