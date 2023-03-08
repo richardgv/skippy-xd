@@ -1353,7 +1353,178 @@ parse_args(session_t *ps, int argc, char **argv, bool first_pass) {
 		}
 	}
 }
-	
+
+static int
+load_config_file(session_t *ps)
+{
+    dlist *config = NULL;
+    {
+        bool user_specified_config = ps->o.config_path;
+        if (!ps->o.config_path)
+            ps->o.config_path = get_cfg_path();
+        if (ps->o.config_path)
+            config = config_load(ps->o.config_path);
+        else
+            printfef("(): WARNING: No configuration file found.");
+        if (!config && user_specified_config)
+            return 1;
+    }
+
+    char *lc_numeric_old = mstrdup(setlocale(LC_NUMERIC, NULL));
+    setlocale(LC_NUMERIC, "C");
+
+    // Read configuration into ps->o, because searching all the time is much
+    // less efficient, may introduce inconsistent default value, and
+    // occupies a lot more memory for non-string types.
+    ps->o.pipePath = mstrdup(config_get(config, "general", "pipePath", "/tmp/skippy-xd-fifo"));
+    ps->o.normal_tint = mstrdup(config_get(config, "normal", "tint", "black"));
+    ps->o.highlight_tint = mstrdup(config_get(config, "highlight", "tint", "#101020"));
+    ps->o.shadow_tint = mstrdup(config_get(config, "shadow", "tint", "#010101"));
+    ps->o.tooltip_border = mstrdup(config_get(config, "tooltip", "border", "#e0e0e0"));
+    ps->o.tooltip_background = mstrdup(config_get(config, "tooltip", "background", "#404040"));
+    ps->o.tooltip_text = mstrdup(config_get(config, "tooltip", "text", "#e0e0e0"));
+    ps->o.tooltip_textShadow = mstrdup(config_get(config, "tooltip", "textShadow", "black"));
+    ps->o.tooltip_font = mstrdup(config_get(config, "tooltip", "font", "fixed-11:weight=bold"));
+
+    // load keybindings settings
+    ps->o.bindings_keysUp = mstrdup(config_get(config, "bindings", "keysUp", "Up w"));
+    ps->o.bindings_keysDown = mstrdup(config_get(config, "bindings", "keysDown", "Down s"));
+    ps->o.bindings_keysLeft = mstrdup(config_get(config, "bindings", "keysLeft", "Left a"));
+    ps->o.bindings_keysRight = mstrdup(config_get(config, "bindings", "keysRight", "Right Tab d"));
+    ps->o.bindings_keysPrev = mstrdup(config_get(config, "bindings", "keysPrev", "p b"));
+    ps->o.bindings_keysNext = mstrdup(config_get(config, "bindings", "keysNext", "n f"));
+    ps->o.bindings_keysExitCancelOnPress = mstrdup(config_get(config, "bindings", "keysExitCancelOnPress", "Escape BackSpace x q"));
+    ps->o.bindings_keysExitCancelOnRelease = mstrdup(config_get(config, "bindings", "keysExitCancelOnRelease", ""));
+    ps->o.bindings_keysExitSelectOnPress = mstrdup(config_get(config, "bindings", "keysExitSelectOnPress", "Return space"));
+    ps->o.bindings_keysExitSelectOnRelease = mstrdup(config_get(config, "bindings", "keysExitSelectOnRelease", "Super_L Super_R Alt_L Alt_R ISO_Level3_Shift"));
+    ps->o.bindings_keysReverseDirection = mstrdup(config_get(config, "bindings", "keysReverseDirection", "Tab"));
+    ps->o.bindings_modifierKeyMasksReverseDirection = mstrdup(config_get(config, "bindings", "modifierKeyMasksReverseDirection", "ShiftMask ControlMask"));
+
+    // print an error message for any key bindings that aren't recognized
+    check_keysyms(ps->o.config_path, ": [bindings] keysUp =", ps->o.bindings_keysUp);
+    check_keysyms(ps->o.config_path, ": [bindings] keysDown =", ps->o.bindings_keysDown);
+    check_keysyms(ps->o.config_path, ": [bindings] keysLeft =", ps->o.bindings_keysLeft);
+    check_keysyms(ps->o.config_path, ": [bindings] keysRight =", ps->o.bindings_keysRight);
+    check_keysyms(ps->o.config_path, ": [bindings] keysPrev =", ps->o.bindings_keysPrev);
+    check_keysyms(ps->o.config_path, ": [bindings] keysNext =", ps->o.bindings_keysNext);
+    check_keysyms(ps->o.config_path, ": [bindings] keysExitCancelOnPress =", ps->o.bindings_keysExitCancelOnPress);
+    check_keysyms(ps->o.config_path, ": [bindings] keysExitCancelOnRelease =", ps->o.bindings_keysExitCancelOnRelease);
+    check_keysyms(ps->o.config_path, ": [bindings] keysExitSelectOnPress =", ps->o.bindings_keysExitSelectOnPress);
+    check_keysyms(ps->o.config_path, ": [bindings] keysExitSelectOnRelease =", ps->o.bindings_keysExitSelectOnRelease);
+    check_keysyms(ps->o.config_path, ": [bindings] keysReverseDirection =", ps->o.bindings_keysReverseDirection);
+    check_modmasks(ps->o.config_path, ": [bindings] modifierKeyMasksReverseDirection =", ps->o.bindings_modifierKeyMasksReverseDirection);
+
+    if (!parse_cliop(ps, config_get(config, "bindings", "miwMouse1", "focus"), &ps->o.bindings_miwMouse[1])
+            || !parse_cliop(ps, config_get(config, "bindings", "miwMouse2", "close-ewmh"), &ps->o.bindings_miwMouse[2])
+            || !parse_cliop(ps, config_get(config, "bindings", "miwMouse3", "iconify"), &ps->o.bindings_miwMouse[3]))
+        return RET_BADARG;
+    {
+        const char *s = config_get(config, "general", "layout", NULL);
+        if (s) {
+           if (strcmp(s,"boxy") == 0) {
+               ps->o.layout = LAYOUT_BOXY;
+           }
+           else if (strcmp(s,"xd") == 0) {
+               ps->o.layout = LAYOUT_XD;
+           }
+           else {
+               ps->o.layout = LAYOUT_BOXY;
+           }
+        }
+    }
+    config_get_int_wrap(config, "general", "distance", &ps->o.distance, 1, INT_MAX);
+    config_get_bool_wrap(config, "general", "useNetWMFullscreen", &ps->o.useNetWMFullscreen);
+    config_get_bool_wrap(config, "general", "ignoreSkipTaskbar", &ps->o.ignoreSkipTaskbar);
+    config_get_bool_wrap(config, "general", "acceptOvRedir", &ps->o.acceptOvRedir);
+    config_get_bool_wrap(config, "general", "acceptWMWin", &ps->o.acceptWMWin);
+    config_get_double_wrap(config, "general", "updateFreq", &ps->o.updateFreq, -1000.0, 1000.0);
+    config_get_int_wrap(config, "general", "animationDuration", &ps->o.animationDuration, 0, 2000);
+    config_get_bool_wrap(config, "general", "lazyTrans", &ps->o.lazyTrans);
+    config_get_bool_wrap(config, "general", "includeFrame", &ps->o.includeFrame);
+    config_get_bool_wrap(config, "general", "allowUpscale", &ps->o.allowUpscale);
+    config_get_int_wrap(config, "general", "preferredIconSize", &ps->o.preferredIconSize, 1, INT_MAX);
+    config_get_bool_wrap(config, "general", "showAllDesktops", &ps->o.showAllDesktops);
+    config_get_bool_wrap(config, "general", "movePointerOnStart", &ps->o.movePointerOnStart);
+    config_get_bool_wrap(config, "general", "movePointerOnSelect", &ps->o.movePointerOnSelect);
+    config_get_bool_wrap(config, "general", "movePointerOnRaise", &ps->o.movePointerOnRaise);
+    config_get_bool_wrap(config, "general", "switchDesktopOnActivate", &ps->o.switchDesktopOnActivate);
+    config_get_bool_wrap(config, "xinerama", "showAll", &ps->o.xinerama_showAll);
+    config_get_int_wrap(config, "normal", "tintOpacity", &ps->o.normal_tintOpacity, 0, 256);
+    config_get_int_wrap(config, "normal", "opacity", &ps->o.normal_opacity, 0, 256);
+    config_get_int_wrap(config, "highlight", "tintOpacity", &ps->o.highlight_tintOpacity, 0, 256);
+    config_get_int_wrap(config, "highlight", "opacity", &ps->o.highlight_opacity, 0, 256);
+    config_get_int_wrap(config, "shadow", "tintOpacity", &ps->o.shadow_tintOpacity, 0, 256);
+    config_get_int_wrap(config, "shadow", "opacity", &ps->o.shadow_opacity, 0, 256);
+    config_get_bool_wrap(config, "tooltip", "show", &ps->o.tooltip_show);
+    config_get_bool_wrap(config, "tooltip", "followsMouse", &ps->o.tooltip_followsMouse);
+    config_get_int_wrap(config, "tooltip", "offsetX", &ps->o.tooltip_offsetX, INT_MIN, INT_MAX);
+    config_get_int_wrap(config, "tooltip", "offsetY", &ps->o.tooltip_offsetY, INT_MIN, INT_MAX);
+    if (!parse_align_full(ps, config_get(config, "tooltip", "align", "left"), &ps->o.tooltip_align))
+        return RET_BADARG;
+    config_get_int_wrap(config, "tooltip", "tintOpacity", &ps->o.highlight_tintOpacity, 0, 256);
+    config_get_int_wrap(config, "tooltip", "opacity", &ps->o.tooltip_opacity, 0, 256);
+    {
+        static client_disp_mode_t DEF_CLIDISPM[] = {
+            CLIDISP_THUMBNAIL, CLIDISP_ZOMBIE, CLIDISP_ICON, CLIDISP_FILLED, CLIDISP_NONE
+        };
+
+        static client_disp_mode_t DEF_CLIDISPM_ICON[] = {
+            CLIDISP_THUMBNAIL_ICON, CLIDISP_THUMBNAIL, CLIDISP_ZOMBIE_ICON,
+            CLIDISP_ZOMBIE, CLIDISP_ICON, CLIDISP_FILLED, CLIDISP_NONE
+        };
+
+        bool thumbnail_icons = false;
+        config_get_bool_wrap(config, "general", "showIconsOnThumbnails", &thumbnail_icons);
+        if (thumbnail_icons) {
+            ps->o.clientDisplayModes = allocchk(malloc(sizeof(DEF_CLIDISPM_ICON)));
+            memcpy(ps->o.clientDisplayModes, &DEF_CLIDISPM_ICON, sizeof(DEF_CLIDISPM_ICON));
+        }
+        else {
+            ps->o.clientDisplayModes = allocchk(malloc(sizeof(DEF_CLIDISPM)));
+            memcpy(ps->o.clientDisplayModes, &DEF_CLIDISPM, sizeof(DEF_CLIDISPM));
+        }
+    }
+    {
+        const char *sspec = config_get(config, "general", "background", NULL);
+        if (sspec && strlen(sspec)) {
+            pictspec_t spec = PICTSPECT_INIT;
+            if (!parse_pictspec(ps, sspec, &spec))
+                return RET_BADARG;
+            int root_width = DisplayWidth(ps->dpy, ps->screen),
+                    root_height = DisplayHeight(ps->dpy, ps->screen);
+            if (!(spec.twidth || spec.theight)) {
+                spec.twidth = root_width;
+                spec.theight = root_height;
+            }
+            pictw_t *p = simg_load_s(ps, &spec);
+            if (!p)
+                exit(1);
+            if (p->width != root_width || p->height != root_height)
+                ps->o.background = simg_postprocess(ps, p, PICTPOSP_ORIG,
+                        root_width, root_height, spec.alg, spec.valg, &spec.c);
+            else
+                ps->o.background = p;
+            free_pictspec(ps, &spec);
+        }
+    }
+    if (!parse_pictspec(ps, config_get(config, "general", "iconFillSpec", "orig mid mid #FFFFFF"), &ps->o.iconFillSpec)
+            || !parse_pictspec(ps, config_get(config, "general", "fillSpec", "orig mid mid #FFFFFF"), &ps->o.fillSpec))
+        return RET_BADARG;
+    if (!simg_cachespec(ps, &ps->o.fillSpec))
+        return RET_BADARG;
+    if (ps->o.iconFillSpec.path
+            && !(ps->o.iconDefault = simg_load(ps, ps->o.iconFillSpec.path,
+                    PICTPOSP_SCALEK, ps->o.preferredIconSize, ps->o.preferredIconSize,
+                    ALIGN_MID, ALIGN_MID, NULL)))
+        return RET_BADARG;
+
+    setlocale(LC_NUMERIC, lc_numeric_old);
+    free(lc_numeric_old);
+    config_free(config);
+
+	return RET_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
 	session_t *ps = NULL;
 	int ret = RET_SUCCESS;
@@ -1392,173 +1563,9 @@ int main(int argc, char *argv[]) {
 
 	wm_get_atoms(ps);
 
-	// Load configuration file
-	{
-		dlist *config = NULL;
-		{
-			bool user_specified_config = ps->o.config_path;
-			if (!ps->o.config_path)
-				ps->o.config_path = get_cfg_path();
-			if (ps->o.config_path)
-				config = config_load(ps->o.config_path);
-			else
-				printfef("(): WARNING: No configuration file found.");
-			if (!config && user_specified_config)
-				return 1;
-		}
-
-		char *lc_numeric_old = mstrdup(setlocale(LC_NUMERIC, NULL));
-		setlocale(LC_NUMERIC, "C");
-
-		// Read configuration into ps->o, because searching all the time is much
-		// less efficient, may introduce inconsistent default value, and
-		// occupies a lot more memory for non-string types.
-		ps->o.pipePath = mstrdup(config_get(config, "general", "pipePath", "/tmp/skippy-xd-fifo"));
-		ps->o.normal_tint = mstrdup(config_get(config, "normal", "tint", "black"));
-		ps->o.highlight_tint = mstrdup(config_get(config, "highlight", "tint", "#101020"));
-		ps->o.shadow_tint = mstrdup(config_get(config, "shadow", "tint", "#010101"));
-		ps->o.tooltip_border = mstrdup(config_get(config, "tooltip", "border", "#e0e0e0"));
-		ps->o.tooltip_background = mstrdup(config_get(config, "tooltip", "background", "#404040"));
-		ps->o.tooltip_text = mstrdup(config_get(config, "tooltip", "text", "#e0e0e0"));
-		ps->o.tooltip_textShadow = mstrdup(config_get(config, "tooltip", "textShadow", "black"));
-		ps->o.tooltip_font = mstrdup(config_get(config, "tooltip", "font", "fixed-11:weight=bold"));
-
-		// load keybindings settings
-		ps->o.bindings_keysUp = mstrdup(config_get(config, "bindings", "keysUp", "Up w"));
-		ps->o.bindings_keysDown = mstrdup(config_get(config, "bindings", "keysDown", "Down s"));
-		ps->o.bindings_keysLeft = mstrdup(config_get(config, "bindings", "keysLeft", "Left a"));
-		ps->o.bindings_keysRight = mstrdup(config_get(config, "bindings", "keysRight", "Right Tab d"));
-		ps->o.bindings_keysPrev = mstrdup(config_get(config, "bindings", "keysPrev", "p b"));
-		ps->o.bindings_keysNext = mstrdup(config_get(config, "bindings", "keysNext", "n f"));
-		ps->o.bindings_keysExitCancelOnPress = mstrdup(config_get(config, "bindings", "keysExitCancelOnPress", "Escape BackSpace x q"));
-		ps->o.bindings_keysExitCancelOnRelease = mstrdup(config_get(config, "bindings", "keysExitCancelOnRelease", ""));
-		ps->o.bindings_keysExitSelectOnPress = mstrdup(config_get(config, "bindings", "keysExitSelectOnPress", "Return space"));
-		ps->o.bindings_keysExitSelectOnRelease = mstrdup(config_get(config, "bindings", "keysExitSelectOnRelease", "Super_L Super_R Alt_L Alt_R ISO_Level3_Shift"));
-		ps->o.bindings_keysReverseDirection = mstrdup(config_get(config, "bindings", "keysReverseDirection", "Tab"));
-		ps->o.bindings_modifierKeyMasksReverseDirection = mstrdup(config_get(config, "bindings", "modifierKeyMasksReverseDirection", "ShiftMask ControlMask"));
-
-		// print an error message for any key bindings that aren't recognized
-		check_keysyms(ps->o.config_path, ": [bindings] keysUp =", ps->o.bindings_keysUp);
-		check_keysyms(ps->o.config_path, ": [bindings] keysDown =", ps->o.bindings_keysDown);
-		check_keysyms(ps->o.config_path, ": [bindings] keysLeft =", ps->o.bindings_keysLeft);
-		check_keysyms(ps->o.config_path, ": [bindings] keysRight =", ps->o.bindings_keysRight);
-		check_keysyms(ps->o.config_path, ": [bindings] keysPrev =", ps->o.bindings_keysPrev);
-		check_keysyms(ps->o.config_path, ": [bindings] keysNext =", ps->o.bindings_keysNext);
-		check_keysyms(ps->o.config_path, ": [bindings] keysExitCancelOnPress =", ps->o.bindings_keysExitCancelOnPress);
-		check_keysyms(ps->o.config_path, ": [bindings] keysExitCancelOnRelease =", ps->o.bindings_keysExitCancelOnRelease);
-		check_keysyms(ps->o.config_path, ": [bindings] keysExitSelectOnPress =", ps->o.bindings_keysExitSelectOnPress);
-		check_keysyms(ps->o.config_path, ": [bindings] keysExitSelectOnRelease =", ps->o.bindings_keysExitSelectOnRelease);
-		check_keysyms(ps->o.config_path, ": [bindings] keysReverseDirection =", ps->o.bindings_keysReverseDirection);
-		check_modmasks(ps->o.config_path, ": [bindings] modifierKeyMasksReverseDirection =", ps->o.bindings_modifierKeyMasksReverseDirection);
-
-		if (!parse_cliop(ps, config_get(config, "bindings", "miwMouse1", "focus"), &ps->o.bindings_miwMouse[1])
-				|| !parse_cliop(ps, config_get(config, "bindings", "miwMouse2", "close-ewmh"), &ps->o.bindings_miwMouse[2])
-				|| !parse_cliop(ps, config_get(config, "bindings", "miwMouse3", "iconify"), &ps->o.bindings_miwMouse[3]))
-			return RET_BADARG;
-		{
-			const char *s = config_get(config, "general", "layout", NULL);
-			if (s) {
-			   if (strcmp(s,"boxy") == 0) {
-				   ps->o.layout = LAYOUT_BOXY;
-			   }
-			   else if (strcmp(s,"xd") == 0) {
-				   ps->o.layout = LAYOUT_XD;
-			   }
-			   else {
-				   ps->o.layout = LAYOUT_BOXY;
-			   }
-			}
-		}
-		config_get_int_wrap(config, "general", "distance", &ps->o.distance, 1, INT_MAX);
-		config_get_bool_wrap(config, "general", "useNetWMFullscreen", &ps->o.useNetWMFullscreen);
-		config_get_bool_wrap(config, "general", "ignoreSkipTaskbar", &ps->o.ignoreSkipTaskbar);
-		config_get_bool_wrap(config, "general", "acceptOvRedir", &ps->o.acceptOvRedir);
-		config_get_bool_wrap(config, "general", "acceptWMWin", &ps->o.acceptWMWin);
-		config_get_double_wrap(config, "general", "updateFreq", &ps->o.updateFreq, -1000.0, 1000.0);
-		config_get_int_wrap(config, "general", "animationDuration", &ps->o.animationDuration, 0, 2000);
-		config_get_bool_wrap(config, "general", "lazyTrans", &ps->o.lazyTrans);
-		config_get_bool_wrap(config, "general", "includeFrame", &ps->o.includeFrame);
-		config_get_bool_wrap(config, "general", "allowUpscale", &ps->o.allowUpscale);
-		config_get_int_wrap(config, "general", "preferredIconSize", &ps->o.preferredIconSize, 1, INT_MAX);
-		config_get_bool_wrap(config, "general", "showAllDesktops", &ps->o.showAllDesktops);
-		config_get_bool_wrap(config, "general", "movePointerOnStart", &ps->o.movePointerOnStart);
-		config_get_bool_wrap(config, "general", "movePointerOnSelect", &ps->o.movePointerOnSelect);
-		config_get_bool_wrap(config, "general", "movePointerOnRaise", &ps->o.movePointerOnRaise);
-		config_get_bool_wrap(config, "general", "switchDesktopOnActivate", &ps->o.switchDesktopOnActivate);
-		config_get_bool_wrap(config, "xinerama", "showAll", &ps->o.xinerama_showAll);
-		config_get_int_wrap(config, "normal", "tintOpacity", &ps->o.normal_tintOpacity, 0, 256);
-		config_get_int_wrap(config, "normal", "opacity", &ps->o.normal_opacity, 0, 256);
-		config_get_int_wrap(config, "highlight", "tintOpacity", &ps->o.highlight_tintOpacity, 0, 256);
-		config_get_int_wrap(config, "highlight", "opacity", &ps->o.highlight_opacity, 0, 256);
-		config_get_int_wrap(config, "shadow", "tintOpacity", &ps->o.shadow_tintOpacity, 0, 256);
-		config_get_int_wrap(config, "shadow", "opacity", &ps->o.shadow_opacity, 0, 256);
-		config_get_bool_wrap(config, "tooltip", "show", &ps->o.tooltip_show);
-		config_get_bool_wrap(config, "tooltip", "followsMouse", &ps->o.tooltip_followsMouse);
-		config_get_int_wrap(config, "tooltip", "offsetX", &ps->o.tooltip_offsetX, INT_MIN, INT_MAX);
-		config_get_int_wrap(config, "tooltip", "offsetY", &ps->o.tooltip_offsetY, INT_MIN, INT_MAX);
-		if (!parse_align_full(ps, config_get(config, "tooltip", "align", "left"), &ps->o.tooltip_align))
-			return RET_BADARG;
-		config_get_int_wrap(config, "tooltip", "tintOpacity", &ps->o.highlight_tintOpacity, 0, 256);
-		config_get_int_wrap(config, "tooltip", "opacity", &ps->o.tooltip_opacity, 0, 256);
-		{
-            static client_disp_mode_t DEF_CLIDISPM[] = {
-                CLIDISP_THUMBNAIL, CLIDISP_ZOMBIE, CLIDISP_ICON, CLIDISP_FILLED, CLIDISP_NONE
-            };
-
-			static client_disp_mode_t DEF_CLIDISPM_ICON[] = {
-				CLIDISP_THUMBNAIL_ICON, CLIDISP_THUMBNAIL, CLIDISP_ZOMBIE_ICON,
-				CLIDISP_ZOMBIE, CLIDISP_ICON, CLIDISP_FILLED, CLIDISP_NONE
-			};
-
-			bool thumbnail_icons = false;
-			config_get_bool_wrap(config, "general", "showIconsOnThumbnails", &thumbnail_icons);
-			if (thumbnail_icons) {
-				ps->o.clientDisplayModes = allocchk(malloc(sizeof(DEF_CLIDISPM_ICON)));
-				memcpy(ps->o.clientDisplayModes, &DEF_CLIDISPM_ICON, sizeof(DEF_CLIDISPM_ICON));
-			}
-			else {
-				ps->o.clientDisplayModes = allocchk(malloc(sizeof(DEF_CLIDISPM)));
-				memcpy(ps->o.clientDisplayModes, &DEF_CLIDISPM, sizeof(DEF_CLIDISPM));
-			}
-		}
-		{
-			const char *sspec = config_get(config, "general", "background", NULL);
-			if (sspec && strlen(sspec)) {
-				pictspec_t spec = PICTSPECT_INIT;
-				if (!parse_pictspec(ps, sspec, &spec))
-					return RET_BADARG;
-				int root_width = DisplayWidth(ps->dpy, ps->screen),
-						root_height = DisplayHeight(ps->dpy, ps->screen);
-				if (!(spec.twidth || spec.theight)) {
-					spec.twidth = root_width;
-					spec.theight = root_height;
-				}
-				pictw_t *p = simg_load_s(ps, &spec);
-				if (!p)
-					exit(1);
-				if (p->width != root_width || p->height != root_height)
-					ps->o.background = simg_postprocess(ps, p, PICTPOSP_ORIG,
-							root_width, root_height, spec.alg, spec.valg, &spec.c);
-				else
-					ps->o.background = p;
-				free_pictspec(ps, &spec);
-			}
-		}
-		if (!parse_pictspec(ps, config_get(config, "general", "iconFillSpec", "orig mid mid #FFFFFF"), &ps->o.iconFillSpec)
-				|| !parse_pictspec(ps, config_get(config, "general", "fillSpec", "orig mid mid #FFFFFF"), &ps->o.fillSpec))
-			return RET_BADARG;
-		if (!simg_cachespec(ps, &ps->o.fillSpec))
-			return RET_BADARG;
-		if (ps->o.iconFillSpec.path
-				&& !(ps->o.iconDefault = simg_load(ps, ps->o.iconFillSpec.path,
-						PICTPOSP_SCALEK, ps->o.preferredIconSize, ps->o.preferredIconSize,
-						ALIGN_MID, ALIGN_MID, NULL)))
-			return RET_BADARG;
-
-		setlocale(LC_NUMERIC, lc_numeric_old);
-		free(lc_numeric_old);
-		config_free(config);
-	}
+	int config_load_ret = load_config_file(ps);
+	if (config_load_ret != 0)
+		return config_load_ret;
 
 	// Second pass
 	parse_args(ps, argc, argv, false);
