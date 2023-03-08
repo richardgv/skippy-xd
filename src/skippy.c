@@ -1501,11 +1501,25 @@ int main(int argc, char *argv[]) {
 		config_get_int_wrap(config, "tooltip", "tintOpacity", &ps->o.highlight_tintOpacity, 0, 256);
 		config_get_int_wrap(config, "tooltip", "opacity", &ps->o.tooltip_opacity, 0, 256);
 		{
-            static const client_disp_mode_t DEF_CLIDISPM[] = {
-                CLIDISP_THUMBNAIL_ICON, CLIDISP_THUMBNAIL, CLIDISP_ZOMBIE_ICON, CLIDISP_ZOMBIE, CLIDISP_ICON, CLIDISP_FILLED, CLIDISP_NONE
+            static client_disp_mode_t DEF_CLIDISPM[] = {
+                CLIDISP_THUMBNAIL, CLIDISP_ZOMBIE, CLIDISP_ICON, CLIDISP_FILLED, CLIDISP_NONE
             };
-            ps->o.clientDisplayModes = allocchk(malloc(sizeof(DEF_CLIDISPM)));
-            memcpy(ps->o.clientDisplayModes, &DEF_CLIDISPM, sizeof(DEF_CLIDISPM));
+
+			static client_disp_mode_t DEF_CLIDISPM_ICON[] = {
+				CLIDISP_THUMBNAIL_ICON, CLIDISP_THUMBNAIL, CLIDISP_ZOMBIE_ICON,
+				CLIDISP_ZOMBIE, CLIDISP_ICON, CLIDISP_FILLED, CLIDISP_NONE
+			};
+
+			bool thumbnail_icons = false;
+			config_get_bool_wrap(config, "general", "showIconsOnThumbnails", &thumbnail_icons);
+			if (thumbnail_icons) {
+				ps->o.clientDisplayModes = allocchk(malloc(sizeof(DEF_CLIDISPM_ICON)));
+				memcpy(ps->o.clientDisplayModes, &DEF_CLIDISPM_ICON, sizeof(DEF_CLIDISPM_ICON));
+			}
+			else {
+				ps->o.clientDisplayModes = allocchk(malloc(sizeof(DEF_CLIDISPM)));
+				memcpy(ps->o.clientDisplayModes, &DEF_CLIDISPM, sizeof(DEF_CLIDISPM));
+			}
 		}
 		{
 			const char *sspec = config_get(config, "general", "background", NULL);
