@@ -258,58 +258,6 @@ parse_pictspec_end:
 	return true;
 }
 
-static client_disp_mode_t *
-parse_client_disp_mode(session_t *ps, const char *s) {
-	static const struct {
-		client_disp_mode_t mode;
-		const char *name;
-	} ENTRIES[] = {
-		{ CLIDISP_NONE, "none" },
-		{ CLIDISP_FILLED, "filled" },
-		{ CLIDISP_ICON, "icon" },
-		{ CLIDISP_ZOMBIE, "zombie" },
-		{ CLIDISP_THUMBNAIL, "thumbnail" },
-		{ CLIDISP_THUMBNAIL_ICON, "thumbnail-icon" },
-	};
-	static const int ALLOC_STEP = 3;
-	int capacity = 0;
-	client_disp_mode_t *ret = NULL;
-
-	int i = 0;
-	for (; s; ++i) {
-		char *word = NULL;
-		s = str_get_word(s, &word);
-		if (!word)
-			break;
-		if (capacity <= i + 1) {
-			capacity += ALLOC_STEP;
-			ret = srealloc(ret, capacity, client_disp_mode_t);
-		}
-		{
-			bool found = false;
-			for (int j = 0; j < CARR_LEN(ENTRIES); ++j)
-				if (!strcmp(word, ENTRIES[j].name)) {
-					found = true;
-					ret[i] = ENTRIES[j].mode;
-				}
-			if (!found) {
-				printfef("(\"%s\"): Invalid mode \"%s\" ignored.", s, word);
-				--i;
-			}
-		}
-		free(word);
-	}
-
-	if (!i) {
-		free(ret);
-	}
-	else {
-		ret[i] = CLIDISP_NONE;
-	}
-
-	return ret;
-}
-
 static void
 anime(
 	MainWin *mw,
@@ -1553,16 +1501,11 @@ int main(int argc, char *argv[]) {
 		config_get_int_wrap(config, "tooltip", "tintOpacity", &ps->o.highlight_tintOpacity, 0, 256);
 		config_get_int_wrap(config, "tooltip", "opacity", &ps->o.tooltip_opacity, 0, 256);
 		{
-			const char *s = config_get(config, "general", "clientDisplayModes", NULL);
-			if (s && !(ps->o.clientDisplayModes = parse_client_disp_mode(ps, s)))
-				return RET_BADARG;
-			if (!ps->o.clientDisplayModes) {
-				static const client_disp_mode_t DEF_CLIDISPM[] = {
-					CLIDISP_THUMBNAIL_ICON, CLIDISP_THUMBNAIL, CLIDISP_ZOMBIE, CLIDISP_ICON, CLIDISP_FILLED, CLIDISP_NONE
-				};
-				ps->o.clientDisplayModes = allocchk(malloc(sizeof(DEF_CLIDISPM)));
-				memcpy(ps->o.clientDisplayModes, &DEF_CLIDISPM, sizeof(DEF_CLIDISPM));
-			}
+            static const client_disp_mode_t DEF_CLIDISPM[] = {
+                CLIDISP_THUMBNAIL_ICON, CLIDISP_THUMBNAIL, CLIDISP_ZOMBIE, CLIDISP_ICON, CLIDISP_FILLED, CLIDISP_NONE
+            };
+            ps->o.clientDisplayModes = allocchk(malloc(sizeof(DEF_CLIDISPM)));
+            memcpy(ps->o.clientDisplayModes, &DEF_CLIDISPM, sizeof(DEF_CLIDISPM));
 		}
 		{
 			const char *sspec = config_get(config, "general", "background", NULL);
