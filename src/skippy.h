@@ -120,6 +120,7 @@ enum progmode {
 	PROGMODE_ACTV_PICKER,
 	PROGMODE_DEACTV_PICKER,
 	PROGMODE_TOGGLE_PICKER,
+	PROGMODE_RELOAD_CONFIG,
 	PROGMODE_DM_STOP,
 };
 
@@ -1366,5 +1367,7 @@ sort_cw_by_pos(dlist* dlist1, dlist* dlist2, void* data)
 }
 
 extern session_t *ps_g;
+
+int load_config_file(session_t *ps);
 
 #endif /* SKIPPY_H */

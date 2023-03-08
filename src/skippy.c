@@ -28,6 +28,7 @@
 
 enum pipe_cmd_t {
 	// Not ordered properly for backward compatibility
+	PIPECMD_RELOAD_CONFIG = 0,
 	PIPECMD_ACTIVATE_WINDOW_PICKER = 1,
 	PIPECMD_EXIT_RUNNING_DAEMON,
 	PIPECMD_DEACTIVATE_WINDOW_PICKER,
@@ -905,6 +906,9 @@ mainloop(session_t *ps, bool activate_on_start) {
 				printfdf("(): Received pipe command: %d", piped_input);
 
 				switch (piped_input) {
+					case PIPECMD_RELOAD_CONFIG:
+						load_config_file(ps);
+						break;
 					case PIPECMD_QUEUE_FI_PREV:
 						ps->o.focus_initial = FI_PREV;
 						break;
@@ -994,6 +998,12 @@ send_command_to_daemon_via_fifo(int command, const char *pipePath) {
 	fclose(fp);
 
 	return true;
+}
+
+static inline bool
+queue_reload_config(const char *pipePath) {
+	printfdf("(): Reload config file...");
+	return send_command_to_daemon_via_fifo(PIPECMD_RELOAD_CONFIG, pipePath);
 }
 
 static inline bool
@@ -1269,6 +1279,7 @@ static void
 parse_args(session_t *ps, int argc, char **argv, bool first_pass) {
 	enum options {
 		OPT_CONFIG = 256,
+		OPT_CONFIG_RELOAD,
 		OPT_ACTV_PICKER,
 		OPT_DEACTV_PICKER,
 		OPT_TOGGLE_PICKER,
@@ -1281,6 +1292,7 @@ parse_args(session_t *ps, int argc, char **argv, bool first_pass) {
 	static const struct option opts_long[] = {
 		{ "help",                     no_argument,       NULL, 'h' },
 		{ "config",                   required_argument, NULL, OPT_CONFIG },
+		{ "config-reload",            no_argument,       NULL, OPT_CONFIG_RELOAD },
 		{ "activate-window-picker",   no_argument,       NULL, OPT_ACTV_PICKER },
 		{ "deactivate-window-picker", no_argument,       NULL, OPT_DEACTV_PICKER },
 		{ "toggle-window-picker",     no_argument,       NULL, OPT_TOGGLE_PICKER },
@@ -1331,6 +1343,9 @@ parse_args(session_t *ps, int argc, char **argv, bool first_pass) {
 		switch (o) {
 			case 'S': break;
 			case OPT_CONFIG: break;
+			case OPT_CONFIG_RELOAD:
+				ps->o.mode = PROGMODE_RELOAD_CONFIG;
+				break;
 			case OPT_PREV: break;
 			case OPT_NEXT: break;
 			case OPT_ACTV_PICKER:
@@ -1354,7 +1369,7 @@ parse_args(session_t *ps, int argc, char **argv, bool first_pass) {
 	}
 }
 
-static int
+int
 load_config_file(session_t *ps)
 {
     dlist *config = NULL;
@@ -1607,6 +1622,9 @@ int main(int argc, char *argv[]) {
 				usleep(10000);
 			}
 			toggle_window_picker(pipePath);
+			goto main_end;
+		case PROGMODE_RELOAD_CONFIG:
+			queue_reload_config(pipePath);
 			goto main_end;
 		case PROGMODE_DM_STOP:
 			exit_daemon(pipePath);
