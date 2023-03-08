@@ -235,6 +235,7 @@ typedef struct {
 	bool switchDesktopOnActivate;
 	bool allowUpscale;
 	bool showAllDesktops;
+	int cornerRadius;
 	int preferredIconSize;
 	client_disp_mode_t *clientDisplayModes;
 	pictspec_t iconFillSpec;
@@ -306,6 +307,7 @@ typedef struct {
 	.movePointerOnRaise = true, \
 	.switchDesktopOnActivate = false, \
 	.allowUpscale = true, \
+	.cornerRadius = 0, \
 	.preferredIconSize = 48, \
 	.clientDisplayModes = NULL, \
 	.iconFillSpec = PICTSPECT_INIT, \

@@ -1458,6 +1458,7 @@ load_config_file(session_t *ps)
     config_get_bool_wrap(config, "general", "lazyTrans", &ps->o.lazyTrans);
     config_get_bool_wrap(config, "general", "includeFrame", &ps->o.includeFrame);
     config_get_bool_wrap(config, "general", "allowUpscale", &ps->o.allowUpscale);
+	config_get_int_wrap(config, "general", "cornerRadius", &ps->o.cornerRadius, 0, INT_MAX);
     config_get_int_wrap(config, "general", "preferredIconSize", &ps->o.preferredIconSize, 1, INT_MAX);
     config_get_bool_wrap(config, "general", "showAllDesktops", &ps->o.showAllDesktops);
     config_get_bool_wrap(config, "general", "movePointerOnStart", &ps->o.movePointerOnStart);

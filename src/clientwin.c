@@ -33,6 +33,8 @@ clientwin_cmp_func(dlist *l, void *data) {
 		|| cw->wid_client == (Window) data;
 }
 
+void clientwin_round_corners(ClientWin *cw);
+
 int
 clientwin_validate_func(dlist *l, void *data) {
 	ClientWin *cw = l->data;
@@ -361,6 +363,8 @@ clientwin_repaint(ClientWin *cw, const XRectangle *pbound)
 			XRenderFillRectangle(cw->mainwin->ps->dpy, PictOpOver, cw->destination, tint, s_x, s_y, s_w, s_h);
 	}
 
+	if(ps->o.cornerRadius)
+		clientwin_round_corners(cw);
 	XClearArea(cw->mainwin->ps->dpy, cw->mini.window, s_x, s_y, s_w, s_h, False);
 }
 
@@ -443,6 +447,9 @@ clientwin_move(ClientWin *cw, float f, int x, int y, float timeslice)
 	XSetWindowBackgroundPixmap(cw->mainwin->ps->dpy, cw->mini.window, cw->pixmap);
 
 	cw->destination = XRenderCreatePicture(cw->mainwin->ps->dpy, cw->pixmap, cw->mini.format, 0, 0);
+	
+	if(cw->mainwin->ps->o.cornerRadius)
+		clientwin_round_corners(cw);
 }
 
 void
@@ -723,4 +730,27 @@ clientwin_action(ClientWin *cw, enum cliop action) {
 	}
 
 	return 0;
+}
+
+void clientwin_round_corners(ClientWin *cw) {
+	session_t* ps = cw->mainwin->ps;
+	int dia = 2 * ps->o.cornerRadius;
+	int w = cw->mini.width;
+	int h = cw->mini.height;
+	XGCValues xgcv;
+	Pixmap mask = XCreatePixmap(ps->dpy, cw->mini.window, w, h, 1);
+	GC shape_gc = XCreateGC(ps->dpy, mask, 0, &xgcv);
+
+	XSetForeground(ps->dpy, shape_gc, 0);
+	XFillRectangle(ps->dpy, mask, shape_gc, 0, 0, w, h);
+	XSetForeground(ps->dpy, shape_gc, 1);
+	XFillArc(ps->dpy, mask, shape_gc, 0, 0, dia, dia, 0, 360 * 64);
+	XFillArc(ps->dpy, mask, shape_gc, w-dia-1, 0, dia, dia, 0, 360 * 64);
+	XFillArc(ps->dpy, mask, shape_gc, 0, h-dia-1, dia, dia, 0, 360 * 64);
+	XFillArc(ps->dpy, mask, shape_gc, w-dia-1, h-dia-1, dia, dia, 0, 360 * 64);
+	XFillRectangle(ps->dpy, mask, shape_gc, ps->o.cornerRadius, 0, w-dia, h);
+	XFillRectangle(ps->dpy, mask, shape_gc, 0, ps->o.cornerRadius, w, h-dia);
+	XShapeCombineMask(ps->dpy, cw->mini.window, ShapeBounding, 0, 0, mask, ShapeSet);
+	XFreePixmap(ps->dpy, mask);
+	XFreeGC(ps->dpy, shape_gc);
 }

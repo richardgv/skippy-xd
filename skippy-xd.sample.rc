@@ -69,6 +69,7 @@ updateFreq = 200.0
 animationDuration = 200
 
 lazyTrans = false
+cornerRadius = 0 # set > 0 to round corners
 pipePath = /tmp/skippy-xd-fifo
 
 # Move the mouse cursor to the next highlighted window, straight after launching skippy
