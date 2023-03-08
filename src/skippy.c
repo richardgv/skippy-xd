@@ -272,8 +272,8 @@ anime(
 	mainwin_transform(mw, multiplier);
 	foreach_dlist (mw->cod) {
 		ClientWin *cw = (ClientWin *) iter->data;
-		clientwin_update2(cw);
 		clientwin_move(cw, multiplier, mw->xoff, mw->yoff, timeslice);
+		clientwin_update2(cw);
 		clientwin_map(cw);
 	}
 }
