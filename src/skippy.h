@@ -103,8 +103,8 @@ hexdump(const char *data, int len) {
 /// @brief Possible return values.
 
 enum {
-	LAYOUT_BOXY,
-	LAYOUT_XD
+	LAYOUT_XD,
+	LAYOUT_BOXY
 };
 
 enum {
@@ -290,7 +290,7 @@ typedef struct {
 	.runAsDaemon = false, \
 	.synchronize = false, \
 \
-	.layout = LAYOUT_BOXY, \
+	.layout = LAYOUT_XD, \
 	.distance = 50, \
 	.useNetWMFullscreen = true, \
 	.ignoreSkipTaskbar = false, \
