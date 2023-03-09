@@ -2,6 +2,10 @@
 #
 # Notes:
 #
+# - File Syntax:
+#   Comments must be on their own seperate lines that start with a #
+#   You cannot append # comment after a settings line or a section header
+#
 # - colors can be anything XAllocNamedColor can handle
 #   (like "black" or "#000000")
 #
@@ -52,12 +56,18 @@
 #
 
 [general]
-layout = boxy
+
+# layout = xd (traditional layout), or boxy (=grouped #1)
+layout = xd
+
 distance = 50
 useNetWMFullscreen = true
 ignoreSkipTaskbar = true
 updateFreq = 200.0
-animationDuration = 200 # set = 0 to switch off animations
+
+# set = 0 to switch off animations
+animationDuration = 200
+
 lazyTrans = false
 pipePath = /tmp/skippy-xd-fifo
 
@@ -75,6 +85,7 @@ switchDesktopOnActivate = false
 includeFrame = true
 allowUpscale = true
 showAllDesktops = false
+cornerRadius = 0
 preferredIconSize = 48
 showIconsOnThumbnails = true
 iconFillSpec = orig mid mid #00FFFF
