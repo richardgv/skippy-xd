@@ -60,9 +60,17 @@ updateFreq = 200.0
 animationDuration = 200 # set = 0 to switch off animations
 lazyTrans = false
 pipePath = /tmp/skippy-xd-fifo
+
+# Move the mouse cursor to the next highlighted window, straight after launching skippy
 movePointerOnStart = true
+
+# Move the mouse cursor over the currently highlighted window, when using the keyboard to navigate between windows
 movePointerOnSelect = true
+
+# After activating the selected window, the skippy window picker is dissmissed. Then move mouse cursor to the center of the selected window.
+# Otherwise (if false), the mouse cursor will remain in the location where it was at the time when skippy was dismissed.
 movePointerOnRaise = true
+
 switchDesktopOnActivate = false
 includeFrame = true
 allowUpscale = true
