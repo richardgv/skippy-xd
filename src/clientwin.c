@@ -327,8 +327,11 @@ clientwin_repaint(ClientWin *cw, const XRectangle *pbound)
 
 	// Drawing main picture
 	{
-		const Picture mask = (cw->focused ? cw->mainwin->highlightPicture :
-				cw->mainwin->normalPicture);
+		Picture mask = cw->mainwin->normalPicture;
+		if (cw->focused)
+			mask = cw->mainwin->highlightPicture;
+		else if (cw->zombie)
+			mask = cw->mainwin->shadowPicture;
 
 		if (ps->o.lazyTrans) {
 			XRenderComposite(ps->dpy, PictOpSrc, source, mask,
