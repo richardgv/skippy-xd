@@ -92,6 +92,11 @@ clientwin_create(MainWin *mw, Window client) {
 	cw->mainwin = mw;
 	cw->wid_client = client;
 	cw->origin = None;
+	cw->destination = None;
+	cw->shadow = None;
+	cw->pixmap = None;
+	cw->cpixmap = None;
+
 	if (ps->o.includeFrame)
 		cw->src.window = wm_find_frame(ps, client);
 	if (!cw->src.window)
@@ -124,8 +129,6 @@ clientwin_create(MainWin *mw, Window client) {
 		wm_wid_set_info(cw->mainwin->ps, cw->mini.window, str, None);
 		free(str);
 	}
-
-	cw->cpixmap = None;
 
 	// Listen to events on the window. We don't want to miss any changes so
 	// this is to be done as early as possible
@@ -164,15 +167,14 @@ clientwin_update(ClientWin *cw) {
 		cw->src.format = XRenderFindVisualFormat(ps->dpy, wattr.visual);
 	}
 
-	cw->zombie = wattr.map_state != IsViewable;
-
 	if (IsViewable == wattr.map_state) {
+		// create cw->origin
         static XRenderPictureAttributes pa = { .subwindow_mode = IncludeInferiors };
         cw->origin = XRenderCreatePicture(ps->dpy,
                 cw->src.window, cw->src.format, CPSubwindowMode, &pa);
         XRenderSetPictureFilter(ps->dpy, cw->origin, FilterBest, 0, 0);
 
-		// Get window pixmap
+		// create cw->shadow
         XCompositeRedirectWindow(ps->dpy, cw->src.window,
                 CompositeRedirectAutomatic);
         cw->redirected = true;
@@ -192,6 +194,8 @@ clientwin_update(ClientWin *cw) {
 	// Reset mini window parameters
 	cw->mini.x = cw->mini.y = 0;
 	cw->mini.width = cw->mini.height = 1;
+
+	cw->zombie = wattr.map_state != IsViewable;
 
 	// modes are CLIDISP_THUMBNAIL_ICON, CLIDISP_THUMBNAIL, CLIDISP_ZOMBIE,
 	// CLIDISP_ZOMBIE_ICON, CLIDISP_ICON, CLIDISP_FILLED, CLIDISP_NONE
@@ -323,8 +327,11 @@ clientwin_repaint(ClientWin *cw, const XRectangle *pbound)
 
 	// Drawing main picture
 	{
-		const Picture mask = (cw->focused ? cw->mainwin->highlightPicture :
-				cw->mainwin->normalPicture);
+		Picture mask = cw->mainwin->normalPicture;
+		if (cw->focused)
+			mask = cw->mainwin->highlightPicture;
+		else if (cw->zombie)
+			mask = cw->mainwin->shadowPicture;
 
 		if (ps->o.lazyTrans) {
 			XRenderComposite(ps->dpy, PictOpSrc, source, mask,

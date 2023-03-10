@@ -235,7 +235,7 @@ mainwin_reload(session_t *ps, MainWin *mw) {
 		mw->highlightTint.blue = exact_color.blue;
 	}
 	mw->highlightTint.alpha = alphaconv(ps->o.highlight_tintOpacity);
-	
+
 	tmp = ps->o.shadow_tint;
 	if(! XParseColor(ps->dpy, mw->colormap, tmp, &exact_color))
 	{
@@ -260,7 +260,7 @@ mainwin_reload(session_t *ps, MainWin *mw) {
 	mw->normalPicture = XRenderCreatePicture(ps->dpy, mw->normalPixmap,
 			XRenderFindStandardFormat(ps->dpy, PictStandardA8), CPRepeat, &pa);
 	XRenderFillRectangle(ps->dpy, PictOpSrc, mw->normalPicture, &clear, 0, 0, 1, 1);
-	
+
 	clear.alpha = alphaconv(ps->o.highlight_opacity);
 	if(mw->highlightPixmap != None)
 		XFreePixmap(ps->dpy, mw->highlightPixmap);
@@ -270,6 +270,16 @@ mainwin_reload(session_t *ps, MainWin *mw) {
 	mw->highlightPicture = XRenderCreatePicture(ps->dpy, mw->highlightPixmap,
 			XRenderFindStandardFormat(ps->dpy, PictStandardA8), CPRepeat, &pa);
 	XRenderFillRectangle(ps->dpy, PictOpSrc, mw->highlightPicture, &clear, 0, 0, 1, 1);
+
+	clear.alpha = alphaconv(ps->o.shadow_opacity);
+	if(mw->shadowPixmap != None)
+		XFreePixmap(ps->dpy, mw->shadowPixmap);
+	mw->shadowPixmap = XCreatePixmap(ps->dpy, mw->window, 1, 1, 8);
+	if(mw->shadowPicture != None)
+		XRenderFreePicture(ps->dpy, mw->shadowPicture);
+	mw->shadowPicture = XRenderCreatePicture(ps->dpy, mw->shadowPixmap,
+			XRenderFindStandardFormat(ps->dpy, PictStandardA8), CPRepeat, &pa);
+	XRenderFillRectangle(ps->dpy, PictOpSrc, mw->shadowPicture, &clear, 0, 0, 1, 1);
 
 	mw->distance = ps->o.distance;
 	
