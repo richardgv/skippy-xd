@@ -175,11 +175,21 @@ Be sure to separate with ` ` spaces each keybinding in a given setting. Like `ke
 
 ## Maintainership / Contributions
 
-The last 'stable maintiner' of this software was [richardgv](https://github.com/richardgv). And that is where the vast majority of Skippy issues are raised / the bug tracker is still on his [fork over there](https://github.com/richardgv/skippy-xd/issues). However at this time, it looks like Richard really does not have time anymore to continue to maintain this software anymore (since 2015). And neither do I as a matter of fact.
+* Creator: Hyriand (2004) - This makes skippy-xd 19 years old now...
+* Current lead developer: `felixfung`. Who has made some fantastic improvements to skippy-xd during the year 2023+
+* Contributions from: `richardgv`, `dreamcat4`, `felixfung`, `cezaris13`, and many others (please edit this line to add any here missing contributor credits)
+* Maintenance / Secondary supportive role: `dreamcat4`
+* Previous stable maintiner: `richardgv`.
 
-This project is definately in need of a new maintainer. In the meantime, best thing we can do is to just fork based off the latest / most reaonable commits. And add whatever feature(s) or bugfixes ontop of that version. A top priority (very important) is not to be super-picky about this but: make safe changes to the code. Do not do anything that is *too risky* or over-extend yourself. Definately play on the safe side. For some pointers see next section
+Richard's upstreamm repo was previously where the majority of Skippy issues were raised. A bug tracker is still over [on his fork](https://github.com/richardgv/skippy-xd/issues). With all older legacy issues. However at this time, it looks like, (as Richard had previously indicated) that he really does not have time anymore to continue to maintain this software (since 2015). But he is welcome to come back and see what developements have been going on in his absense!
+
+In the meanntime we maintain new bugs tracker, here on this fork. And welcome any contributions / PRs.
+
+This project is in need of more contributors, and perhaps a new maintainer. Best thing we can do is just continue along over here. Adding whatever feature(s) & bugfixes ontop of the latest version. 
 
 ## Developer notes
+
+A top priority (very important) is not to be super-picky about this but: make safe changes to the code. Do not do anything that is *too risky* or over-extend yourself. Definately play on the safe side.
 
 Here are 3 basic safeguard mechanisms you can use in this project:
 

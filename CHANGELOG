@@ -1,10 +1,12 @@
 Skippy-XD changelog
 
+0.6.0~fung -- "" (10 Mar 2023) ~/felixfung
+ - Iconized thumbnails
+ - Config reloading while daemon is kept running
+ - Rounded Corners
+ - Boxy layout / multiple layouts
+
 0.5.2~pre -- "Puzzlebox" (09 Sept 2018) ~/dreamcat4
- =====
- - This is a pre-release version. Certain features are not fully complete.
-   When the release is ready, this msg + the '~pre' tag will be removed.
- =====
  - Fully customizable keybindings, and documentation for configuring them
  - Default keybindings settings made consistent with 'Alt-Tab' behaviour
  - (Alt-Tab) New --prev and --next args for --activate and --toggle modes
