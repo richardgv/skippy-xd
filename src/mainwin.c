@@ -86,7 +86,9 @@ mainwin_create(session_t *ps) {
 	// receive ButtonRelease events in some cases
 	wattr.event_mask = VisibilityChangeMask | ButtonPressMask
 		| ButtonReleaseMask | KeyPressMask | KeyReleaseMask;
-	
+
+	mw = mainwin_reload(ps, mw);
+
 	mw->window = XCreateWindow(dpy, ps->root, 0, 0, mw->width, mw->height, 0,
 			mw->depth, InputOutput, mw->visual,
 			CWBackPixel | CWBorderPixel | CWColormap | CWEventMask | CWOverrideRedirect, &wattr);
@@ -95,6 +97,8 @@ mainwin_create(session_t *ps) {
 		return 0;
 	}
 	wm_wid_set_info(ps, mw->window, "main window", None);
+
+	mainwin_create_pixmap(mw);
 
 #ifdef CFG_XINERAMA
 	if (ps->xinfo.xinerama_exist && XineramaIsActive(dpy)) {
@@ -107,18 +111,12 @@ mainwin_create(session_t *ps) {
 
 	XCompositeRedirectSubwindows (ps->dpy, ps->root, CompositeRedirectAutomatic);
 
-	return mainwin_reload(ps, mw);
+	return mw;
 }
 
 MainWin *
 mainwin_reload(session_t *ps, MainWin *mw) {
 	Display * const dpy = ps->dpy;
-
-	const char *tmp;
-	double tmp_d;
-	XColor exact_color;
-	XRenderPictureAttributes pa;
-	XRenderColor clear;
 
 	// convert the keybindings settings strings into arrays of KeySyms
 	keys_str_syms(ps->o.bindings_keysUp, &mw->keysyms_Up);
@@ -187,11 +185,10 @@ mainwin_reload(session_t *ps, MainWin *mw) {
 	check_keybindings_conflict(ps->o.config_path, "keysExitCancelOnRelease", mw->keysyms_ExitCancelOnRelease, "keysExitSelectOnRelease", mw->keysyms_ExitSelectOnRelease);
 	check_keybindings_conflict(ps->o.config_path, "keysExitSelectOnPress", mw->keysyms_ExitSelectOnPress, "keysExitSelectOnRelease", mw->keysyms_ExitSelectOnRelease);
 	
-	tmp_d = ps->o.updateFreq;
-	if(tmp_d != 0.0)
-		mw->poll_time = (1.0 / tmp_d) * 1000.0;
+	if (ps->o.updateFreq != 0.0)
+		mw->poll_time = (1.0 / ps->o.updateFreq) * 1000.0;
 	else
-		mw->poll_time = (1.0 / 200.0) * 1000.0;
+		mw->poll_time = (1.0 / 60.0) * 1000.0;
 
 	if (ps->o.lazyTrans) {
 		mw->depth  = 32;
@@ -209,6 +206,8 @@ mainwin_reload(session_t *ps, MainWin *mw) {
 	mw->colormap = XCreateColormap(dpy, ps->root, mw->visual, AllocNone);
 	mw->format = XRenderFindVisualFormat(dpy, mw->visual);
 
+	XColor exact_color;
+
 	if(!XParseColor(ps->dpy, mw->colormap, ps->o.normal_tint, &exact_color)) {
 		printfef("(): Couldn't look up color '%s', reverting to black.", ps->o.normal_tint);
 		mw->normalTint.red = mw->normalTint.green = mw->normalTint.blue = 0;
@@ -220,11 +219,10 @@ mainwin_reload(session_t *ps, MainWin *mw) {
 		mw->normalTint.blue = exact_color.blue;
 	}
 	mw->normalTint.alpha = alphaconv(ps->o.normal_tintOpacity);
-	
-	tmp = ps->o.highlight_tint;
-	if(! XParseColor(ps->dpy, mw->colormap, tmp, &exact_color))
+
+	if(! XParseColor(ps->dpy, mw->colormap, ps->o.highlight_tint, &exact_color))
 	{
-		fprintf(stderr, "Couldn't look up color '%s', reverting to #101020", tmp);
+		fprintf(stderr, "Couldn't look up color '%s', reverting to #101020", ps->o.highlight_tint);
 		mw->highlightTint.red = mw->highlightTint.green = 0x10;
 		mw->highlightTint.blue = 0x20;
 	}
@@ -236,10 +234,10 @@ mainwin_reload(session_t *ps, MainWin *mw) {
 	}
 	mw->highlightTint.alpha = alphaconv(ps->o.highlight_tintOpacity);
 
-	tmp = ps->o.shadow_tint;
-	if(! XParseColor(ps->dpy, mw->colormap, tmp, &exact_color))
+	;
+	if(! XParseColor(ps->dpy, mw->colormap, ps->o.shadow_tint, &exact_color))
 	{
-		fprintf(stderr, "Couldn't look up color '%s', reverting to #040404", tmp);
+		fprintf(stderr, "Couldn't look up color '%s', reverting to #040404", ps->o.shadow_tint);
 		mw->shadowTint.red = mw->shadowTint.green =	mw->shadowTint.blue = 0x04;
 	}
 	else
@@ -249,6 +247,29 @@ mainwin_reload(session_t *ps, MainWin *mw) {
 		mw->shadowTint.blue = exact_color.blue;
 	}
 	mw->shadowTint.alpha = alphaconv(ps->o.shadow_tintOpacity);
+
+	mw->distance = ps->o.distance;
+	
+	if (ps->o.tooltip_show) {
+		if(mw->tooltip)
+			tooltip_destroy(mw->tooltip);
+		mw->tooltip = tooltip_create(mw);
+	}
+	
+	return mw;
+
+mainwin_create_err:
+	if (mw)
+		free(mw);
+	return NULL;
+}
+
+MainWin *
+mainwin_create_pixmap(MainWin *mw) {
+	session_t *ps = mw->ps;
+
+	XRenderPictureAttributes pa;
+	XRenderColor clear;
 
 	pa.repeat = True;
 	clear.alpha = alphaconv(ps->o.normal_opacity);
@@ -281,20 +302,7 @@ mainwin_reload(session_t *ps, MainWin *mw) {
 			XRenderFindStandardFormat(ps->dpy, PictStandardA8), CPRepeat, &pa);
 	XRenderFillRectangle(ps->dpy, PictOpSrc, mw->shadowPicture, &clear, 0, 0, 1, 1);
 
-	mw->distance = ps->o.distance;
-	
-	if (ps->o.tooltip_show) {
-		if(mw->tooltip)
-			tooltip_destroy(mw->tooltip);
-		mw->tooltip = tooltip_create(mw);
-	}
-	
 	return mw;
-
-mainwin_create_err:
-	if (mw)
-		free(mw);
-	return NULL;
 }
 
 void
