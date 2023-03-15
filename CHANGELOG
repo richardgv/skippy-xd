@@ -1,10 +1,11 @@
 Skippy-XD changelog
 
 0.6.0~fung -- "" (10 Mar 2023) ~/felixfung
- - Iconized thumbnails
+ - Thumbnail displays for iconized or otherwise unmapped windows
+ - Animation when activating skippy
+ - Boxy layout / multiple layouts
  - Config reloading while daemon is kept running
  - Rounded Corners
- - Boxy layout / multiple layouts
 
 0.5.2~pre -- "Puzzlebox" (09 Sept 2018) ~/dreamcat4
  - Fully customizable keybindings, and documentation for configuring them
