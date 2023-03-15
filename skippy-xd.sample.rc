@@ -63,7 +63,7 @@ layout = xd
 distance = 50
 useNetWMFullscreen = true
 ignoreSkipTaskbar = true
-updateFreq = 200.0
+updateFreq = 60.0
 
 # set = 0 to switch off animations
 animationDuration = 200
@@ -108,7 +108,7 @@ opacity = 255
 [shadow]
 tint = #040404
 tintOpacity = 164
-opacity = 255
+opacity = 200
 
 [tooltip]
 show = true

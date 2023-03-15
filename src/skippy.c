@@ -267,7 +267,6 @@ anime(
 )
 {
 	clients = dlist_first(clients);
-	wm_get_current_desktop(mw->ps);
 	float multiplier = 1.0 + timeslice * (mw->multiplier - 1.0);
 	mainwin_transform(mw, multiplier);
 	foreach_dlist (mw->cod) {
@@ -709,22 +708,31 @@ mainloop(session_t *ps, bool activate_on_start) {
 		{
 			// animation!
 			if (mw && animating) {
-				last_rendered = time_in_millis();
-				long timeslice = time_in_millis() - first_animated;
-				anime(ps->mainwin, ps->mainwin->clients,
-					((float)timeslice)/(float)ps->o.animationDuration);
-				if ( timeslice >= ps->o.animationDuration) {
+				int timeslice = time_in_millis() - first_animated;
+				if (timeslice < ps->o.animationDuration
+						&& timeslice + first_animated >=
+						last_rendered + ps->mainwin->poll_time) {
+					anime(ps->mainwin, ps->mainwin->clients,
+						((float)timeslice)/(float)ps->o.animationDuration);
+					last_rendered = time_in_millis();
+
+					/* Map the main window and run our event loop */
+					if (!ps->o.lazyTrans && !mw->mapped)
+						mainwin_map(mw);
+					XFlush(ps->dpy);
+				}
+				else if (timeslice >= ps->o.animationDuration) {
 					anime(ps->mainwin, ps->mainwin->clients, 1);
 					animating = false;
 					last_rendered = time_in_millis();
 					focus_miniw_adv(ps, mw->client_to_focus,
 							ps->o.movePointerOnStart);
-				}
 
-				/* Map the main window and run our event loop */
-				if (!ps->o.lazyTrans && !mw->mapped)
-					mainwin_map(mw);
-				XFlush(ps->dpy);
+					/* Map the main window and run our event loop */
+					if (!ps->o.lazyTrans && !mw->mapped)
+						mainwin_map(mw);
+					XFlush(ps->dpy);
+				}
 
 				continue; // while animating, do not allow user actions
 			}
