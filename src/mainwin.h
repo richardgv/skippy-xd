@@ -104,6 +104,7 @@ void mainwin_unmap(MainWin *);
 int mainwin_handle(MainWin *, XEvent *);
 void mainwin_update_background(MainWin *mw);
 void mainwin_update(MainWin *mw);
+MainWin *mainwin_create_pixmap(MainWin *mw);
 void mainwin_transform(MainWin *mw, float f);
 
 #endif /* SKIPPY_MAINWIN_H */
