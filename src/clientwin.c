@@ -168,15 +168,19 @@ clientwin_update(ClientWin *cw) {
 
 	if (IsViewable == wattr.map_state) {
         static XRenderPictureAttributes pa = { .subwindow_mode = IncludeInferiors };
-        cw->origin = XRenderCreatePicture(ps->dpy,
-                cw->src.window, cw->src.format, CPSubwindowMode, &pa);
-        XRenderSetPictureFilter(ps->dpy, cw->origin, FilterBest, 0, 0);
+		if (cw->origin)
+			free_picture(ps, &cw->origin);
+		cw->origin = XRenderCreatePicture(ps->dpy,
+				cw->src.window, cw->src.format, CPSubwindowMode, &pa);
+		XRenderSetPictureFilter(ps->dpy, cw->origin, FilterBest, 0, 0);
 
 		// Get window pixmap
-        XCompositeRedirectWindow(ps->dpy, cw->src.window,
-                CompositeRedirectAutomatic);
-        cw->redirected = true;
-        cw->cpixmap = XCompositeNameWindowPixmap(ps->dpy, cw->src.window);
+		XCompositeRedirectWindow(ps->dpy, cw->src.window,
+				CompositeRedirectAutomatic);
+		cw->redirected = true;
+		if (cw->cpixmap)
+			free_pixmap(ps, &cw->cpixmap);
+		cw->cpixmap = XCompositeNameWindowPixmap(ps->dpy, cw->src.window);
 
 		if (cw->shadow)
 			free_picture(ps, &cw->shadow);
