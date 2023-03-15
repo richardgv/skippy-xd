@@ -169,7 +169,7 @@ clientwin_update(ClientWin *cw) {
 
 	if (IsViewable == wattr.map_state) {
 		// create cw->origin
-        static XRenderPictureAttributes pa = { .subwindow_mode = IncludeInferiors };
+		static XRenderPictureAttributes pa = { .subwindow_mode = IncludeInferiors };
 		if (cw->origin)
 			free_picture(ps, &cw->origin);
 		cw->origin = XRenderCreatePicture(ps->dpy,
