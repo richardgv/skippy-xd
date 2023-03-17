@@ -535,6 +535,17 @@ skippy_activate(MainWin *mw, Window leader)
 		return false;
 	}
 
+	foreach_dlist(mw->clients) {
+		ClientWin *cw = iter->data;
+		if(mw->ps->o.lazyTrans)
+		{
+			cw->x += cw->mainwin->x;
+			cw->y += cw->mainwin->y;
+		}
+		cw->x *= mw->multiplier;
+		cw->y *= mw->multiplier;
+	}
+
 	// Get the currently focused window and select which mini-window to focus
 	{
 		dlist *iter = dlist_find(mw->cod, clientwin_cmp_func, (void *) mw->revert_focus_win);
