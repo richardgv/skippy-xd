@@ -78,6 +78,8 @@ mainwin_create(session_t *ps) {
 	mw->width = rootattr.width;
 	mw->height = rootattr.height;
 
+	mw = mainwin_reload(ps, mw);
+
 	XSetWindowAttributes wattr;
 	wattr.colormap = mw->colormap;
 	wattr.background_pixel = wattr.border_pixel = 0;
@@ -86,8 +88,6 @@ mainwin_create(session_t *ps) {
 	// receive ButtonRelease events in some cases
 	wattr.event_mask = VisibilityChangeMask | ButtonPressMask
 		| ButtonReleaseMask | KeyPressMask | KeyReleaseMask;
-
-	mw = mainwin_reload(ps, mw);
 
 	mw->window = XCreateWindow(dpy, ps->root, 0, 0, mw->width, mw->height, 0,
 			mw->depth, InputOutput, mw->visual,
