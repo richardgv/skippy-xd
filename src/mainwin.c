@@ -70,7 +70,8 @@ mainwin_create(session_t *ps) {
 	// mw->pressed = mw->focus = 0;
 	mw->pressed = mw->client_to_focus = 0;
 	mw->tooltip = 0;
-	mw->cod = 0;
+	mw->clientondesktop = 0;
+	mw->focuslist = 0;
 
 	XWindowAttributes rootattr;
 	XGetWindowAttributes(dpy, ps->root, &rootattr);

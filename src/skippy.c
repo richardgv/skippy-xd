@@ -269,7 +269,7 @@ anime(
 	clients = dlist_first(clients);
 	float multiplier = 1.0 + timeslice * (mw->multiplier - 1.0);
 	mainwin_transform(mw, multiplier);
-	foreach_dlist (mw->cod) {
+	foreach_dlist (mw->clientondesktop) {
 		ClientWin *cw = (ClientWin *) iter->data;
 		clientwin_move(cw, multiplier, mw->xoff, mw->yoff, timeslice);
 		clientwin_update2(cw);
@@ -325,10 +325,10 @@ update_clients(MainWin *mw, Bool *touched)
 static void
 daemon_count_clients(MainWin *mw, Bool *touched, Window leader)
 {
-	// given the client table, update the cod
-	// the difference between mw->clients and mw->cod
+	// given the client table, update the clientondesktop
+	// the difference between mw->clients and mw->clientondesktop
 	// is that mw->clients is all the client windows 
-	// while mw->cod is only those in current virtual desktop
+	// while mw->clientondesktop is only those in current virtual desktop
 	// if that option is user supplied
 
 	// printfef("(): updating dl list of clients");
@@ -338,8 +338,8 @@ daemon_count_clients(MainWin *mw, Bool *touched, Window leader)
 		return;
 	}
 
-	dlist_free(mw->cod);
-	mw->cod = NULL;
+	dlist_free(mw->clientondesktop);
+	mw->clientondesktop = NULL;
 
 	{
         session_t * const ps = mw->ps;
@@ -353,11 +353,11 @@ daemon_count_clients(MainWin *mw, Bool *touched, Window leader)
 		}
 
 		if (leader) {
-			mw->cod = dlist_first(dlist_find_all(tmp, clientwin_check_group_leader_func, (void*)&leader));
+			mw->clientondesktop = dlist_first(dlist_find_all(tmp, clientwin_check_group_leader_func, (void*)&leader));
 			dlist_free(tmp);
 		}
 		else {
-			mw->cod = tmp;
+			mw->clientondesktop = tmp;
 		}
 	}
 
@@ -367,19 +367,23 @@ daemon_count_clients(MainWin *mw, Bool *touched, Window leader)
 static void
 init_layout(MainWin *mw, Window focus, Window leader)
 {
-	if (!mw->cod)
+	if (!mw->clientondesktop)
 		return;
 	
-	dlist_sort(mw->cod, clientwin_sort_func, 0);
+	dlist_sort(mw->clientondesktop, clientwin_sort_func, 0);
 
 	/* set up the windows layout */
 	{
 		unsigned int newwidth = 0, newheight = 0;
-		layout_run(mw, mw->cod, &newwidth, &newheight);
+		layout_run(mw, mw->clientondesktop, &newwidth, &newheight);
 
 		// ordering of client windows list
 		// is important for prev/next window selection
-		dlist_sort(mw->cod, sort_cw_by_pos, 0);
+		if (mw->ps->o.sortByColumn)
+			dlist_sort(mw->clientondesktop, sort_cw_by_column, 0);
+		else
+			dlist_sort(mw->clientondesktop, sort_cw_by_row, 0);
+		mw->focuslist = mw->clientondesktop;
 
 		float multiplier = (float) (mw->width - 2 * mw->distance) / newwidth;
 		if (multiplier * newheight > mw->height - 2 * mw->distance)
@@ -530,7 +534,7 @@ skippy_activate(MainWin *mw, Window leader)
 	}
 
 	init_layout(mw, mw->revert_focus_win, leader);
-	if (!mw->cod) {
+	if (!mw->clientondesktop) {
 		printfef("(): Failed to build layout.");
 		return false;
 	}
@@ -548,7 +552,7 @@ skippy_activate(MainWin *mw, Window leader)
 
 	// Get the currently focused window and select which mini-window to focus
 	{
-		dlist *iter = dlist_find(mw->cod, clientwin_cmp_func, (void *) mw->revert_focus_win);
+		dlist *iter = dlist_find(mw->clientondesktop, clientwin_cmp_func, (void *) mw->revert_focus_win);
 
 		// check if the user specified --prev or --next on the cmdline
 		if(ps->o.focus_initial)
@@ -561,12 +565,12 @@ skippy_activate(MainWin *mw, Window leader)
 
 			if(ps->o.focus_initial == FI_PREV)
 			{
-				// here, mw->cod is the first (dlist*) item in the list
-				if (iter == mw->cod)
-					iter = dlist_last(mw->cod);
+				// here, mw->clientondesktop is the first (dlist*) item in the list
+				if (iter == mw->clientondesktop)
+					iter = dlist_last(mw->clientondesktop);
 				else
 				{
-					dlist *i = mw->cod;
+					dlist *i = mw->clientondesktop;
 					for (; i != NULL; i = i->next)
 						if (i->next && i->next == iter)
 							break;
@@ -582,7 +586,7 @@ skippy_activate(MainWin *mw, Window leader)
 		ps->o.focus_initial = 0;
 
 		if (!iter)
-			iter = mw->cod;
+			iter = mw->clientondesktop;
 
 		// mw->focus = (ClientWin *) iter->data;
 		mw->client_to_focus = (ClientWin *) iter->data;
@@ -671,7 +675,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 			// Unmap the main window and all clients, to make sure focus doesn't fall out
 			// when we start setting focus on client window
 			mainwin_unmap(mw);
-			foreach_dlist(mw->cod) { clientwin_unmap((ClientWin *) iter->data); }
+			foreach_dlist(mw->clientondesktop) { clientwin_unmap((ClientWin *) iter->data); }
 			XSync(ps->dpy, False);
 
 			// Focus the client window only after the main window get unmapped and
@@ -684,8 +688,8 @@ mainloop(session_t *ps, bool activate_on_start) {
 			}
 
 			// Cleanup
-			dlist_free(mw->cod);
-			mw->cod = 0;
+			dlist_free(mw->clientondesktop);
+			mw->clientondesktop = 0;
 
 			if (refocus && mw->revert_focus_win) {
 				// printfef("(): if (refocus && mw->revert_focus_win) {");
@@ -806,11 +810,11 @@ mainloop(session_t *ps, bool activate_on_start) {
 						ClientWin *cw = (ClientWin *) iter->data;
 						if (!cw->mode) {
 							mw->clients = dlist_first(dlist_remove(iter));
-							iter = dlist_find(mw->cod, clientwin_cmp_func, (void *) wid);
+							iter = dlist_find(mw->clientondesktop, clientwin_cmp_func, (void *) wid);
 							if (iter)
-								mw->cod = dlist_first(dlist_remove(iter));
+								mw->clientondesktop = dlist_first(dlist_remove(iter));
 							clientwin_destroy(cw, true);
-							if (!mw->cod) {
+							if (!mw->clientondesktop) {
 								printfef("(): Last client window destroyed/unmapped, "
 										"exiting.");
 								die = true;
@@ -861,16 +865,16 @@ mainloop(session_t *ps, bool activate_on_start) {
 
 					    // printfef("(): if (!ps->o.background && ...");
 					    // printfef("(): mainwin_update_background(mw);");
-					    // printfef("(): REDUCE(clientwin_render((ClientWin *)iter->data), mw->cod);");
+					    // printfef("(): REDUCE(clientwin_render((ClientWin *)iter->data), mw->clientondesktop);");
 
 						mainwin_update_background(mw);
-						REDUCE(clientwin_render((ClientWin *)iter->data), mw->cod);
+						REDUCE(clientwin_render((ClientWin *)iter->data), mw->clientondesktop);
 					}
 				}
 				else if (mw && mw->tooltip && wid == mw->tooltip->window)
 					tooltip_handle(mw->tooltip, &ev);
 				else if (mw && wid) {
-					for (dlist *iter = mw->cod; iter; iter = iter->next) {
+					for (dlist *iter = mw->clientondesktop; iter; iter = iter->next) {
 						ClientWin *cw = (ClientWin *) iter->data;
 						if (cw->mini.window == wid) {
                             if (!(POLLIN & r_fd[1].revents))
@@ -889,7 +893,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 			if (mw && pending_damage && !die) {
 				//printfdf("(): delayed painting");
 				pending_damage = false;
-				foreach_dlist(mw->cod) {
+				foreach_dlist(mw->clientondesktop) {
 					if (((ClientWin *) iter->data)->damaged)
 					{
 						// printfef("(): if (((ClientWin *) iter->data)->damaged)");
@@ -1467,6 +1471,7 @@ load_config_file(session_t *ps)
            }
         }
     }
+    config_get_bool_wrap(config, "general", "sortByColumn", &ps->o.sortByColumn);
     config_get_int_wrap(config, "general", "distance", &ps->o.distance, 1, INT_MAX);
     config_get_bool_wrap(config, "general", "useNetWMFullscreen", &ps->o.useNetWMFullscreen);
     config_get_bool_wrap(config, "general", "ignoreSkipTaskbar", &ps->o.ignoreSkipTaskbar);

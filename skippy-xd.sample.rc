@@ -57,8 +57,14 @@
 
 [general]
 
-# layout = xd (traditional layout), or boxy (=grouped #1)
-layout = xd
+# layout=boxy is favoured by expo usage
+# layout=xd is favoured by alt+tab usage
+layout = boxy
+
+# sort by row or sort by column
+# sorting by column is favoured by boxy layout
+# sorting by row is favoured by xd layout
+sortByColumn = true
 
 distance = 50
 useNetWMFullscreen = true
