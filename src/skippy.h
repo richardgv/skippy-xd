@@ -219,6 +219,7 @@ typedef struct {
 	int focus_initial;
 
 	int layout;
+	bool sortByColumn;
 	int distance;
 	bool useNetWMFullscreen;
 	bool ignoreSkipTaskbar;
@@ -292,6 +293,7 @@ typedef struct {
 	.synchronize = false, \
 \
 	.layout = LAYOUT_XD, \
+	.sortByColumn = true, \
 	.distance = 50, \
 	.useNetWMFullscreen = true, \
 	.ignoreSkipTaskbar = false, \
@@ -1348,7 +1350,7 @@ report_key_modifiers(XKeyEvent *evk)
 #endif
 
 static inline int
-sort_cw_by_pos(dlist* dlist1, dlist* dlist2, void* data)
+sort_cw_by_row(dlist* dlist1, dlist* dlist2, void* data)
 {
 	ClientWin *cw1 = (ClientWin *) dlist1->data;
 	ClientWin *cw2 = (ClientWin *) dlist2->data;
@@ -1359,6 +1361,28 @@ sort_cw_by_pos(dlist* dlist1, dlist* dlist2, void* data)
 	else if (cw1->x < cw2->x)
 		return -1;
 	else if (cw1->x > cw2->x)
+		return 1;
+	else
+		return 0;
+}
+
+static inline int
+sort_cw_by_column(dlist* dlist1, dlist* dlist2, void* data)
+{
+	ClientWin *cw1 = (ClientWin *) dlist1->data;
+	ClientWin *cw2 = (ClientWin *) dlist2->data;
+
+	if (cw1->x + cw1->src.width / 2
+			< cw2->x + cw2->src.width / 2)
+		return -1;
+	else if (cw1->x + cw1->src.width / 2
+			> cw2->x + cw2->src.width / 2)
+		return 1;
+	else if (cw1->y + cw1->src.height / 2
+			< cw2->y + cw2->src.height / 2)
+		return -1;
+	else if (cw1->y + cw1->src.height / 2
+			> cw2->y + cw2->src.height / 2)
 		return 1;
 	else
 		return 0;

@@ -58,9 +58,9 @@ printfefXFocusChangeEvent(session_t *ps, XFocusChangeEvent *evf)
 }
 
 static inline void
-clear_focus_all(dlist *cod)
+clear_focus_all(dlist *focuslist)
 {
-	dlist *elem = dlist_first(cod);
+	dlist *elem = dlist_first(focuslist);
 	while (elem)
 	{
 		ClientWin *cw = (ClientWin *)elem->data;
@@ -80,7 +80,7 @@ focus_miniw_adv(session_t *ps, ClientWin *cw, bool move_ptr) {
 	if (!cw || !ps)
 		return;
 
-	clear_focus_all(cw->mainwin->cod);
+	clear_focus_all(cw->mainwin->focuslist);
 
 	//printfefWindowName(ps, "(): window = ", cw->wid_client);
 
@@ -118,7 +118,7 @@ focus_miniw(session_t *ps, ClientWin *cw) {
  */
 static inline void
 focus_miniw_next(session_t *ps, ClientWin *cw) {
-	dlist *e = dlist_find_data(cw->mainwin->cod, cw);
+	dlist *e = dlist_find_data(cw->mainwin->focuslist, cw);
 	if (!e) {
 		printfef("(%#010lx): Client window not found in list.", cw->src.window);
 		return;
@@ -134,7 +134,7 @@ focus_miniw_next(session_t *ps, ClientWin *cw) {
  */
 static inline void
 focus_miniw_prev(session_t *ps, ClientWin *cw) {
-	dlist *cwlist = dlist_first(cw->mainwin->cod);
+	dlist *cwlist = dlist_first(cw->mainwin->focuslist);
 	dlist *tgt = NULL;
 
 	if (cw == cwlist->data)
