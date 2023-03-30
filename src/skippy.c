@@ -29,10 +29,11 @@
 enum pipe_cmd_t {
 	// Not ordered properly for backward compatibility
 	PIPECMD_RELOAD_CONFIG = 0,
-	PIPECMD_ACTIVATE_WINDOW_PICKER = 1,
-	PIPECMD_EXIT_RUNNING_DAEMON,
-	PIPECMD_DEACTIVATE_WINDOW_PICKER,
-	PIPECMD_TOGGLE_WINDOW_PICKER,
+	PIPECMD_ACTIVATE_EXPOSE = 1,
+	PIPECMD_ACTIVATE_PAGING,
+	PIPECMD_DEACTIVATE,
+	PIPECMD_TOGGLE,
+	PIPECMD_EXIT_DAEMON,
 	PIPECMD_QUEUE_FI_PREV,
 	PIPECMD_QUEUE_FI_NEXT,
 };
@@ -447,6 +448,9 @@ init_desktop_layout(MainWin *mw, Window focus, Window leader)
 		cw->src.y += (win_desktop_y - current_desktop_y) * (mw->height + mw->distance);
 	}
 
+	dlist_sort(mw->clientondesktop, sort_cw_by_row, 0);
+	mw->focuslist = mw->clientondesktop;
+
 	return;
 }
 
@@ -604,7 +608,7 @@ init_focus(MainWin *mw, Window leader) {
 }
 
 static bool
-skippy_activate(MainWin *mw, Window leader)
+skippy_activate(MainWin *mw, Window leader, bool paging)
 {
 	session_t *ps = mw->ps;
 
@@ -632,7 +636,7 @@ skippy_activate(MainWin *mw, Window leader)
 		clientwin_update2((ClientWin *) iter->data);
 	}
 
-	if (mw->ps->o.showAllDesktops) {
+	if (paging) {
 		init_desktop_layout(mw, mw->revert_focus_win, leader);
 		if (!mw->clientondesktop) {
 			printfef("(): Failed to build layout.");
@@ -693,6 +697,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 	bool refocus = false;
 	bool pending_damage = false;
 	long last_rendered = 0L;
+	bool paging = ps->o.mode == PROGMODE_ACTV_PAGING;
 	bool animating = activate;
 	long first_animated = 0L;
 
@@ -719,7 +724,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 			assert(ps->mainwin);
 			activate = false;
 
-			if (skippy_activate(ps->mainwin, None)) {
+			if (skippy_activate(ps->mainwin, None, paging)) {
                 // printfef("(): if (skippy_activate(ps->mainwin, None)) {");
                 // printfef("(): was in skippy_activate");
 				last_rendered = time_in_millis();
@@ -995,14 +1000,11 @@ mainloop(session_t *ps, bool activate_on_start) {
 						load_config_file(ps);
 						mainwin_reload(ps, ps->mainwin);
 						break;
-					case PIPECMD_QUEUE_FI_PREV:
-						ps->o.focus_initial = FI_PREV;
-						break;
-					case PIPECMD_QUEUE_FI_NEXT:
-						ps->o.focus_initial = FI_NEXT;
-						break;
-					case PIPECMD_ACTIVATE_WINDOW_PICKER:
-						printfef("(): case PIPECMD_ACTIVATE_WINDOW_PICKER:");
+					case PIPECMD_ACTIVATE_EXPOSE:
+					case PIPECMD_ACTIVATE_PAGING:
+						paging = piped_input == PIPECMD_ACTIVATE_PAGING;
+						ps->o.mode = paging? PROGMODE_ACTV_PAGING: PROGMODE_ACTV_EXPOSE;
+						printfef("(): case PIPECMD_ACTIVATE, paging=%d:", paging);
 						if (ps->mainwin->mapped)
 						{
 							printfef("(): if (ps->mainwin->mapped)");
@@ -1028,8 +1030,6 @@ mainloop(session_t *ps, bool activate_on_start) {
 								focus_miniw_next(ps, mw->client_to_focus);
 							}
 							clientwin_render(mw->client_to_focus);
-
-
 						}
 						else
 						{
@@ -1037,20 +1037,26 @@ mainloop(session_t *ps, bool activate_on_start) {
 							animating = activate = true;
 						}
 						break;
-					case PIPECMD_DEACTIVATE_WINDOW_PICKER:
+					case PIPECMD_DEACTIVATE:
 						if (mw)
 							die = true;
 						break;
-					case PIPECMD_TOGGLE_WINDOW_PICKER:
+					case PIPECMD_TOGGLE:
 						if (mw)
 							die = true;
 						else
 							animating = activate = true;
 						break;
-					case PIPECMD_EXIT_RUNNING_DAEMON:
+					case PIPECMD_EXIT_DAEMON:
 						printfdf("(): Exit command received, killing daemon...");
 						unlink(ps->o.pipePath);
 						return;
+					case PIPECMD_QUEUE_FI_PREV:
+						ps->o.focus_initial = FI_PREV;
+						break;
+					case PIPECMD_QUEUE_FI_NEXT:
+						ps->o.focus_initial = FI_NEXT;
+						break;
 					default:
 						printfdf("(): Unknown daemon command \"%d\" received.", piped_input);
 						break;
@@ -1105,27 +1111,33 @@ queue_initial_focus_next(const char *pipePath) {
 }
 
 static inline bool
-activate_window_picker(const char *pipePath) {
-	printfdf("(): Activating window picker...");
-	return send_command_to_daemon_via_fifo(PIPECMD_ACTIVATE_WINDOW_PICKER, pipePath);
+activate_expose(const char *pipePath) {
+	printfdf("(): Activating expose...");
+	return send_command_to_daemon_via_fifo(PIPECMD_ACTIVATE_EXPOSE, pipePath);
+}
+
+static inline bool
+activate_paging(const char *pipePath) {
+	printfdf("(): Activating paging...");
+	return send_command_to_daemon_via_fifo(PIPECMD_ACTIVATE_PAGING, pipePath);
 }
 
 static inline bool
 exit_daemon(const char *pipePath) {
 	printfdf("(): Killing daemon...");
-	return send_command_to_daemon_via_fifo(PIPECMD_EXIT_RUNNING_DAEMON, pipePath);
+	return send_command_to_daemon_via_fifo(PIPECMD_EXIT_DAEMON, pipePath);
 }
 
 static inline bool
-deactivate_window_picker(const char *pipePath) {
-	printfdf("(): Deactivating window picker...");
-	return send_command_to_daemon_via_fifo(PIPECMD_DEACTIVATE_WINDOW_PICKER, pipePath);
+deactivate(const char *pipePath) {
+	printfdf("(): Deactivating...");
+	return send_command_to_daemon_via_fifo(PIPECMD_DEACTIVATE, pipePath);
 }
 
 static inline bool
-toggle_window_picker(const char *pipePath) {
+toggle_activate(const char *pipePath) {
 	printfdf("(): Toggling window picker...");
-	return send_command_to_daemon_via_fifo(PIPECMD_TOGGLE_WINDOW_PICKER, pipePath);
+	return send_command_to_daemon_via_fifo(PIPECMD_TOGGLE, pipePath);
 }
 
 /**
@@ -1202,19 +1214,21 @@ show_help() {
 	fputs("skippy-xd " SKIPPYXD_VERSION "\n"
 			"Usage: skippy-xd [command]\n\n"
 			"The available commands are:\n"
-			"  --config-reload             - reload configuration file; currently the file path must ermain unchanged.\n"
-			"  --config                    - read the specified configuration file.\n"
-			"  --start-daemon              - starts the daemon running.\n"
-			"  --stop-daemon               - stops the daemon running.\n"
-			"  --activate-window-picker    - tells the daemon to show the window picker.\n"
-			"  --deactivate-window-picker  - tells the daemon to hide the window picker.\n"
-			"  --toggle-window-picker      - tells the daemon to toggle the window picker.\n"
-			"  --prev                      - launch initially focussed to previous selection.\n"
-			"  --next                      - launch initially focussed to next selection.\n"
+			"  [no command]        - activate expose once without daemon.\n"
+			"  --config-reload     - reload configuration file; currently the file path must remain unchanged.\n"
+			"  --config            - read the specified configuration file.\n"
+			"  --start-daemon      - starts the daemon running.\n"
+			"  --stop-daemon       - stops the daemon running.\n"
+			"  --activate-expose   - connects to daemon and activate expose.\n"
+			"  --activate-paging   - connects to daemon and activate paging.\n"
+			"  --deactivate        - connects to daemon and deactivate expose or paging.\n"
+			"  --toggle            - connects to daemon and toggle activation.\n"
+			"  --prev              - focus window to previous.\n"
+			"  --next              - focus window to next.\n"
 			// "  --test                      - Temporary development testing. To be removed.\n"
 			"\n"
-			"  --help                      - show this message.\n"
-			"  -S                          - Synchronize X operation (debugging).\n"
+			"  --help              - show this message.\n"
+			"  -S                  - Synchronize X operation (debugging).\n"
 			, stdout);
 #ifdef CFG_LIBPNG
 	spng_about(stdout);
@@ -1367,9 +1381,10 @@ parse_args(session_t *ps, int argc, char **argv, bool first_pass) {
 	enum options {
 		OPT_CONFIG = 256,
 		OPT_CONFIG_RELOAD,
-		OPT_ACTV_PICKER,
-		OPT_DEACTV_PICKER,
-		OPT_TOGGLE_PICKER,
+		OPT_ACTV_EXPOSE,
+		OPT_ACTV_PAGING,
+		OPT_DEACTV,
+		OPT_TOGGLE,
 		OPT_DM_START,
 		OPT_DM_STOP,
 		OPT_PREV,
@@ -1380,9 +1395,10 @@ parse_args(session_t *ps, int argc, char **argv, bool first_pass) {
 		{ "help",                     no_argument,       NULL, 'h' },
 		{ "config",                   required_argument, NULL, OPT_CONFIG },
 		{ "config-reload",            no_argument,       NULL, OPT_CONFIG_RELOAD },
-		{ "activate-window-picker",   no_argument,       NULL, OPT_ACTV_PICKER },
-		{ "deactivate-window-picker", no_argument,       NULL, OPT_DEACTV_PICKER },
-		{ "toggle-window-picker",     no_argument,       NULL, OPT_TOGGLE_PICKER },
+		{ "activate-expose",          no_argument,       NULL, OPT_ACTV_EXPOSE },
+		{ "activate-paging",          no_argument,       NULL, OPT_ACTV_PAGING },
+		{ "deactivate",               no_argument,       NULL, OPT_DEACTV },
+		{ "toggle",                   no_argument,       NULL, OPT_TOGGLE },
 		{ "start-daemon",             no_argument,       NULL, OPT_DM_START },
 		{ "stop-daemon",              no_argument,       NULL, OPT_DM_STOP },
 		{ "prev",                     no_argument,       NULL, OPT_PREV },
@@ -1433,21 +1449,24 @@ parse_args(session_t *ps, int argc, char **argv, bool first_pass) {
 			case OPT_CONFIG_RELOAD:
 				ps->o.mode = PROGMODE_RELOAD_CONFIG;
 				break;
-			case OPT_PREV: break;
-			case OPT_NEXT: break;
-			case OPT_ACTV_PICKER:
-				ps->o.mode = PROGMODE_ACTV_PICKER;
+			case OPT_ACTV_EXPOSE:
+				ps->o.mode = PROGMODE_ACTV_EXPOSE;
 				break;
-			case OPT_DEACTV_PICKER:
-				ps->o.mode = PROGMODE_DEACTV_PICKER;
+			case OPT_ACTV_PAGING:
+				ps->o.mode = PROGMODE_ACTV_PAGING;
 				break;
-			case OPT_TOGGLE_PICKER:
-				ps->o.mode = PROGMODE_TOGGLE_PICKER;
+			case OPT_DEACTV:
+				ps->o.mode = PROGMODE_DEACTV;
 				break;
-			T_CASEBOOL(OPT_DM_START, runAsDaemon);
+			case OPT_TOGGLE:
+				ps->o.mode = PROGMODE_TOGGLE;
+				break;
 			case OPT_DM_STOP:
 				ps->o.mode = PROGMODE_DM_STOP;
 				break;
+			T_CASEBOOL(OPT_DM_START, runAsDaemon);
+			case OPT_PREV: break;
+			case OPT_NEXT: break;
 #undef T_CASEBOOL
 			default:
 				printfef("(0): Unimplemented option %d.", o);
@@ -1682,7 +1701,8 @@ int main(int argc, char *argv[]) {
 	switch (ps->o.mode) {
 		case PROGMODE_NORMAL:
 			break;
-		case PROGMODE_ACTV_PICKER:
+		case PROGMODE_ACTV_EXPOSE:
+		case PROGMODE_ACTV_PAGING:
 			if(ps->o.focus_initial)
 			{
 				if(ps->o.focus_initial == FI_PREV)
@@ -1694,12 +1714,15 @@ int main(int argc, char *argv[]) {
 				// we must pause slightly, otherwise will miss next read() call in this loop()
 				usleep(10000);
 			}
-			activate_window_picker(pipePath);
+			if (ps->o.mode == PROGMODE_ACTV_EXPOSE)
+				activate_expose(pipePath);
+			else
+				activate_paging(pipePath);
 			goto main_end;
-		case PROGMODE_DEACTV_PICKER:
-			deactivate_window_picker(pipePath);
+		case PROGMODE_DEACTV:
+			deactivate(pipePath);
 			goto main_end;
-		case PROGMODE_TOGGLE_PICKER:
+		case PROGMODE_TOGGLE:
 			if(ps->o.focus_initial)
 			{
 				if(ps->o.focus_initial == FI_PREV)
@@ -1710,7 +1733,7 @@ int main(int argc, char *argv[]) {
 				// we must pause slightly, otherwise will miss next read() call in this loop()
 				usleep(10000);
 			}
-			toggle_window_picker(pipePath);
+			toggle_activate(pipePath);
 			goto main_end;
 		case PROGMODE_RELOAD_CONFIG:
 			queue_reload_config(pipePath);
