@@ -82,6 +82,7 @@ wm_check(session_t *ps) {
 
 dlist *wm_get_stack(session_t *ps);
 Pixmap wm_get_root_pmap(Display *dpy);
+unsigned long wm_get_desktops(session_t *ps);
 long wm_get_current_desktop(session_t *ps);
 FcChar8 *wm_get_window_title(session_t *ps, Window wid, int *length_return);
 void printfefWindowName(session_t *ps, char *prefix_str, Window wid);

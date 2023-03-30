@@ -429,6 +429,36 @@ wm_get_root_pmap(Display *dpy)
 	return rootpmap;
 }
 
+unsigned long
+wm_get_desktops(session_t *ps) {
+	Atom real_type;
+	int real_format;
+	unsigned long items_read, items_left;
+	unsigned char *data;
+
+	char num_desktops = -1;
+
+	int status = XGetWindowProperty(ps->dpy, ps->root,
+			_NET_NUMBER_OF_DESKTOPS, 0L, 1L, False, XA_CARDINAL,
+			&real_type, &real_format, &items_read, &items_left, &data);
+
+	if (status == Success && items_read && data && real_format == 32)
+		goto return_status;
+
+	status = XGetWindowProperty(ps->dpy, ps->root,
+			_WIN_WORKSPACE_COUNT, 0L, 1L, False, XA_CARDINAL,
+			&real_type, &real_format, &items_read, &items_left, &data);
+
+	if (status == Success && items_read && data && real_format == 32)
+		goto return_status;
+
+return_status:
+	if (status == Success && items_read && data && real_format == 32)
+		num_desktops = data[0];
+
+	return num_desktops;
+}
+
 long
 wm_get_current_desktop(session_t *ps) {
 	winprop_t prop = { };

@@ -397,8 +397,54 @@ init_layout(MainWin *mw, Window focus, Window leader)
 		mw->multiplier = multiplier;
 		mw->xoff = xoff;
 		mw->yoff = yoff;
-		mw->newwidth = newwidth;
-		mw->newheight = newheight;
+	}
+
+	return;
+}
+
+static void
+init_desktop_layout(MainWin *mw, Window focus, Window leader)
+{
+	if (!mw->clients)
+		return;
+
+	int screencount = wm_get_desktops(mw->ps);
+	if (screencount == -1)
+		screencount = 1;
+	int desktop_dim = ceil(sqrt(screencount));
+
+    {
+		int totalwidth = desktop_dim * (mw->width + mw->distance) - mw->distance;
+		int totalheight = desktop_dim * (mw->height + mw->distance) - mw->distance;
+
+		float multiplier = (float) (mw->width - 1 * mw->distance) / (float) totalwidth;
+		if (multiplier * totalheight > mw->height - 1 * mw->distance)
+			multiplier = (float) (mw->height - 1 * mw->distance) / (float) totalheight;
+
+		int xoff = (mw->width - (float) totalwidth * multiplier) / 2;
+		int yoff = (mw->height - (float) totalheight * multiplier) / 2;
+
+		mw->multiplier = multiplier;
+		mw->xoff = xoff;
+		mw->yoff = yoff;
+	}
+
+	foreach_dlist (mw->clients) {
+		ClientWin *cw = (ClientWin *) iter->data;
+		int win_desktop = wm_get_window_desktop(mw->ps, cw->wid_client);
+		int current_desktop = wm_get_current_desktop(mw->ps);
+
+		int win_desktop_x = win_desktop % desktop_dim;
+		int win_desktop_y = win_desktop / desktop_dim;
+
+		int current_desktop_x = current_desktop % desktop_dim;
+		int current_desktop_y = current_desktop / desktop_dim;
+
+		cw->x = cw->src.x + win_desktop_x * (mw->width + mw->distance);
+		cw->y = cw->src.y + win_desktop_y * (mw->height + mw->distance);
+
+		cw->src.x += (win_desktop_x - current_desktop_x) * (mw->width + mw->distance);
+		cw->src.y += (win_desktop_y - current_desktop_y) * (mw->height + mw->distance);
 	}
 
 	return;
@@ -504,6 +550,59 @@ ev_dump(session_t *ps, const MainWin *mw, const XEvent *ev) {
 	printfd("Event %-13.13s wid %#010lx %s", name, wid, wextra);
 }
 
+static void
+init_focus(MainWin *mw, Window leader) {
+	session_t *ps = mw->ps;
+
+	// Get the currently focused window and select which mini-window to focus
+	{
+		dlist *iter = dlist_find(mw->focuslist, clientwin_cmp_func, (void *) mw->revert_focus_win);
+
+		// check if the user specified --prev or --next on the cmdline
+		if(ps->o.focus_initial)
+		{
+
+			// ps->mainwin->ignore_next_refocus = 1;
+			// ps->mainwin->ignore_next_refocus = 2;
+			// ps->mainwin->ignore_next_refocus = 4;
+
+
+			if(ps->o.focus_initial == FI_PREV)
+			{
+				// here, mw->focuslist is the first (dlist*) item in the list
+				if (iter == mw->focuslist)
+					iter = dlist_last(mw->focuslist);
+				else
+				{
+					dlist *i = mw->focuslist;
+					for (; i != NULL; i = i->next)
+						if (i->next && i->next == iter)
+							break;
+					iter = i;
+				}
+			}
+			else if(ps->o.focus_initial == FI_NEXT)
+				iter = iter->next;
+
+		}
+
+		// then clear this flag, so daemon not remember on its next activation
+		ps->o.focus_initial = 0;
+
+		if (!iter)
+			iter = mw->focuslist;
+
+		// mw->focus = (ClientWin *) iter->data;
+		mw->client_to_focus = (ClientWin *) iter->data;
+		mw->client_to_focus_on_cancel = (ClientWin *) iter->data;
+		// mw->focus->focused = 1;
+
+
+		mw->client_to_focus->focused = 1;
+		// focus_miniw(ps, mw->client_to_focus);
+	}
+}
+
 static bool
 skippy_activate(MainWin *mw, Window leader)
 {
@@ -533,69 +632,32 @@ skippy_activate(MainWin *mw, Window leader)
 		clientwin_update2((ClientWin *) iter->data);
 	}
 
-	init_layout(mw, mw->revert_focus_win, leader);
-	if (!mw->clientondesktop) {
-		printfef("(): Failed to build layout.");
-		return false;
+	if (mw->ps->o.showAllDesktops) {
+		init_desktop_layout(mw, mw->revert_focus_win, leader);
+		if (!mw->clientondesktop) {
+			printfef("(): Failed to build layout.");
+			return false;
+		}
+		mw->focuslist = mw->clientondesktop;
 	}
+	else {
+		init_layout(mw, mw->revert_focus_win, leader);
+		if (!mw->clientondesktop) {
+			printfef("(): Failed to build layout.");
+			return false;
+		}
+	}
+	init_focus(mw, leader);
 
 	foreach_dlist(mw->clients) {
 		ClientWin *cw = iter->data;
-		if(mw->ps->o.lazyTrans)
+		if (mw->ps->o.lazyTrans)
 		{
 			cw->x += cw->mainwin->x;
 			cw->y += cw->mainwin->y;
 		}
 		cw->x *= mw->multiplier;
 		cw->y *= mw->multiplier;
-	}
-
-	// Get the currently focused window and select which mini-window to focus
-	{
-		dlist *iter = dlist_find(mw->clientondesktop, clientwin_cmp_func, (void *) mw->revert_focus_win);
-
-		// check if the user specified --prev or --next on the cmdline
-		if(ps->o.focus_initial)
-		{
-
-			// ps->mainwin->ignore_next_refocus = 1;
-			// ps->mainwin->ignore_next_refocus = 2;
-			// ps->mainwin->ignore_next_refocus = 4;
-
-
-			if(ps->o.focus_initial == FI_PREV)
-			{
-				// here, mw->clientondesktop is the first (dlist*) item in the list
-				if (iter == mw->clientondesktop)
-					iter = dlist_last(mw->clientondesktop);
-				else
-				{
-					dlist *i = mw->clientondesktop;
-					for (; i != NULL; i = i->next)
-						if (i->next && i->next == iter)
-							break;
-					iter = i;
-				}
-			}
-			else if(ps->o.focus_initial == FI_NEXT)
-				iter = iter->next;
-
-		}
-
-		// then clear this flag, so daemon not remember on its next activation
-		ps->o.focus_initial = 0;
-
-		if (!iter)
-			iter = mw->clientondesktop;
-
-		// mw->focus = (ClientWin *) iter->data;
-		mw->client_to_focus = (ClientWin *) iter->data;
-		mw->client_to_focus_on_cancel = (ClientWin *) iter->data;
-		// mw->focus->focused = 1;
-
-
-		mw->client_to_focus->focused = 1;
-		// focus_miniw(ps, mw->client_to_focus);
 	}
 
 	return true;
