@@ -30,9 +30,10 @@ enum pipe_cmd_t {
 	// Not ordered properly for backward compatibility
 	PIPECMD_RELOAD_CONFIG = 0,
 	PIPECMD_ACTIVATE_EXPOSE = 1,
+	PIPECMD_TOGGLE_EXPOSE,
 	PIPECMD_ACTIVATE_PAGING,
+	PIPECMD_TOGGLE_PAGING,
 	PIPECMD_DEACTIVATE,
-	PIPECMD_TOGGLE,
 	PIPECMD_EXIT_DAEMON,
 	PIPECMD_QUEUE_FI_PREV,
 	PIPECMD_QUEUE_FI_NEXT,
@@ -1041,11 +1042,15 @@ mainloop(session_t *ps, bool activate_on_start) {
 						if (mw)
 							die = true;
 						break;
-					case PIPECMD_TOGGLE:
+					case PIPECMD_TOGGLE_EXPOSE:
+					case PIPECMD_TOGGLE_PAGING:
 						if (mw)
 							die = true;
-						else
+						else {
 							animating = activate = true;
+							paging = piped_input == PIPECMD_TOGGLE_PAGING;
+							ps->o.mode = paging? PROGMODE_TGG_PAGING: PROGMODE_TGG_EXPOSE;
+						}
 						break;
 					case PIPECMD_EXIT_DAEMON:
 						printfdf("(): Exit command received, killing daemon...");
@@ -1135,9 +1140,15 @@ deactivate(const char *pipePath) {
 }
 
 static inline bool
-toggle_activate(const char *pipePath) {
-	printfdf("(): Toggling window picker...");
-	return send_command_to_daemon_via_fifo(PIPECMD_TOGGLE, pipePath);
+toggle_expose(const char *pipePath) {
+	printfdf("(): Toggling expose...");
+	return send_command_to_daemon_via_fifo(PIPECMD_TOGGLE_EXPOSE, pipePath);
+}
+
+static inline bool
+toggle_paging(const char *pipePath) {
+	printfdf("(): Toggling paging...");
+	return send_command_to_daemon_via_fifo(PIPECMD_TOGGLE_PAGING, pipePath);
 }
 
 /**
@@ -1220,9 +1231,10 @@ show_help() {
 			"  --start-daemon      - starts the daemon running.\n"
 			"  --stop-daemon       - stops the daemon running.\n"
 			"  --activate-expose   - connects to daemon and activate expose.\n"
+			"  --toggle-expose     - connects to daemon and toggle expose.\n"
 			"  --activate-paging   - connects to daemon and activate paging.\n"
+			"  --toggle-paging     - connects to daemon and toggle paging.\n"
 			"  --deactivate        - connects to daemon and deactivate expose or paging.\n"
-			"  --toggle            - connects to daemon and toggle activation.\n"
 			"  --prev              - focus window to previous.\n"
 			"  --next              - focus window to next.\n"
 			// "  --test                      - Temporary development testing. To be removed.\n"
@@ -1382,9 +1394,10 @@ parse_args(session_t *ps, int argc, char **argv, bool first_pass) {
 		OPT_CONFIG = 256,
 		OPT_CONFIG_RELOAD,
 		OPT_ACTV_EXPOSE,
+		OPT_TGG_EXPOSE,
 		OPT_ACTV_PAGING,
+		OPT_TGG_PAGING,
 		OPT_DEACTV,
-		OPT_TOGGLE,
 		OPT_DM_START,
 		OPT_DM_STOP,
 		OPT_PREV,
@@ -1396,9 +1409,10 @@ parse_args(session_t *ps, int argc, char **argv, bool first_pass) {
 		{ "config",                   required_argument, NULL, OPT_CONFIG },
 		{ "config-reload",            no_argument,       NULL, OPT_CONFIG_RELOAD },
 		{ "activate-expose",          no_argument,       NULL, OPT_ACTV_EXPOSE },
+		{ "toggle-expose",            no_argument,       NULL, OPT_TGG_EXPOSE },
 		{ "activate-paging",          no_argument,       NULL, OPT_ACTV_PAGING },
+		{ "toggle-paging",            no_argument,       NULL, OPT_TGG_PAGING },
 		{ "deactivate",               no_argument,       NULL, OPT_DEACTV },
-		{ "toggle",                   no_argument,       NULL, OPT_TOGGLE },
 		{ "start-daemon",             no_argument,       NULL, OPT_DM_START },
 		{ "stop-daemon",              no_argument,       NULL, OPT_DM_STOP },
 		{ "prev",                     no_argument,       NULL, OPT_PREV },
@@ -1452,14 +1466,17 @@ parse_args(session_t *ps, int argc, char **argv, bool first_pass) {
 			case OPT_ACTV_EXPOSE:
 				ps->o.mode = PROGMODE_ACTV_EXPOSE;
 				break;
+			case OPT_TGG_EXPOSE:
+				ps->o.mode = PROGMODE_TGG_EXPOSE;
+				break;
 			case OPT_ACTV_PAGING:
 				ps->o.mode = PROGMODE_ACTV_PAGING;
 				break;
+			case OPT_TGG_PAGING:
+				ps->o.mode = PROGMODE_TGG_PAGING;
+				break;
 			case OPT_DEACTV:
 				ps->o.mode = PROGMODE_DEACTV;
-				break;
-			case OPT_TOGGLE:
-				ps->o.mode = PROGMODE_TOGGLE;
 				break;
 			case OPT_DM_STOP:
 				ps->o.mode = PROGMODE_DM_STOP;
@@ -1719,10 +1736,8 @@ int main(int argc, char *argv[]) {
 			else
 				activate_paging(pipePath);
 			goto main_end;
-		case PROGMODE_DEACTV:
-			deactivate(pipePath);
-			goto main_end;
-		case PROGMODE_TOGGLE:
+		case PROGMODE_TGG_EXPOSE:
+		case PROGMODE_TGG_PAGING:
 			if(ps->o.focus_initial)
 			{
 				if(ps->o.focus_initial == FI_PREV)
@@ -1733,7 +1748,13 @@ int main(int argc, char *argv[]) {
 				// we must pause slightly, otherwise will miss next read() call in this loop()
 				usleep(10000);
 			}
-			toggle_activate(pipePath);
+			if (PROGMODE_TGG_EXPOSE == ps->o.mode)
+				toggle_expose(pipePath);
+			else
+				toggle_paging(pipePath);
+			goto main_end;
+		case PROGMODE_DEACTV:
+			deactivate(pipePath);
 			goto main_end;
 		case PROGMODE_RELOAD_CONFIG:
 			queue_reload_config(pipePath);
