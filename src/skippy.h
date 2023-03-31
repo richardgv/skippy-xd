@@ -326,6 +326,9 @@ typedef struct {
 	.highlight_tint = NULL, \
 	.highlight_tintOpacity = 64, \
 	.highlight_opacity = 255, \
+	.shadow_tint = NULL, \
+	.shadow_tintOpacity = 164, \
+	.shadow_opacity = 200, \
 	.tooltip_show = true, \
 	.tooltip_followsMouse = true, \
 	.tooltip_offsetX = 20, \
