@@ -1100,6 +1100,7 @@ check_keybindings_conflict(const char *config_path, const char *arr1_str, KeySym
     free(conflicts);
     return true;
   }
+  free(conflicts);
   return false;
 }
 
