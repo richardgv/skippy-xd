@@ -15,15 +15,20 @@
 #   skippy-xd-runner <args>
 #
 # The available commands are:
-#   --config                    - Read the specified configuration file.
-#   --start-daemon              - starts the daemon running.
-#   --stop-daemon               - stops the daemon running.
-#   --activate-window-picker    - tells the daemon to show the window picker.
-#   --deactivate-window-picker  - tells the daemon to hide the window picker.
-#   --toggle-window-picker      - tells the daemon to toggle the window picker.
-#   --prev                      - launch initially focussed to previous selection.
-#   --next                      - launch initially focussed to next selection.
-#   --help                      - show this message.
+#  [no command]        - activate expose once without daemon.
+#  --config-reload     - reload configuration file; currently the file path must remain unchanged.
+#  --config            - read the specified configuration file.
+#  --start-daemon      - starts the daemon running.
+#  --stop-daemon       - stops the daemon running.
+#  --activate-expose   - connects to daemon and activate expose.
+#  --toggle-expose     - connects to daemon and toggle expose.
+#  --activate-paging   - connects to daemon and activate paging.
+#  --toggle-paging     - connects to daemon and toggle paging.
+#  --deactivate        - connects to daemon and deactivate expose or paging.
+#  --prev              - focus window to previous.
+#  --next              - focus window to next.
+#  
+#  --help              - show this message.
 #   -S                          - Synchronize X operation (debugging).
 #
 #
@@ -48,12 +53,15 @@ _parse_args()
 
     case $arg in
 
+      --config-reload)                            _config_reload=true ;;
       --config)                                   shift && _config="$1" ;;
       --start-daemon|--start)                     _start_daemon=true ;;
       --stop-daemon|--stop)                       _stop_daemon=true ;;
-      --activate-window-picker|--activate)        _activate=true ;;
-      --deactivate-window-picker|--deactivate)    _deactivate=true ;;
-      --toggle-window-picker|--toggle)            _toggle=true ;;
+      --activate-expose|--activate)               _activate_expose=true ;;
+      --toggle-expose|--toggle)                   _toggle_expose=true ;;
+      --activate-paging|--activate)               _activate_paging=true ;;
+      --toggle-paging|--toggle)                   _toggle_paging=true ;;
+      --deactivate|--deactivate)                  _deactivate=true ;;
       --prev)                                     _prev=true ;;
       --next)                                     _next=true ;;
       --help|-h)                                  _help=true ;;
@@ -65,16 +73,24 @@ _parse_args()
   done
 
   unset _first_arg
-  if [ "$_activate" ]; then
-    _first_arg="--activate"
+  if [ "$_activate_expose" ]; then
+    _first_arg="--activate-expose"
+  fi
+
+  if [ "$_toggle_expose" ]; then
+    _first_arg="--toggle-expose"
+  fi
+
+  if [ "$_activate_paging" ]; then
+    _first_arg="--activate-paging"
+  fi
+
+  if [ "$_toggle_paging" ]; then
+    _first_arg="--toggle-paging"
   fi
 
   if [ "$_deactivate" ]; then
     _first_arg="--deactivate"
-  fi
-
-  if [ "$_toggle" ]; then
-    _first_arg="--toggle"
   fi
 
   if [ "$_first_arg" ]; then
@@ -86,12 +102,14 @@ _main()
 {
   lastActivationTimeoutSeconds=1
 
-  psSkippyActivateOut="`pgrep -f 'skippy-xd --activate'`"
+  psSkippyActivateExposeOut="`pgrep -f 'skippy-xd --activate-expose'`"
+  psSkippyToggleExposeOut="`pgrep -f 'skippy-xd --toggle-expose'`"
+  psSkippyActivatePagingOut="`pgrep -f 'skippy-xd --activate-paging'`"
+  psSkippyTogglePagingOut="`pgrep -f 'skippy-xd --toggle-paging'`"
   psSkippyDeactivateOut="`pgrep -f 'skippy-xd --deactivate'`"
-  psSkippyToggleOut="`pgrep -f 'skippy-xd --toggle'`"
 
   _other_clients=0
-  for pid in $psSkippyActivateOut $psSkippyDeactivateOut $psSkippyToggleOut; do
+  for pid in $psSkippyActivateExposeOut $psSkippyToggleExposeOut $psSkippyActivatePagingOut $psSkippyTogglePagingOut $psSkippyDeactivateOut; do
     ptime="$(ps -o etimes= -p "$pid")"
     if [ "$ptime" -ge "$lastActivationTimeoutSeconds" ]; then
       _killall=true
@@ -120,8 +138,10 @@ _main()
 
   # if the action requires the skippy-xd daemon, but it is not already running, we should start it
   if [ "$_first_arg" ] && [ ! "$_deactivate" ] && [ ! "$(pgrep -f 'skippy-xd ')" ]; then
+
     if [ "$_config" ]; then
       skippy-xd --start-daemon --config "$_config" &
+
     else
       skippy-xd --start-daemon &
     fi
