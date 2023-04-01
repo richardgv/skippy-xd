@@ -1517,17 +1517,17 @@ load_config_file(session_t *ps)
 	{
 	// Appending UID to the file name
 		// Dash-separated initial single-digit string
-		int uid = (int)getuid(), pipeStrLen = 3;
+		int xid = XConnectionNumber(ps->dpy), pipeStrLen = 3;
 		{
 			int num;
-			for (num = uid; num >= 10; num /= 10) pipeStrLen++;
+			for (num = xid; num >= 10; num /= 10) pipeStrLen++;
 		}
 
 		const char * path = config_get(config, "general", "pipePath", "/tmp/skippy-xd-fifo");
 		pipeStrLen += strlen(path);
 
 		char * pipePath = malloc (pipeStrLen * sizeof(unsigned char));
-		sprintf(pipePath, "%s-%i", path, uid);
+		sprintf(pipePath, "%s-%i", path, xid);
 
 		ps->o.pipePath = pipePath;
 	}
