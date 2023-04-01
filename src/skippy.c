@@ -1514,7 +1514,23 @@ load_config_file(session_t *ps)
     // Read configuration into ps->o, because searching all the time is much
     // less efficient, may introduce inconsistent default value, and
     // occupies a lot more memory for non-string types.
-    ps->o.pipePath = mstrdup(config_get(config, "general", "pipePath", "/tmp/skippy-xd-fifo"));
+	{
+	// Appending UID to the file name
+		// Dash-separated initial single-digit string
+		int uid = (int)getuid(), pipeStrLen = 3;
+		{
+			int num;
+			for (num = uid; num >= 10; num /= 10) pipeStrLen++;
+		}
+
+		const char * path = config_get(config, "general", "pipePath", "/tmp/skippy-xd-fifo");
+		pipeStrLen += strlen(path);
+
+		char * pipePath = malloc (pipeStrLen * sizeof(unsigned char));
+		sprintf(pipePath, "%s-%i", path, uid);
+
+		ps->o.pipePath = pipePath;
+	}
     ps->o.normal_tint = mstrdup(config_get(config, "normal", "tint", "black"));
     ps->o.highlight_tint = mstrdup(config_get(config, "highlight", "tint", "#101020"));
     ps->o.shadow_tint = mstrdup(config_get(config, "shadow", "tint", "#010101"));
