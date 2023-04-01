@@ -193,6 +193,8 @@ clientwin_update(ClientWin *cw) {
 	}
 
 	// Get window icon
+	if (cw->icon_pict)
+		free_pictw(ps, &cw->icon_pict);
 	cw->icon_pict = simg_load_icon(ps, cw->wid_client, ps->o.preferredIconSize);
 	if (!cw->icon_pict && ps->o.iconDefault)
 		cw->icon_pict = clone_pictw(ps, ps->o.iconDefault);
@@ -215,6 +217,8 @@ clientwin_update(ClientWin *cw) {
 
 static inline bool
 clientwin_update2_filled(session_t *ps, MainWin *mw, ClientWin *cw) {
+	if (cw->pict_filled)
+		free_pictw(ps, &cw->pict_filled);
 	cw->pict_filled = simg_postprocess(ps,
 			clone_pictw(ps, ps->o.fillSpec.img),
 			ps->o.fillSpec.mode,
@@ -226,6 +230,8 @@ clientwin_update2_filled(session_t *ps, MainWin *mw, ClientWin *cw) {
 
 static inline bool
 clientwin_update2_icon(session_t *ps, MainWin *mw, ClientWin *cw) {
+	if (cw->icon_pict_filled)
+		free_pictw(ps, &cw->icon_pict_filled);
 	cw->icon_pict_filled = simg_postprocess(ps,
 			clone_pictw(ps, cw->icon_pict),
 			ps->o.iconFillSpec.mode,

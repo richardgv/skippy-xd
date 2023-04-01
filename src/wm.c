@@ -456,6 +456,7 @@ return_status:
 	if (status == Success && items_read && data && real_format == 32)
 		num_desktops = data[0];
 
+	XFree(data);
 	return num_desktops;
 }
 

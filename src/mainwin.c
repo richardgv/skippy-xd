@@ -472,6 +472,8 @@ mainwin_destroy(MainWin *mw) {
 	free(mw->keysyms_Down);
 	free(mw->keysyms_Left);
 	free(mw->keysyms_Right);
+	free(mw->keysyms_Prev);
+	free(mw->keysyms_Next);
 	free(mw->keysyms_ExitCancelOnPress);
 	free(mw->keysyms_ExitCancelOnRelease);
 	free(mw->keysyms_ExitSelectOnPress);

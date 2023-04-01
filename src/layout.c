@@ -571,6 +571,8 @@ move_window:
 	}
 
 	if (recalculate) {
+		for (int i=0; i<number_of_slots; i++)
+			dlist_free (slot2cw[i]);
 		free(slot2cw);
 		free(slot2n);
 	}
@@ -634,6 +636,9 @@ move_window:
 	*total_width = maxx - minx;
 	*total_height = maxy - miny;
 
+	for (int j=slot_miny; j<slot_maxy; j++)
+		for (int i=slot_minx; i<slot_maxx; i++)
+			dlist_free (slot2cw[(j-slot_miny) * (slot_maxx - slot_minx) + i-slot_minx]);
 	free(slot2cw);
 	free(slot2n);
 }
