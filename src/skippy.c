@@ -870,31 +870,11 @@ mainloop(session_t *ps, bool activate_on_start) {
 				else if (mw && ev.type == DestroyNotify) {
 					// printfef("(): else if (ev.type == DestroyNotify) {");
 					daemon_count_clients(ps->mainwin, 0, None);
-					dlist *iter = (wid ? dlist_find(mw->clients, clientwin_cmp_func, (void *) wid): NULL);
-					if (iter) {
-						// printfef("(): if (iter) {");
-						ClientWin *cw = (ClientWin *) iter->data;
-						if (!cw->mode) {
-							mw->clients = dlist_first(dlist_remove(iter));
-							iter = dlist_find(mw->clientondesktop, clientwin_cmp_func, (void *) wid);
-							if (iter)
-								mw->clientondesktop = dlist_first(dlist_remove(iter));
-							clientwin_destroy(cw, true);
-							if (!mw->clientondesktop) {
-								printfef("(): Last client window destroyed/unmapped, "
-										"exiting.");
-								die = true;
-							}
-						}
-						else {
-							// printfef("(): else {");
-							// printfef("(): do: clientwin_render(cw);");
-							free_pixmap(ps, &cw->cpixmap);
-							free_picture(ps, &cw->origin);
-							free_damage(ps, &cw->damage);
-							clientwin_update2(cw);
-							clientwin_render(cw);
-						}
+					if (!mw->clientondesktop) {
+						printfef("(): Last client window destroyed/unmapped, "
+								"exiting.");
+						die = true;
+						mw->client_to_focus = NULL;
 					}
 				}
 				else if (ev.type == MapNotify || ev.type == UnmapNotify) {
