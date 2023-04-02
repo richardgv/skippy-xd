@@ -292,8 +292,7 @@ update_clients(MainWin *mw, Bool *touched)
 	// Terminate mw->clients that are no longer managed
 	for (dlist *iter = mw->clients; iter; ) {
 		ClientWin *cw = (ClientWin *) iter->data;
-		if (dlist_find_data(stack, (void *) cw->wid_client)
-				/*&& clientwin_update(cw)*/) {
+		if (dlist_find_data(stack, (void *) cw->wid_client)) {
 			iter = iter->next;
 		}
 		else {
@@ -315,7 +314,6 @@ update_clients(MainWin *mw, Bool *touched)
 			cw = clientwin_create(mw, (Window)iter->data);
 			if (!cw) continue;
 			mw->clients = dlist_add(mw->clients, cw);
-			/*clientwin_update(cw)*/;
 			if (touched)
 				*touched = True;
 		}
@@ -344,8 +342,8 @@ daemon_count_clients(MainWin *mw, Bool *touched, Window leader)
 	mw->clientondesktop = NULL;
 
 	{
-        session_t * const ps = mw->ps;
-        long desktop = wm_get_current_desktop(ps);
+		session_t * const ps = mw->ps;
+		long desktop = wm_get_current_desktop(ps);
 
 		dlist *tmp = dlist_first(dlist_find_all(mw->clients,
 					(dlist_match_func) clientwin_validate_func, &desktop));
@@ -900,14 +898,13 @@ mainloop(session_t *ps, bool activate_on_start) {
 					}
 				}
 				else if (ev.type == MapNotify || ev.type == UnmapNotify) {
-					//printfef("(): else if (ev.type == MapNotify || ev.type == UnmapNotify) {");
+					// printfef("(): else if (ev.type == MapNotify || ev.type == UnmapNotify) {");
 					daemon_count_clients(ps->mainwin, 0, None);
 					dlist *iter = (wid ? dlist_find(ps->mainwin->clients, clientwin_cmp_func, (void *) wid): NULL);
 					if (iter) {
 						ClientWin *cw = (ClientWin *) iter->data;
 						clientwin_update(cw);
 						clientwin_update2(cw);
-						clientwin_render(cw);
 					}
 				}
 				else if (mw && (ps->xinfo.damage_ev_base + XDamageNotify == ev.type)) {

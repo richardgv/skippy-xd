@@ -66,37 +66,8 @@ struct _clientwin_t {
 	.mainwin = NULL \
 }
 
-static inline client_disp_mode_t
-clientwin_get_disp_mode(session_t *ps, ClientWin *cw) {
-	XWindowAttributes wattr = { };
-	XGetWindowAttributes(ps->dpy, cw->src.window, &wattr);
-
-	for (client_disp_mode_t *p = ps->o.clientDisplayModes; *p; p++) {
-		switch (*p) {
-			case CLIDISP_THUMBNAIL_ICON:
-				if (IsViewable == wattr.map_state && cw->origin && cw->icon_pict)
-					return *p;
-				break;
-			case CLIDISP_THUMBNAIL:
-				if (IsViewable == wattr.map_state && cw->origin) return *p;
-				break;
-			case CLIDISP_ZOMBIE_ICON:
-				if (cw->shadow && cw->icon_pict != NULL) return *p;
-				break;
-			case CLIDISP_ZOMBIE:
-				if (cw->shadow) return *p;
-				break;
-			case CLIDISP_ICON:
-				if (cw->icon_pict) return *p;
-				break;
-			case CLIDISP_FILLED:
-			case CLIDISP_NONE:
-				return *p;
-		}
-	}
-
-	return CLIDISP_NONE;
-}
+client_disp_mode_t
+clientwin_get_disp_mode(session_t *ps, ClientWin *cw, bool isViewable);
 
 static inline void
 clientwin_free_res2(session_t *ps, ClientWin *cw) {

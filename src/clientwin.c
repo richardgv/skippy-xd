@@ -145,6 +145,37 @@ clientwin_create_err:
 	return NULL;
 }
 
+client_disp_mode_t
+clientwin_get_disp_mode(session_t *ps, ClientWin *cw, bool isViewable) {
+	for (client_disp_mode_t *p = ps->o.clientDisplayModes; *p; p++) {
+		switch (*p) {
+			case CLIDISP_THUMBNAIL_ICON:
+				if (isViewable && cw->origin && cw->icon_pict)
+					return *p;
+				break;
+			case CLIDISP_THUMBNAIL:
+				if (isViewable && cw->origin)
+					return *p;
+				break;
+			case CLIDISP_ZOMBIE_ICON:
+				if (cw->shadow && cw->icon_pict != NULL)
+					return *p;
+				break;
+			case CLIDISP_ZOMBIE:
+				if (cw->shadow) return *p;
+				break;
+			case CLIDISP_ICON:
+				if (cw->icon_pict) return *p;
+				break;
+			case CLIDISP_FILLED:
+			case CLIDISP_NONE:
+				return *p;
+		}
+	}
+
+	return CLIDISP_NONE;
+}
+
 /**
  * @brief Update window data to prepare for rendering.
  */
@@ -152,6 +183,10 @@ bool
 clientwin_update(ClientWin *cw) {
 	session_t *ps = cw->mainwin->ps;
 	clientwin_free_res2(ps, cw);
+
+	// Reset mini window parameters
+	cw->mini.x = cw->mini.y = 0;
+	cw->mini.width = cw->mini.height = 1;
 
 	// Get window attributes
 	XWindowAttributes wattr = { };
@@ -169,19 +204,22 @@ clientwin_update(ClientWin *cw) {
 		cw->src.format = XRenderFindVisualFormat(ps->dpy, wattr.visual);
 	}
 
-	if (IsViewable == wattr.map_state) {
-		// create cw->origin
+	bool isViewable = wattr.map_state == IsViewable;
+	cw->zombie = !isViewable;
+
+	if (isViewable) {
 		static XRenderPictureAttributes pa = { .subwindow_mode = IncludeInferiors };
+
 		if (cw->origin)
 			free_picture(ps, &cw->origin);
 		cw->origin = XRenderCreatePicture(ps->dpy,
 				cw->src.window, cw->src.format, CPSubwindowMode, &pa);
 		XRenderSetPictureFilter(ps->dpy, cw->origin, FilterBest, 0, 0);
 
-		// Get window pixmap
 		XCompositeRedirectWindow(ps->dpy, cw->src.window,
 				CompositeRedirectAutomatic);
 		cw->redirected = true;
+
 		if (cw->cpixmap)
 			free_pixmap(ps, &cw->cpixmap);
 		cw->cpixmap = XCompositeNameWindowPixmap(ps->dpy, cw->src.window);
@@ -190,6 +228,7 @@ clientwin_update(ClientWin *cw) {
 			free_picture(ps, &cw->shadow);
 		cw->shadow = XRenderCreatePicture(ps->dpy,
 			cw->cpixmap, cw->src.format, CPSubwindowMode, &pa);
+		XRenderSetPictureFilter(ps->dpy, cw->shadow, FilterBest, 0, 0);
 	}
 
 	// Get window icon
@@ -199,17 +238,11 @@ clientwin_update(ClientWin *cw) {
 	if (!cw->icon_pict && ps->o.iconDefault)
 		cw->icon_pict = clone_pictw(ps, ps->o.iconDefault);
 
-	// Reset mini window parameters
-	cw->mini.x = cw->mini.y = 0;
-	cw->mini.width = cw->mini.height = 1;
-
-	cw->zombie = wattr.map_state != IsViewable;
-
 	// modes are CLIDISP_THUMBNAIL_ICON, CLIDISP_THUMBNAIL, CLIDISP_ZOMBIE,
 	// CLIDISP_ZOMBIE_ICON, CLIDISP_ICON, CLIDISP_FILLED, CLIDISP_NONE
 	// if we ever got a thumbnail for the window,
 	// the mode for that window always will be thumbnail
-	cw->mode = clientwin_get_disp_mode(ps, cw);
+	cw->mode = clientwin_get_disp_mode(ps, cw, isViewable);
 	// printfdf("(%#010lx): %d", cw->wid_client, cw->mode);
 
 	return true;
@@ -283,7 +316,6 @@ clientwin_destroy(ClientWin *cw, bool destroyed) {
 
 	if (cw->src.window && !destroyed) {
 		free_damage(ps, &cw->damage);
-
 		// Stop listening to events, this should be safe because we don't
 		// monitor window re-map anyway
 		XSelectInput(ps->dpy, cw->src.window, 0);
