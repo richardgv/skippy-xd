@@ -480,7 +480,7 @@ print_timestamp(session_t *ps) {
 
 	timeval_subtract(&diff, &tm, &ps->time_start);
 
-	printfef(false, "[ %5ld.%02ld ] ", diff.tv_sec, diff.tv_usec / 10000);
+	printfef(false, "() [ %5ld.%02ld ] ", diff.tv_sec, diff.tv_usec / 10000);
 }
 
 /**

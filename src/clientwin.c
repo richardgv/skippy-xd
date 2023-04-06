@@ -243,7 +243,7 @@ clientwin_update(ClientWin *cw) {
 	// if we ever got a thumbnail for the window,
 	// the mode for that window always will be thumbnail
 	cw->mode = clientwin_get_disp_mode(ps, cw, isViewable);
-	printfdf(false, "(%#010lx): %d", cw->wid_client, cw->mode);
+	printfdf(false, "(): (%#010lx): %d", cw->wid_client, cw->mode);
 
 	return true;
 }

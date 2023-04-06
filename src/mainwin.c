@@ -223,7 +223,7 @@ mainwin_reload(session_t *ps, MainWin *mw) {
 
 	if(! XParseColor(ps->dpy, mw->colormap, ps->o.highlight_tint, &exact_color))
 	{
-		printfef(true, "Couldn't look up color '%s', reverting to #101020", ps->o.highlight_tint);
+		printfef(true, "(): Couldn't look up color '%s', reverting to #101020", ps->o.highlight_tint);
 		mw->highlightTint.red = mw->highlightTint.green = 0x10;
 		mw->highlightTint.blue = 0x20;
 	}
@@ -238,7 +238,7 @@ mainwin_reload(session_t *ps, MainWin *mw) {
 	;
 	if(! XParseColor(ps->dpy, mw->colormap, ps->o.shadow_tint, &exact_color))
 	{
-		printfef(true, "Couldn't look up color '%s', reverting to #040404", ps->o.shadow_tint);
+		printfef(true, "(): Couldn't look up color '%s', reverting to #040404", ps->o.shadow_tint);
 		mw->shadowTint.red = mw->shadowTint.green =	mw->shadowTint.blue = 0x04;
 	}
 	else
@@ -358,13 +358,13 @@ mainwin_update(MainWin *mw)
 	}
 	
 # ifdef DEBUG
-	printfdf(false, "--> querying pointer... ");
+	printfdf(false, "(): --> querying pointer... ");
 # endif /* DEBUG */
 	XQueryPointer(ps->dpy, ps->root, &dummy_w, &dummy_w, &root_x, &root_y, &dummy_i, &dummy_i, &dummy_u);
 # ifdef DEBUG	
-	printfdf(false, "+%i+%i\n", root_x, root_y);
+	printfdf(false, "(): +%i+%i\n", root_x, root_y);
 	
-	printfdf(false, "--> figuring out which screen we're on... ");
+	printfdf(false, "(): --> figuring out which screen we're on... ");
 # endif /* DEBUG */
 	iter = mw->xin_info;
 	for(i = 0; i < mw->xin_screens; ++i)
@@ -373,7 +373,7 @@ mainwin_update(MainWin *mw)
 		   root_y >= iter->y_org && root_y < iter->y_org + iter->height)
 		{
 # ifdef DEBUG
-			printfdf(false, "screen %i %ix%i+%i+%i\n", iter->screen_number, iter->width, iter->height, iter->x_org, iter->y_org);
+			printfdf(false, "(): screen %i %ix%i+%i+%i\n", iter->screen_number, iter->width, iter->height, iter->x_org, iter->y_org);
 # endif /* DEBUG */
 			break;
 		}
@@ -382,7 +382,7 @@ mainwin_update(MainWin *mw)
 	if(i == mw->xin_screens)
 	{
 # ifdef DEBUG 
-		printfdf(false, "unknown\n");
+		printfdf(false, "(): unknown\n");
 # endif /* DEBUG */
 		return;
 	}

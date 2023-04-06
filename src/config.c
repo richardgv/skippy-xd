@@ -93,7 +93,7 @@ config_parse(const char *config) {
 				     *value = copy_match(line, &matches[2]);
 				new_config = entry_set(new_config, section, key, value);
 			} else  {
-				printfef(true, "WARNING: Ignoring invalid line: %s\n", line);
+				printfef(true, "(): WARNING: Ignoring invalid line: %s\n", line);
 			}
 			l_ix = 0;
 		} else {
@@ -125,7 +125,7 @@ config_load(const char *path)
 	
 	if(! fin)
 	{
-		printfef(true, "WARNING: Couldn't load config file '%s'.\n", path);
+		printfef(true, "(): WARNING: Couldn't load config file '%s'.\n", path);
 		return 0;
 	}
 	else
@@ -138,7 +138,7 @@ config_load(const char *path)
 	
 	if(! flen)
 	{
-		printfef(true, "WARNING: '%s' is empty.\n", path);
+		printfef(true, "(): WARNING: '%s' is empty.\n", path);
 		fclose(fin);
 		return 0;
 	}
@@ -149,7 +149,7 @@ config_load(const char *path)
 	data[flen] = '\0';
 	if(fread(data, 1, flen, fin) != flen)
 	{
-		printfef(true, "WARNING: Couldn't read from config file '%s'.\n", path);
+		printfef(true, "(): WARNING: Couldn't read from config file '%s'.\n", path);
 		free(data);
 		fclose(fin);
 		return 0;

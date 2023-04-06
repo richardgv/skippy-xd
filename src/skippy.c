@@ -63,7 +63,7 @@ parse_cliop(session_t *ps, const char *str, enum cliop *dest) {
 			return true;
 		}
 
-	printfef(true, "(\"%s\"): Unrecognized operation.", str);
+	printfef(true, "() (\"%s\"): Unrecognized operation.", str);
 	return false;
 }
 
@@ -83,7 +83,7 @@ parse_align(session_t *ps, const char *str, enum align *dest) {
 			return strlen(STRS_ALIGN[i]);
 		}
 
-	printfef(true, "(\"%s\"): Unrecognized operation.", str);
+	printfef(true, "() (\"%s\"): Unrecognized operation.", str);
 	return 0;
 }
 
@@ -113,7 +113,7 @@ parse_pict_posp_mode(session_t *ps, const char *str, enum pict_posp_mode *dest) 
 			return strlen(STRS_PICTPOSP[i]);
 		}
 
-	printfef(true, "(\"%s\"): Unrecognized operation.", str);
+	printfef(true, "() (\"%s\"): Unrecognized operation.", str);
 	return 0;
 }
 static inline int
@@ -161,7 +161,7 @@ parse_color(session_t *ps, const char *s, XRenderColor *pc) {
 		if (!((next = parse_color_sub(s, &pc->red))
 					&& (next = parse_color_sub((s += next), &pc->green))
 					&& (next = parse_color_sub((s += next), &pc->blue)))) {
-			printfef(true, "(\"%s\"): Failed to read color segment.", s);
+			printfef(true, "() (\"%s\"): Failed to read color segment.", s);
 			return 0;
 		}
 		if (!(next = parse_color_sub((s += next), &pc->alpha)))
@@ -206,7 +206,7 @@ parse_size(const char *s, int *px, int *py) {
 		if (endptr && s != endptr) {
 			*py = val;
 			if (*py < 0) {
-				printfef(true, "(\"%s\"): Invalid height.", s);
+				printfef(true, "() (\"%s\"): Invalid height.", s);
 				return 0;
 			}
 			s = endptr;
@@ -220,7 +220,7 @@ parse_size(const char *s, int *px, int *py) {
 		return 0;
 
 	if (!isspace0(*s)) {
-		printfef(true, "(\"%s\"): Trailing characters.", s);
+		printfef(true, "() (\"%s\"): Trailing characters.", s);
 		return 0;
 	}
 
@@ -551,7 +551,7 @@ ev_dump(session_t *ps, const MainWin *mw, const XEvent *ev) {
 	if (mw && mw->window == wid) wextra = "(Main)";
 
 	print_timestamp(ps);
-	printfdf(false, "Event %-13.13s wid %#010lx %s", name, wid, wextra);
+	printfdf(false, "(): Event %-13.13s wid %#010lx %s", name, wid, wextra);
 }
 
 static void
@@ -1168,7 +1168,7 @@ xerror(Display *dpy, XErrorEvent *ev) {
 	{
 		char buf[BUF_LEN] = "";
 		XGetErrorText(ps->dpy, ev->error_code, buf, BUF_LEN);
-		printfef(false, "error %d (%s) request %d minor %d serial %lu (\"%s\")",
+		printfef(false, "(): error %d (%s) request %d minor %d serial %lu (\"%s\")",
 				ev->error_code, name, ev->request_code,
 				ev->minor_code, ev->serial, buf);
 	}
@@ -1200,7 +1200,7 @@ show_help() {
 			// "  --test                      - Temporary development testing. To be removed.\n"
 			"\n"
 			"  --help              - show this message.\n"
-			"  --debug             - enable debugging logs.\n"
+			"  -S                  - enable debugging logs.\n"
 			, stdout);
 #ifdef CFG_LIBPNG
 	spng_about(stdout);
@@ -1394,11 +1394,11 @@ parse_args(session_t *ps, int argc, char **argv, bool first_pass) {
 					break;
 				case OPT_PREV:
 					ps->o.focus_initial = FI_PREV;
-					printfdf(false, "ps->o.focus_initial=%i\n", ps->o.focus_initial);
+					printfdf(false, "(): ps->o.focus_initial=%i\n", ps->o.focus_initial);
 					break;
 				case OPT_NEXT:
 					ps->o.focus_initial = FI_NEXT;
-					printfdf(false, "ps->o.focus_initial=%i\n", ps->o.focus_initial);
+					printfdf(false, "(): ps->o.focus_initial=%i\n", ps->o.focus_initial);
 					break;
 				case 'S':
 					debuglog = true;
@@ -1530,26 +1530,29 @@ load_config_file(session_t *ps)
     check_keysyms(ps->o.config_path, ": [bindings] keysReverseDirection =", ps->o.bindings_keysReverseDirection);
     check_modmasks(ps->o.config_path, ": [bindings] modifierKeyMasksReverseDirection =", ps->o.bindings_modifierKeyMasksReverseDirection);
 
-    if (!parse_cliop(ps, config_get(config, "bindings", "miwMouse1", "focus"), &ps->o.bindings_miwMouse[1])
-            || !parse_cliop(ps, config_get(config, "bindings", "miwMouse2", "close-ewmh"), &ps->o.bindings_miwMouse[2])
-            || !parse_cliop(ps, config_get(config, "bindings", "miwMouse3", "iconify"), &ps->o.bindings_miwMouse[3]))
-        return RET_BADARG;
-    {
-        const char *s = config_get(config, "general", "layout", NULL);
-        if (s) {
-           if (strcmp(s,"boxy") == 0) {
-               ps->o.layout = LAYOUT_BOXY;
-           }
-           else if (strcmp(s,"xd") == 0) {
-               ps->o.layout = LAYOUT_XD;
-           }
-           else {
-               ps->o.layout = LAYOUT_BOXY;
-           }
-        }
+	if (!parse_cliop(ps, config_get(config, "bindings", "miwMouse1", "focus"), &ps->o.bindings_miwMouse[1])
+			|| !parse_cliop(ps, config_get(config, "bindings", "miwMouse2", "close-ewmh"), &ps->o.bindings_miwMouse[2])
+			|| !parse_cliop(ps, config_get(config, "bindings", "miwMouse3", "iconify"), &ps->o.bindings_miwMouse[3])) {
+		return RET_BADARG;
+	}
+
+	{
+		const char *s = config_get(config, "general", "layout", NULL);
+		if (s) {
+			if (strcmp(s,"boxy") == 0) {
+				ps->o.layout = LAYOUT_BOXY;
+			}
+			else if (strcmp(s,"xd") == 0) {
+				ps->o.layout = LAYOUT_XD;
+			}
+			else {
+				ps->o.layout = LAYOUT_BOXY;
+			}
+		}
 		else
 			ps->o.layout = LAYOUT_BOXY;
     }
+
     config_get_bool_wrap(config, "general", "sortByColumn", &ps->o.sortByColumn);
     config_get_int_wrap(config, "general", "distance", &ps->o.distance, 1, INT_MAX);
     config_get_bool_wrap(config, "general", "useNetWMFullscreen", &ps->o.useNetWMFullscreen);

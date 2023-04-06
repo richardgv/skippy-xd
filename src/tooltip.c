@@ -97,7 +97,7 @@ tooltip_create(MainWin *mw) {
 	tmp = ps->o.tooltip_border;
 	if(! XftColorAllocName(ps->dpy, mw->visual, mw->colormap, tmp, &tt->border))
 	{
-		printfef(false, "WARNING: Invalid color '%s'.\n", tmp);
+		printfef(false, "(): WARNING: Invalid color '%s'.\n", tmp);
 		tooltip_destroy(tt);
 		return 0;
 	}
@@ -105,7 +105,7 @@ tooltip_create(MainWin *mw) {
 	tmp = ps->o.tooltip_background;
 	if(! XftColorAllocName(ps->dpy, mw->visual, mw->colormap, tmp, &tt->background))
 	{
-		printfef(false, "WARNING: Invalid color '%s'.\n", tmp);
+		printfef(false, "(): WARNING: Invalid color '%s'.\n", tmp);
 		tooltip_destroy(tt);
 		return 0;
 	}
@@ -117,7 +117,7 @@ tooltip_create(MainWin *mw) {
 	tmp = ps->o.tooltip_text;
 	if(! XftColorAllocName(ps->dpy, mw->visual, mw->colormap, tmp, &tt->color))
 	{
-		printfef(false, "WARNING: Couldn't allocate color '%s'.\n", tmp);
+		printfef(false, "(): WARNING: Couldn't allocate color '%s'.\n", tmp);
 		tooltip_destroy(tt);
 		return 0;
 	}
@@ -127,7 +127,7 @@ tooltip_create(MainWin *mw) {
 	{
 		if(! XftColorAllocName(ps->dpy, mw->visual, mw->colormap, tmp, &tt->shadow))
 		{
-			printfef(false, "WARNING: Couldn't allocate color '%s'.\n", tmp);
+			printfef(false, "(): WARNING: Couldn't allocate color '%s'.\n", tmp);
 			tooltip_destroy(tt);
 			return 0;
 		}
@@ -136,7 +136,7 @@ tooltip_create(MainWin *mw) {
 	tt->draw = XftDrawCreate(ps->dpy, tt->window, mw->visual, mw->colormap);
 	if(! tt->draw)
 	{
-		printfef(false, "WARNING: Couldn't create Xft draw surface.\n");
+		printfef(false, "(): WARNING: Couldn't create Xft draw surface.\n");
 		tooltip_destroy(tt);
 		return 0;
 	}
@@ -144,7 +144,7 @@ tooltip_create(MainWin *mw) {
 	tt->font = XftFontOpenName(ps->dpy, ps->screen, ps->o.tooltip_font);
 	if(! tt->font)
 	{
-		printfef(false, "WARNING: Couldn't open Xft font.\n");
+		printfef(false, "(): WARNING: Couldn't open Xft font.\n");
 		tooltip_destroy(tt);
 		return 0;
 	}

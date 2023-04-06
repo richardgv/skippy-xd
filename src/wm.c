@@ -511,11 +511,11 @@ printfdfWindowName(session_t *ps, char *prefix_str, Window wid)
 		return;
 
 	if (prefix_str) {
-		printfdf(false, "%s%s", prefix_str, win_title);
+		printfdf(false, "(): %s%s", prefix_str, win_title);
 	}
 
 	else {
-		printfdf(false, "%s", win_title);
+		printfdf(false, "(): %s", win_title);
 	}
 
 	free(win_title);

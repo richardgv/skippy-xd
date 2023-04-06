@@ -39,7 +39,7 @@ sgif_read(session_t *ps, const char *path) {
 #ifdef SGIF_THREADSAFE
 		errstr = GifErrorString(err);
 #endif
-		printfef(false, "(\"%s\"): Failed to open file: %d (%s)", path, err, errstr);
+		printfef(false, "(): (\"%s\"): Failed to open file: %d (%s)", path, err, errstr);
 		goto sgif_read_end;
 	}
 
@@ -51,29 +51,29 @@ sgif_read(session_t *ps, const char *path) {
 			++i;
 			switch (rectype) {
 				case UNDEFINED_RECORD_TYPE:
-					printfef(false, "(\"%s\"): %d: Encountered a record of unknown type.",
+					printfef(false, "(): (\"%s\"): %d: Encountered a record of unknown type.",
 							path, i);
 					break;
 				case SCREEN_DESC_RECORD_TYPE:
-					printfef(false, "(\"%s\"): %d: Encountered a record of "
+					printfef(false, "(): (\"%s\"): %d: Encountered a record of "
 							"ScreenDescRecordType. This shouldn't happen!",
 							path, i);
 					break;
 				case IMAGE_DESC_RECORD_TYPE:
 					if (data) {
-						printfef(false, "(\"%s\"): %d: Extra image section ignored.",
+						printfef(false, "(): (\"%s\"): %d: Extra image section ignored.",
 								path, i);
 						break;
 					}
 					if (GIF_ERROR == DGifGetImageDesc(f)) {
-						printfef(false, "(\"%s\"): %d: Failed to read GIF image info.",
+						printfef(false, "(): (\"%s\"): %d: Failed to read GIF image info.",
 								path, i);
 						break;
 					}
 					width = f->Image.Width;
 					height = f->Image.Height;
 					if (width <= 0 || height <= 0) {
-						printfef(false, "(\"%s\"): %d: Width/height invalid.", path, i);
+						printfef(false, "(): (\"%s\"): %d: Width/height invalid.", path, i);
 						break;
 					}
 					assert(!data);
@@ -81,7 +81,7 @@ sgif_read(session_t *ps, const char *path) {
 					// FIXME: Interlace images may need special treatments
 					for (int j = 0; j < height; ++j)
 						if (GIF_OK != DGifGetLine(f, &data[j * width], width)) {
-							printfef(false, "(\"%s\"): %d: Failed to read line %d.", path, i, j);
+							printfef(false, "(): (\"%s\"): %d: Failed to read line %d.", path, i, j);
 							goto sgif_read_end;
 						}
 					break;
@@ -90,7 +90,7 @@ sgif_read(session_t *ps, const char *path) {
 						int code = 0;
 						GifByteType *pbytes = NULL;
 						if (GIF_OK != DGifGetExtension(f, &code, &pbytes) || !pbytes) {
-							printfef(false, "(\"%s\"): %d: Failed to read extension block.",
+							printfef(false, "(): (\"%s\"): %d: Failed to read extension block.",
 									path, i);
 							break;
 						}
@@ -107,7 +107,7 @@ sgif_read(session_t *ps, const char *path) {
 			}
 		}
 		if (unlikely(!data)) {
-			printfef(false, "(\"%s\"): No valid data found.", path);
+			printfef(false, "(): (\"%s\"): No valid data found.", path);
 			goto sgif_read_end;
 		}
 	}
@@ -118,7 +118,7 @@ sgif_read(session_t *ps, const char *path) {
 		ColorMapObject *cmap = f->Image.ColorMap;
 		if (!cmap) cmap = f->SColorMap;
 		if (unlikely(!cmap)) {
-			printfef(false, "(\"%s\"): No colormap found.", path);
+			printfef(false, "(): (\"%s\"): No colormap found.", path);
 			goto sgif_read_end;
 		}
 		tdata = allocchk(malloc(width * height * depth / 8));
@@ -143,7 +143,7 @@ sgif_read(session_t *ps, const char *path) {
 	pictw = simg_data_to_pictw(ps, width, height, depth, tdata, 0);
 	free(tdata);
 	if (unlikely(!pictw)) {
-		printfef(false, "(\"%s\"): Failed to create Picture.", path);
+		printfef(false, "(): (\"%s\"): Failed to create Picture.", path);
 		goto sgif_read_end;
 	}
 

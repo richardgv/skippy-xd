@@ -132,7 +132,7 @@ static inline void
 focus_miniw_next(session_t *ps, ClientWin *cw) {
 	dlist *e = dlist_find_data(cw->mainwin->focuslist, cw);
 	if (!e) {
-		printfef(false, "(%#010lx): Client window not found in list.", cw->src.window);
+		printfef(false, "() (%#010lx): Client window not found in list.", cw->src.window);
 		return;
 	}
 	if (e->next)
@@ -160,7 +160,7 @@ focus_miniw_prev(session_t *ps, ClientWin *cw) {
 		}
 
 	if (!tgt) {
-		printfef(false, "(%#010lx): Client window not found in list.", cw->src.window);
+		printfef(false, "() (%#010lx): Client window not found in list.", cw->src.window);
 		return;
 	}
 
