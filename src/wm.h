@@ -67,15 +67,15 @@ static inline bool
 wm_check(session_t *ps) {
 	if (wm_check_netwm(ps)) {
 		ps->wmpsn = WMPSN_EWMH;
-		printfdf("(): Your WM looks EWMH compliant.");
+		printfdf(true, "(): Your WM looks EWMH compliant.");
 		return true;
 	}
 	if (wm_check_gnome(ps)) {
 		ps->wmpsn = WMPSN_GNOME;
-		printfdf("(): Your WM looks GNOME compliant.");
+		printfdf(true, "(): Your WM looks GNOME compliant.");
 		return true;
 	}
-	printfef("(): Your WM is neither EWMH nor GNOME WM compliant. "
+	printfdf(true, "(): Your WM is neither EWMH nor GNOME WM compliant. "
 			"Troubles ahead.");
 	return false;
 }
@@ -85,7 +85,7 @@ Pixmap wm_get_root_pmap(Display *dpy);
 unsigned long wm_get_desktops(session_t *ps);
 long wm_get_current_desktop(session_t *ps);
 FcChar8 *wm_get_window_title(session_t *ps, Window wid, int *length_return);
-void printfefWindowName(session_t *ps, char *prefix_str, Window wid);
+void printfdfWindowName(session_t *ps, char *prefix_str, Window wid);
 Window wm_get_group_leader(Display *dpy, Window window);
 void wm_set_fullscreen(session_t *ps, Window window,
 		int x, int y, unsigned width, unsigned height);

@@ -21,40 +21,54 @@
 #define SKIPPY_FOCUS_H
 
 static inline void
-printfefXFocusChangeEvent(session_t *ps, XFocusChangeEvent *evf)
+printfdfXFocusChangeEvent(session_t *ps, XFocusChangeEvent *evf)
 {
-	printfefWindowName(ps, "(): event window = ", evf->window);
-	printfef("(): event window id = %#010lx", evf->window);
+	printfdfWindowName(ps, "(): event window = ", evf->window);
+	printfdf(false, "(): event window id = %#010lx", evf->window);
 
-	if(evf->mode == NotifyNormal)
-		printfef("(): evf->mode = NotifyNormal");
-	else if(evf->mode == NotifyGrab)
-		printfef("(): evf->mode = NotifyGrab");
-	else if(evf->mode == NotifyUngrab)
-		printfef("(): evf->mode = NotifyUngrab");
-	else if(evf->mode == NotifyWhileGrabbed)
-		printfef("(): evf->mode = NotifyWhileGrabbed");
-	else
-		printfef("(): evf->mode = %i (not recognized)", evf->mode);
+	if(evf->mode == NotifyNormal) {
+		printfdf(false, "(): evf->mode = NotifyNormal");
+	}
+	else if(evf->mode == NotifyGrab) {
+		printfdf(false, "(): evf->mode = NotifyGrab");
+	}
+	else if(evf->mode == NotifyUngrab) {
+		printfdf(false, "(): evf->mode = NotifyUngrab");
+	}
+	else if(evf->mode == NotifyWhileGrabbed) {
+		printfdf(false, "(): evf->mode = NotifyWhileGrabbed");
+	}
+	else {
+		printfdf(false, "(): evf->mode = %i (not recognized)", evf->mode);
+	}
 
-	if(evf->detail == NotifyAncestor)
-		printfef("(): evf->detail = NotifyAncestor");
-	else if(evf->detail == NotifyVirtual)
-		printfef("(): evf->detail = NotifyVirtual");
-	else if(evf->detail == NotifyInferior)
-		printfef("(): evf->detail = NotifyInferior");
-	else if(evf->detail == NotifyNonlinear)
-		printfef("(): evf->detail = NotifyNonlinear");
-	else if(evf->detail == NotifyNonlinearVirtual)
-		printfef("(): evf->detail = NotifyNonlinearVirtual");
-	else if(evf->detail == NotifyPointer)
-		printfef("(): evf->detail = NotifyPointer");
-	else if(evf->detail == NotifyPointerRoot)
-		printfef("(): evf->detail = NotifyPointerRoot");
-	else if(evf->detail == NotifyDetailNone)
-		printfef("(): evf->detail = NotifyDetailNone");
-	else
-		printfef("(): evf->detail = %i (not recognized)", evf->detail);
+	if(evf->detail == NotifyAncestor) {
+		printfdf(false, "(): evf->detail = NotifyAncestor");
+	}
+	else if(evf->detail == NotifyVirtual) {
+		printfdf(false, "(): evf->detail = NotifyVirtual");
+	}
+	else if(evf->detail == NotifyInferior) {
+		printfdf(false, "(): evf->detail = NotifyInferior");
+	}
+	else if(evf->detail == NotifyNonlinear) {
+		printfdf(false, "(): evf->detail = NotifyNonlinear");
+	}
+	else if(evf->detail == NotifyNonlinearVirtual) {
+		printfdf(false, "(): evf->detail = NotifyNonlinearVirtual");
+	}
+	else if(evf->detail == NotifyPointer) {
+		printfdf(false, "(): evf->detail = NotifyPointer");
+	}
+	else if(evf->detail == NotifyPointerRoot) {
+		printfdf(false, "(): evf->detail = NotifyPointerRoot");
+	}
+	else if(evf->detail == NotifyDetailNone) {
+		printfdf(false, "(): evf->detail = NotifyDetailNone");
+	}
+	else {
+		printfdf(false, "(): evf->detail = %i (not recognized)", evf->detail);
+	}
 }
 
 static inline void
@@ -75,18 +89,16 @@ clear_focus_all(dlist *focuslist)
  */
 static inline void
 focus_miniw_adv(session_t *ps, ClientWin *cw, bool move_ptr) {
-	// printfef("(): ");
-
 	if (!cw || !ps)
 		return;
 
 	clear_focus_all(cw->mainwin->focuslist);
 
-	//printfefWindowName(ps, "(): window = ", cw->wid_client);
+	printfdfWindowName(ps, "(): window = ", cw->wid_client);
 
 	if (unlikely(!cw))
 	{
-		// printfef("(): if (unlikely(!cw))");
+		printfdf(false, "(): if (unlikely(!cw))");
 		return;
 	}
 	assert(cw->mini.window);
@@ -95,7 +107,7 @@ focus_miniw_adv(session_t *ps, ClientWin *cw, bool move_ptr) {
 
 	if (move_ptr)
 	{
-		// printfef("(): if (move_ptr)");
+		printfdf(false, "(): if (move_ptr)");
 		XWarpPointer(ps->dpy, None, cw->mini.window, 0, 0, 0, 0, cw->mini.width / 2, cw->mini.height / 2);
 	}
 	XSetInputFocus(ps->dpy, cw->mini.window, RevertToParent, CurrentTime);
@@ -104,8 +116,8 @@ focus_miniw_adv(session_t *ps, ClientWin *cw, bool move_ptr) {
 	ps->mainwin->client_to_focus = cw;
 	ps->mainwin->client_to_focus->focused = 1;
 
-	// printfef("(): ");
-	// printfef("(): client_to_focus = %p", (uintptr_t)ps->mainwin->client_to_focus);
+	printfdf(false, "(): ");
+	printfdf(false, "(): client_to_focus = %p", ps->mainwin->client_to_focus);
 }
 
 static inline void
@@ -120,7 +132,7 @@ static inline void
 focus_miniw_next(session_t *ps, ClientWin *cw) {
 	dlist *e = dlist_find_data(cw->mainwin->focuslist, cw);
 	if (!e) {
-		printfef("(%#010lx): Client window not found in list.", cw->src.window);
+		printfef(false, "() (%#010lx): Client window not found in list.", cw->src.window);
 		return;
 	}
 	if (e->next)
@@ -148,7 +160,7 @@ focus_miniw_prev(session_t *ps, ClientWin *cw) {
 		}
 
 	if (!tgt) {
-		printfef("(%#010lx): Client window not found in list.", cw->src.window);
+		printfef(false, "() (%#010lx): Client window not found in list.", cw->src.window);
 		return;
 	}
 

@@ -141,7 +141,7 @@ dlist_insert_nth(dlist *l, dlist *new_elem, unsigned int n)
 	else
 	{
 		// there is no nth element
-		printfef("(%p,%p,%i): list has fewer than %i elements. appending as the last element.", l, new_elem, n, n);
+		printfef(false, "(): (%p,%p,%i): list has fewer than %i elements. appending as the last element.", l, new_elem, n, n);
 		first_elem = dlist_insert_after( dlist_last(l), new_elem);
 	}
 

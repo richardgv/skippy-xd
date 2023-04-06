@@ -26,6 +26,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+bool debuglog = false;
+
 enum pipe_cmd_t {
 	// Not ordered properly for backward compatibility
 	PIPECMD_RELOAD_CONFIG = 0,
@@ -61,7 +63,7 @@ parse_cliop(session_t *ps, const char *str, enum cliop *dest) {
 			return true;
 		}
 
-	printfef("(\"%s\"): Unrecognized operation.", str);
+	printfef(true, "() (\"%s\"): Unrecognized operation.", str);
 	return false;
 }
 
@@ -81,7 +83,7 @@ parse_align(session_t *ps, const char *str, enum align *dest) {
 			return strlen(STRS_ALIGN[i]);
 		}
 
-	printfef("(\"%s\"): Unrecognized operation.", str);
+	printfef(true, "() (\"%s\"): Unrecognized operation.", str);
 	return 0;
 }
 
@@ -111,7 +113,7 @@ parse_pict_posp_mode(session_t *ps, const char *str, enum pict_posp_mode *dest) 
 			return strlen(STRS_PICTPOSP[i]);
 		}
 
-	printfef("(\"%s\"): Unrecognized operation.", str);
+	printfef(true, "() (\"%s\"): Unrecognized operation.", str);
 	return 0;
 }
 static inline int
@@ -159,7 +161,7 @@ parse_color(session_t *ps, const char *s, XRenderColor *pc) {
 		if (!((next = parse_color_sub(s, &pc->red))
 					&& (next = parse_color_sub((s += next), &pc->green))
 					&& (next = parse_color_sub((s += next), &pc->blue)))) {
-			printfef("(\"%s\"): Failed to read color segment.", s);
+			printfef(true, "() (\"%s\"): Failed to read color segment.", s);
 			return 0;
 		}
 		if (!(next = parse_color_sub((s += next), &pc->alpha)))
@@ -168,7 +170,7 @@ parse_color(session_t *ps, const char *s, XRenderColor *pc) {
 		return s - sorig;
 	}
 
-	printfef("(\"%s\"): Unrecognized color format.", s);
+	printfef(true, "(\"%s\"): Unrecognized color format.", s);
 	return 0;
 }
 
@@ -204,7 +206,7 @@ parse_size(const char *s, int *px, int *py) {
 		if (endptr && s != endptr) {
 			*py = val;
 			if (*py < 0) {
-				printfef("(\"%s\"): Invalid height.", s);
+				printfef(true, "() (\"%s\"): Invalid height.", s);
 				return 0;
 			}
 			s = endptr;
@@ -218,7 +220,7 @@ parse_size(const char *s, int *px, int *py) {
 		return 0;
 
 	if (!isspace0(*s)) {
-		printfef("(\"%s\"): Trailing characters.", s);
+		printfef(true, "() (\"%s\"): Trailing characters.", s);
 		return 0;
 	}
 
@@ -331,10 +333,9 @@ daemon_count_clients(MainWin *mw, Bool *touched, Window leader)
 	// while mw->clientondesktop is only those in current virtual desktop
 	// if that option is user supplied
 
-	// printfef("(): updating dl list of clients");
 	update_clients(mw, 0);
 	if (!mw->clients) {
-		printfef("(): No client windows found.");
+		printfdf(false, "(): No client windows found.");
 		return;
 	}
 
@@ -348,7 +349,7 @@ daemon_count_clients(MainWin *mw, Bool *touched, Window leader)
 		dlist *tmp = dlist_first(dlist_find_all(mw->clients,
 					(dlist_match_func) clientwin_validate_func, &desktop));
 		if (!tmp) {
-			printfef("(): No client window on current desktop found.");
+			printfdf(false, "(): No client window on current desktop found.");
 			return;
 		}
 
@@ -531,7 +532,7 @@ ev_window(session_t *ps, const XEvent *ev) {
 	if (ps->xinfo.damage_ev_base + XDamageNotify == ev->type)
 	  return ((XDamageNotifyEvent *) ev)->drawable;
 
-	printf("(): Failed to find window for event type %d. Troubles ahead.",
+	printfef(false, "(): Failed to find window for event type %d. Troubles ahead.",
 			ev->type);
 
 	return ev->xany.window;
@@ -550,7 +551,7 @@ ev_dump(session_t *ps, const MainWin *mw, const XEvent *ev) {
 	if (mw && mw->window == wid) wextra = "(Main)";
 
 	print_timestamp(ps);
-	printfd("Event %-13.13s wid %#010lx %s", name, wid, wextra);
+	printfdf(false, "(): Event %-13.13s wid %#010lx %s", name, wid, wextra);
 }
 
 static void
@@ -638,7 +639,7 @@ skippy_activate(MainWin *mw, Window leader, bool paging)
 	if (paging) {
 		init_desktop_layout(mw, mw->revert_focus_win, leader);
 		if (!mw->clientondesktop) {
-			printfef("(): Failed to build layout.");
+			printfef(false, "(): Failed to build layout.");
 			return false;
 		}
 		mw->focuslist = mw->clientondesktop;
@@ -646,7 +647,7 @@ skippy_activate(MainWin *mw, Window leader, bool paging)
 	else {
 		init_layout(mw, mw->revert_focus_win, leader);
 		if (!mw->clientondesktop) {
-			printfef("(): Failed to build layout.");
+			printfef(false, "(): Failed to build layout.");
 			return false;
 		}
 	}
@@ -681,7 +682,7 @@ open_pipe(session_t *ps, struct pollfd *r_fd) {
 		return true;
 	}
 	else {
-		printfef("(): Failed to open pipe \"%s\": %d", ps->o.pipePath, errno);
+		printfef(true, "(): Failed to open pipe \"%s\": %d", ps->o.pipePath, errno);
 		perror("open");
 	}
 
@@ -718,14 +719,10 @@ mainloop(session_t *ps, bool activate_on_start) {
 
 		// Activation goes first, so that it won't be delayed by poll()
 		if (!mw && activate) {
-            // printfef("(): if (!mw && activate) {");
-
 			assert(ps->mainwin);
 			activate = false;
 
 			if (skippy_activate(ps->mainwin, None, paging)) {
-                // printfef("(): if (skippy_activate(ps->mainwin, None)) {");
-                // printfef("(): was in skippy_activate");
 				last_rendered = time_in_millis();
 				mw = ps->mainwin;
 				refocus = false;
@@ -758,8 +755,6 @@ mainloop(session_t *ps, bool activate_on_start) {
 			mw->clientondesktop = 0;
 
 			if (refocus && mw->revert_focus_win) {
-				// printfef("(): if (refocus && mw->revert_focus_win) {");
-				// printfef("(): wm_activate_window(ps, mw->revert_focus_win);");
 				// No idea why. Plain XSetInputFocus() no longer works after ungrabbing.
 				wm_activate_window(ps, mw->revert_focus_win);
 				refocus = false;
@@ -829,7 +824,6 @@ mainloop(session_t *ps, bool activate_on_start) {
 				ev_dump(ps, mw, &ev);
 #endif
 				Window wid = ev_window(ps, &ev);
-//printfdf("(): Event!);
 
 				if (mw && MotionNotify == ev.type)
 				{
@@ -868,17 +862,17 @@ mainloop(session_t *ps, bool activate_on_start) {
 								ev.xmotion.x_root, ev.xmotion.y_root);
 				}
 				else if (mw && ev.type == DestroyNotify) {
-					// printfef("(): else if (ev.type == DestroyNotify) {");
+					printfdf(false, "(): else if (ev.type == DestroyNotify) {");
 					daemon_count_clients(ps->mainwin, 0, None);
 					if (!mw->clientondesktop) {
-						printfef("(): Last client window destroyed/unmapped, "
+						printfdf(false, "(): Last client window destroyed/unmapped, "
 								"exiting.");
 						die = true;
 						mw->client_to_focus = NULL;
 					}
 				}
 				else if (ev.type == MapNotify || ev.type == UnmapNotify) {
-					// printfef("(): else if (ev.type == MapNotify || ev.type == UnmapNotify) {");
+					printfdf(false, "(): else if (ev.type == MapNotify || ev.type == UnmapNotify) {");
 					daemon_count_clients(ps->mainwin, 0, None);
 					dlist *iter = (wid ? dlist_find(ps->mainwin->clients, clientwin_cmp_func, (void *) wid): NULL);
 					if (iter) {
@@ -888,8 +882,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 					}
 				}
 				else if (mw && (ps->xinfo.damage_ev_base + XDamageNotify == ev.type)) {
-					//printfef("(): else if (ev.type == XDamageNotify) {");
-					// XDamageNotifyEvent *d_ev = (XDamageNotifyEvent *) &ev;
+					//printfdf(false, "(): else if (ev.type == XDamageNotify) {");
 					dlist *iter = dlist_find(ps->mainwin->clients, clientwin_cmp_func,
 							(void *) wid);
 					pending_damage = true;
@@ -900,17 +893,11 @@ mainloop(session_t *ps, bool activate_on_start) {
 				else if (mw && wid == mw->window)
 					die = mainwin_handle(mw, &ev);
 				else if (mw && PropertyNotify == ev.type) {
-					printfef("(): else if (ev.type == PropertyNotify) {");
-
-					// printfef("(): else if (PropertyNotify == ev.type) {");
+					printfdf(false, "(): else if (ev.type == PropertyNotify) {");
 
 					if (!ps->o.background &&
 							(ESETROOT_PMAP_ID == ev.xproperty.atom
 							 || _XROOTPMAP_ID == ev.xproperty.atom)) {
-
-					    // printfef("(): if (!ps->o.background && ...");
-					    // printfef("(): mainwin_update_background(mw);");
-					    // printfef("(): REDUCE(clientwin_render((ClientWin *)iter->data), mw->clientondesktop);");
 
 						mainwin_update_background(mw);
 						REDUCE(clientwin_render((ClientWin *)iter->data), mw->clientondesktop);
@@ -924,8 +911,6 @@ mainloop(session_t *ps, bool activate_on_start) {
 						if (cw->mini.window == wid) {
                             if (!(POLLIN & r_fd[1].revents))
                             {
-							    // we handle key events in here
-                                // printfef("(): die = clientwin_handle(cw, &ev);");
 							    die = clientwin_handle(cw, &ev);
                             }
 							break;
@@ -936,14 +921,12 @@ mainloop(session_t *ps, bool activate_on_start) {
 
 			// Do delayed painting if it's active
 			if (mw && pending_damage && !die) {
-				//printfdf("(): delayed painting");
+				//printfdf(false, "(): delayed painting");
 				pending_damage = false;
 				foreach_dlist(mw->clientondesktop) {
 					if (((ClientWin *) iter->data)->damaged)
 					{
-						// printfef("(): if (((ClientWin *) iter->data)->damaged)");
 						clientwin_repair(iter->data);
-						// fputs("\n", stdout);
 					}
 				}
 				last_rendered = time_in_millis();
@@ -962,16 +945,16 @@ mainloop(session_t *ps, bool activate_on_start) {
 			unsigned char piped_input = 0;
 			int read_ret = read(ps->fd_pipe, &piped_input, 1);
 			if (0 == read_ret) {
-				printfdf("(): EOF reached on pipe \"%s\".", ps->o.pipePath);
+				printfdf(false, "(): EOF reached on pipe \"%s\".", ps->o.pipePath);
 				open_pipe(ps, r_fd);
 			}
 			else if (-1 == read_ret) {
 				if (EAGAIN != errno)
-					printfef("(): Reading pipe \"%s\" failed: %d", ps->o.pipePath, errno);
+					printfdf(false, "(): Reading pipe \"%s\" failed: %d", ps->o.pipePath, errno);
 			}
 			else {
 				assert(1 == read_ret);
-				printfdf("(): Received pipe command: %d", piped_input);
+				printfdf(false, "(): Received pipe command: %d", piped_input);
 
 				switch (piped_input) {
 					case PIPECMD_RELOAD_CONFIG:
@@ -982,10 +965,10 @@ mainloop(session_t *ps, bool activate_on_start) {
 					case PIPECMD_ACTIVATE_PAGING:
 						paging = piped_input == PIPECMD_ACTIVATE_PAGING;
 						ps->o.mode = paging? PROGMODE_ACTV_PAGING: PROGMODE_ACTV_EXPOSE;
-						printfef("(): case PIPECMD_ACTIVATE, paging=%d:", paging);
+						printfdf(false, "(): case PIPECMD_ACTIVATE, paging=%d:", paging);
 						if (ps->mainwin->mapped)
 						{
-							printfef("(): if (ps->mainwin->mapped)");
+							printfdf(false, "(): if (ps->mainwin->mapped)");
 							fflush(stdout);fflush(stderr);
 
 							// There is a glitch whereby calling focus_miniw_prev() or focus_miniw_next()
@@ -998,20 +981,20 @@ mainloop(session_t *ps, bool activate_on_start) {
 
 							if (ps->o.focus_initial == FI_PREV)
 							{
-								printfef("(): focus_miniw_prev(ps, mw->client_to_focus);");
+								printfdf(false, "(): focus_miniw_prev(ps, mw->client_to_focus);");
 								focus_miniw_prev(ps, mw->client_to_focus);
 							}
 
 							else if (ps->o.focus_initial == FI_NEXT)
 							{
-								printfef("(): focus_miniw_next(ps, mw->client_to_focus);");
+								printfdf(false, "(): focus_miniw_next(ps, mw->client_to_focus);");
 								focus_miniw_next(ps, mw->client_to_focus);
 							}
 							clientwin_render(mw->client_to_focus);
 						}
 						else
 						{
-							printfef("(): activate = true;");
+							printfdf(false, "(): activate = true;");
 							animating = activate = true;
 						}
 						break;
@@ -1030,7 +1013,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 						}
 						break;
 					case PIPECMD_EXIT_DAEMON:
-						printfdf("(): Exit command received, killing daemon...");
+						printfdf(false, "(): Exit command received, killing daemon...");
 						unlink(ps->o.pipePath);
 						return;
 					case PIPECMD_QUEUE_FI_PREV:
@@ -1040,14 +1023,14 @@ mainloop(session_t *ps, bool activate_on_start) {
 						ps->o.focus_initial = FI_NEXT;
 						break;
 					default:
-						printfdf("(): Unknown daemon command \"%d\" received.", piped_input);
+						printfdf(false, "(): Unknown daemon command \"%d\" received.", piped_input);
 						break;
 				}
 			}
 		}
 
 		if (POLLHUP & r_fd[1].revents) {
-			printfdf("(): PIPEHUP on pipe \"%s\".", ps->o.pipePath);
+			printfdf(false, "(): PIPEHUP on pipe \"%s\".", ps->o.pipePath);
 			open_pipe(ps, r_fd);
 		}
 	}
@@ -1058,7 +1041,7 @@ send_command_to_daemon_via_fifo(int command, const char *pipePath) {
 	{
 		int access_ret = 0;
 		if ((access_ret = access(pipePath, W_OK))) {
-			printfef("(): Failed to access() pipe \"%s\": %d", pipePath, access_ret);
+			printfef(true, "(): Failed to access() pipe \"%s\": %d", pipePath, access_ret);
 			perror("access");
 			exit(1);
 		}
@@ -1066,7 +1049,7 @@ send_command_to_daemon_via_fifo(int command, const char *pipePath) {
 
 	FILE *fp = fopen(pipePath, "w");
 
-	printfdf("(): Sending command...");
+	printfdf(false, "(): Sending command...");
 	fputc(command, fp);
 
 	fclose(fp);
@@ -1076,55 +1059,55 @@ send_command_to_daemon_via_fifo(int command, const char *pipePath) {
 
 static inline bool
 queue_reload_config(const char *pipePath) {
-	printfdf("(): Reload config file...");
+	printfdf(false, "(): Reload config file...");
 	return send_command_to_daemon_via_fifo(PIPECMD_RELOAD_CONFIG, pipePath);
 }
 
 static inline bool
 queue_initial_focus_prev(const char *pipePath) {
-	printfdf("(): Set initial focus to previous selection...");
+	printfdf(false, "(): Set initial focus to previous selection...");
 	return send_command_to_daemon_via_fifo(PIPECMD_QUEUE_FI_PREV, pipePath);
 }
 
 static inline bool
 queue_initial_focus_next(const char *pipePath) {
-	printfdf("(): Set initial focus to next selection...");
+	printfdf(false, "(): Set initial focus to next selection...");
 	return send_command_to_daemon_via_fifo(PIPECMD_QUEUE_FI_NEXT, pipePath);
 }
 
 static inline bool
 activate_expose(const char *pipePath) {
-	printfdf("(): Activating expose...");
+	printfdf(false, "(): Activating expose...");
 	return send_command_to_daemon_via_fifo(PIPECMD_ACTIVATE_EXPOSE, pipePath);
 }
 
 static inline bool
 activate_paging(const char *pipePath) {
-	printfdf("(): Activating paging...");
+	printfdf(false, "(): Activating paging...");
 	return send_command_to_daemon_via_fifo(PIPECMD_ACTIVATE_PAGING, pipePath);
 }
 
 static inline bool
 exit_daemon(const char *pipePath) {
-	printfdf("(): Killing daemon...");
+	printfdf(false, "(): Killing daemon...");
 	return send_command_to_daemon_via_fifo(PIPECMD_EXIT_DAEMON, pipePath);
 }
 
 static inline bool
 deactivate(const char *pipePath) {
-	printfdf("(): Deactivating...");
+	printfdf(false, "(): Deactivating...");
 	return send_command_to_daemon_via_fifo(PIPECMD_DEACTIVATE, pipePath);
 }
 
 static inline bool
 toggle_expose(const char *pipePath) {
-	printfdf("(): Toggling expose...");
+	printfdf(false, "(): Toggling expose...");
 	return send_command_to_daemon_via_fifo(PIPECMD_TOGGLE_EXPOSE, pipePath);
 }
 
 static inline bool
 toggle_paging(const char *pipePath) {
-	printfdf("(): Toggling paging...");
+	printfdf(false, "(): Toggling paging...");
 	return send_command_to_daemon_via_fifo(PIPECMD_TOGGLE_PAGING, pipePath);
 }
 
@@ -1185,7 +1168,7 @@ xerror(Display *dpy, XErrorEvent *ev) {
 	{
 		char buf[BUF_LEN] = "";
 		XGetErrorText(ps->dpy, ev->error_code, buf, BUF_LEN);
-		printfef("error %d (%s) request %d minor %d serial %lu (\"%s\")\n",
+		printfef(false, "(): error %d (%s) request %d minor %d serial %lu (\"%s\")",
 				ev->error_code, name, ev->request_code,
 				ev->minor_code, ev->serial, buf);
 	}
@@ -1217,7 +1200,7 @@ show_help() {
 			// "  --test                      - Temporary development testing. To be removed.\n"
 			"\n"
 			"  --help              - show this message.\n"
-			"  -S                  - Synchronize X operation (debugging).\n"
+			"  -S                  - enable debugging logs.\n"
 			, stdout);
 #ifdef CFG_LIBPNG
 	spng_about(stdout);
@@ -1256,32 +1239,32 @@ init_xexts(session_t *ps) {
 	ps->xinfo.xinerama_exist = XineramaQueryExtension(dpy,
 			&ps->xinfo.xinerama_ev_base, &ps->xinfo.xinerama_err_base);
 # ifdef DEBUG_XINERAMA
-	printfef("(): Xinerama extension: %s",
+	printfef(true, "(): Xinerama extension: %s",
 			(ps->xinfo.xinerama_exist ? "yes": "no"));
 # endif /* DEBUG_XINERAMA */
 #endif /* CFG_XINERAMA */
 
 	if(!XDamageQueryExtension(dpy,
 				&ps->xinfo.damage_ev_base, &ps->xinfo.damage_err_base)) {
-		printfef("(): FATAL: XDamage extension not found.");
+		printfef(true, "(): FATAL: XDamage extension not found.");
 		return false;
 	}
 
 	if(!XCompositeQueryExtension(dpy, &ps->xinfo.composite_ev_base,
 				&ps->xinfo.composite_err_base)) {
-		printfef("(): FATAL: XComposite extension not found.");
+		printfef(true, "(): FATAL: XComposite extension not found.");
 		return false;
 	}
 
 	if(!XRenderQueryExtension(dpy,
 				&ps->xinfo.render_ev_base, &ps->xinfo.render_err_base)) {
-		printfef("(): FATAL: XRender extension not found.");
+		printfef(true, "(): FATAL: XRender extension not found.");
 		return false;
 	}
 
 	if(!XFixesQueryExtension(dpy,
 				&ps->xinfo.fixes_ev_base, &ps->xinfo.fixes_err_base)) {
-		printfef("(): FATAL: XFixes extension not found.");
+		printfef(true, "(): FATAL: XFixes extension not found.");
 		return false;
 	}
 
@@ -1411,13 +1394,15 @@ parse_args(session_t *ps, int argc, char **argv, bool first_pass) {
 					break;
 				case OPT_PREV:
 					ps->o.focus_initial = FI_PREV;
-					// fprintf(stdout, "ps->o.focus_initial=%i\n", ps->o.focus_initial);
+					printfdf(false, "(): ps->o.focus_initial=%i\n", ps->o.focus_initial);
 					break;
 				case OPT_NEXT:
 					ps->o.focus_initial = FI_NEXT;
-					// fprintf(stdout, "ps->o.focus_initial=%i\n", ps->o.focus_initial);
+					printfdf(false, "(): ps->o.focus_initial=%i\n", ps->o.focus_initial);
 					break;
-				T_CASEBOOL('S', synchronize);
+				case 'S':
+					debuglog = true;
+					break;
 				// case 't':
 				// 	developer_tests();
 				// 	exit('t' == o ? RET_SUCCESS: RET_BADARG);
@@ -1463,7 +1448,7 @@ parse_args(session_t *ps, int argc, char **argv, bool first_pass) {
 			case OPT_NEXT: break;
 #undef T_CASEBOOL
 			default:
-				printfef("(0): Unimplemented option %d.", o);
+				printfef(false, "(0): Unimplemented option %d.", o);
 				exit(RET_UNKNOWN);
 		}
 	}
@@ -1480,7 +1465,7 @@ load_config_file(session_t *ps)
         if (ps->o.config_path)
             config = config_load(ps->o.config_path);
         else
-            printfef("(): WARNING: No configuration file found.");
+            printfef(true, "(): WARNING: No configuration file found.");
         if (!config && user_specified_config)
             return 1;
     }
@@ -1545,24 +1530,29 @@ load_config_file(session_t *ps)
     check_keysyms(ps->o.config_path, ": [bindings] keysReverseDirection =", ps->o.bindings_keysReverseDirection);
     check_modmasks(ps->o.config_path, ": [bindings] modifierKeyMasksReverseDirection =", ps->o.bindings_modifierKeyMasksReverseDirection);
 
-    if (!parse_cliop(ps, config_get(config, "bindings", "miwMouse1", "focus"), &ps->o.bindings_miwMouse[1])
-            || !parse_cliop(ps, config_get(config, "bindings", "miwMouse2", "close-ewmh"), &ps->o.bindings_miwMouse[2])
-            || !parse_cliop(ps, config_get(config, "bindings", "miwMouse3", "iconify"), &ps->o.bindings_miwMouse[3]))
-        return RET_BADARG;
-    {
-        const char *s = config_get(config, "general", "layout", NULL);
-        if (s) {
-           if (strcmp(s,"boxy") == 0) {
-               ps->o.layout = LAYOUT_BOXY;
-           }
-           else if (strcmp(s,"xd") == 0) {
-               ps->o.layout = LAYOUT_XD;
-           }
-           else {
-               ps->o.layout = LAYOUT_BOXY;
-           }
-        }
+	if (!parse_cliop(ps, config_get(config, "bindings", "miwMouse1", "focus"), &ps->o.bindings_miwMouse[1])
+			|| !parse_cliop(ps, config_get(config, "bindings", "miwMouse2", "close-ewmh"), &ps->o.bindings_miwMouse[2])
+			|| !parse_cliop(ps, config_get(config, "bindings", "miwMouse3", "iconify"), &ps->o.bindings_miwMouse[3])) {
+		return RET_BADARG;
+	}
+
+	{
+		const char *s = config_get(config, "general", "layout", NULL);
+		if (s) {
+			if (strcmp(s,"boxy") == 0) {
+				ps->o.layout = LAYOUT_BOXY;
+			}
+			else if (strcmp(s,"xd") == 0) {
+				ps->o.layout = LAYOUT_XD;
+			}
+			else {
+				ps->o.layout = LAYOUT_BOXY;
+			}
+		}
+		else
+			ps->o.layout = LAYOUT_BOXY;
     }
+
     config_get_bool_wrap(config, "general", "sortByColumn", &ps->o.sortByColumn);
     config_get_int_wrap(config, "general", "distance", &ps->o.distance, 1, INT_MAX);
     config_get_bool_wrap(config, "general", "useNetWMFullscreen", &ps->o.useNetWMFullscreen);
@@ -1639,6 +1629,9 @@ load_config_file(session_t *ps)
                 ps->o.background = p;
             free_pictspec(ps, &spec);
         }
+		else {
+			ps->o.background = None;
+		}
     }
     if (!parse_pictspec(ps, config_get(config, "general", "iconFillSpec", "orig mid mid #FFFFFF"), &ps->o.iconFillSpec)
             || !parse_pictspec(ps, config_get(config, "general", "fillSpec", "orig mid mid #FFFFFF"), &ps->o.fillSpec))
@@ -1679,7 +1672,7 @@ int main(int argc, char *argv[]) {
 
 	// Open connection to X
 	if (!(ps->dpy = dpy = XOpenDisplay(NULL))) {
-		printfef("(): FATAL: Couldn't connect to display.");
+		printfef(true, "(): FATAL: Couldn't connect to display.");
 		ret = RET_XFAIL;
 		goto main_end;
 	}
@@ -1687,7 +1680,7 @@ int main(int argc, char *argv[]) {
 		ret = RET_XFAIL;
 		goto main_end;
 	}
-	if (ps->o.synchronize)
+	if (debuglog)
 		XSynchronize(ps->dpy, True);
 	XSetErrorHandler(xerror);
 
@@ -1703,7 +1696,7 @@ int main(int argc, char *argv[]) {
 	// Second pass
 	parse_args(ps, argc, argv, false);
 
-	// fprintf(stdout, "after 2nd pass:  ps->o.focus_initial =  %i\n", ps->o.focus_initial);
+	printfdf(false, "(): after 2nd pass:  ps->o.focus_initial =  %i", ps->o.focus_initial);
 
 	const char* pipePath = ps->o.pipePath;
 
@@ -1765,7 +1758,7 @@ int main(int argc, char *argv[]) {
 	// Main branch
 	MainWin *mw = mainwin_create(ps);
 	if (!mw) {
-		printfef("(): FATAL: Couldn't create main window.");
+		printfef(true, "(): FATAL: Couldn't create main window.");
 		ret = 1;
 		goto main_end;
 	}
@@ -1777,7 +1770,7 @@ int main(int argc, char *argv[]) {
 	if (ps->o.runAsDaemon) {
 		bool flush_file = false;
 
-		printfdf("(): Running as daemon...");
+		printfdf(false, "(): Running as daemon...");
 
 		// Flush file if we could access() it (or, usually, if it exists)
 		if (!access(pipePath, R_OK))
@@ -1786,7 +1779,7 @@ int main(int argc, char *argv[]) {
 		{
 			int result = mkfifo(pipePath, S_IRUSR | S_IWUSR);
 			if (result < 0  && EEXIST != errno) {
-				printfef("(): Failed to create named pipe \"%s\": %d", pipePath, result);
+				printfef(true, "(): Failed to create named pipe \"%s\": %d", pipePath, result);
 				perror("mkfifo");
 				ret = 2;
 				goto main_end;
@@ -1803,7 +1796,7 @@ int main(int argc, char *argv[]) {
 			char *buf[BUF_LEN];
 			while (read(ps->fd_pipe, buf, sizeof(buf)) > 0)
 				continue;
-			printfdf("(): Finished flushing pipe \"%s\".", pipePath);
+			printfdf(false, "(): Finished flushing pipe \"%s\".", pipePath);
 		}
 
 		daemon_count_clients(mw, 0, None);
@@ -1816,7 +1809,7 @@ int main(int argc, char *argv[]) {
 		mainloop(ps, false);
 	}
 	else {
-		printfdf("(): running once then quitting...");
+		printfdf(false, "(): running once then quitting...");
 		mainloop(ps, true);
 	}
 

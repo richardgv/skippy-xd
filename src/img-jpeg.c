@@ -14,7 +14,7 @@ sjpg_read(session_t *ps, const char *path) {
 
 	FILE *fp = fopen(path, "rb");
 	if (unlikely(!fp)) {
-		printfef("(\"%s\"): Failed to open file.", path);
+		printfef(false, "(): (\"%s\"): Failed to open file.", path);
 		goto sjpg_read_end;
 	}
 	jpeg_stdio_src(&cinfo, fp);
@@ -35,7 +35,7 @@ sjpg_read(session_t *ps, const char *path) {
 		while (cinfo.output_scanline < cinfo.output_height) {
 			if (unlikely(!jpeg_read_scanlines(&cinfo, &rowptrs[cinfo.output_scanline],
 							cinfo.output_height - cinfo.output_scanline))) {
-				printfef("(\"%s\"): Failed to read scanline %d.", path,
+				printfef(false, "(): (\"%s\"): Failed to read scanline %d.", path,
 						cinfo.output_scanline);
 				goto sjpg_read_end;
 			}
@@ -60,14 +60,14 @@ sjpg_read(session_t *ps, const char *path) {
 		}
 	}
 	if (unlikely(!jpeg_finish_decompress(&cinfo))) {
-		printfef("(\"%s\"): Failed to finish decompression.", path);
+		printfef(false, "(): (\"%s\"): Failed to finish decompression.", path);
 		goto sjpg_read_end;
 	}
 	need_abort = false;
 	pictw = simg_data_to_pictw(ps, width, height, depth, data, 0);
 	free(data);
 	if (unlikely(!pictw)) {
-		printfef("(\"%s\"): Failed to create Picture.", path);
+		printfef(false, "(): (\"%s\"): Failed to create Picture.", path);
 		goto sjpg_read_end;
 	}
 

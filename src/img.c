@@ -43,8 +43,9 @@ simg_postprocess(session_t *ps, pictw_t *src, enum pict_posp_mode mode,
 
 	if (!src) {
 		if (twidth && theight) {
-			if (!(dest = create_pictw(ps, twidth, theight, depth)))
-				printfef("(): Failed to create Picture.");
+			if (!(dest = create_pictw(ps, twidth, theight, depth))) {
+				printfef(false, "(): Failed to create Picture.");
+			}
 			else
 				XRenderFillRectangle(ps->dpy, PictOpSrc, dest->pict, pc, 0, 0,
 						twidth, theight);
@@ -60,7 +61,7 @@ simg_postprocess(session_t *ps, pictw_t *src, enum pict_posp_mode mode,
 	else if (!theight) theight = (double) twidth / src->width * src->height;
 
 	if (!(dest = create_pictw(ps, twidth, theight, depth))) {
-		printfef("(): Failed to create Picture.");
+		printfef(false, "(): Failed to create Picture.");
 		goto simg_postprocess_end;
 	}
 
