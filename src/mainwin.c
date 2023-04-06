@@ -105,7 +105,7 @@ mainwin_create(session_t *ps) {
 	if (ps->xinfo.xinerama_exist && XineramaIsActive(dpy)) {
 		mw->xin_info = XineramaQueryScreens(ps->dpy, &mw->xin_screens);
 # ifdef DEBUG_XINERAMA
-		printfef("(): Xinerama is enabled (%d screens).", mw->xin_screens);
+		printfdf(false, "(): Xinerama is enabled (%d screens).", mw->xin_screens);
 # endif /* DEBUG_XINERAMA */
 	}
 #endif /* CFG_XINERAMA */
@@ -195,7 +195,7 @@ mainwin_reload(session_t *ps, MainWin *mw) {
 		mw->depth  = 32;
 		mw->visual = ps->argb_visual;
 		if (!mw->visual) {
-			printfef("(): Couldn't find ARGB visual, lazy transparency can't work.");
+			printfef(true, "(): Couldn't find ARGB visual, lazy transparency can't work.");
 			goto mainwin_create_err;
 		}
 	}
@@ -210,7 +210,7 @@ mainwin_reload(session_t *ps, MainWin *mw) {
 	XColor exact_color;
 
 	if(!XParseColor(ps->dpy, mw->colormap, ps->o.normal_tint, &exact_color)) {
-		printfef("(): Couldn't look up color '%s', reverting to black.", ps->o.normal_tint);
+		printfef(true, "(): Couldn't look up color '%s', reverting to black.", ps->o.normal_tint);
 		mw->normalTint.red = mw->normalTint.green = mw->normalTint.blue = 0;
 	}
 	else
@@ -223,7 +223,7 @@ mainwin_reload(session_t *ps, MainWin *mw) {
 
 	if(! XParseColor(ps->dpy, mw->colormap, ps->o.highlight_tint, &exact_color))
 	{
-		fprintf(stderr, "Couldn't look up color '%s', reverting to #101020", ps->o.highlight_tint);
+		printfef(true, "(): Couldn't look up color '%s', reverting to #101020", ps->o.highlight_tint);
 		mw->highlightTint.red = mw->highlightTint.green = 0x10;
 		mw->highlightTint.blue = 0x20;
 	}
@@ -238,7 +238,7 @@ mainwin_reload(session_t *ps, MainWin *mw) {
 	;
 	if(! XParseColor(ps->dpy, mw->colormap, ps->o.shadow_tint, &exact_color))
 	{
-		fprintf(stderr, "Couldn't look up color '%s', reverting to #040404", ps->o.shadow_tint);
+		printfef(true, "(): Couldn't look up color '%s', reverting to #040404", ps->o.shadow_tint);
 		mw->shadowTint.red = mw->shadowTint.green =	mw->shadowTint.blue = 0x04;
 	}
 	else
@@ -358,13 +358,13 @@ mainwin_update(MainWin *mw)
 	}
 	
 # ifdef DEBUG
-	fprintf(stderr, "--> querying pointer... ");
+	printfdf(false, "(): --> querying pointer... ");
 # endif /* DEBUG */
 	XQueryPointer(ps->dpy, ps->root, &dummy_w, &dummy_w, &root_x, &root_y, &dummy_i, &dummy_i, &dummy_u);
 # ifdef DEBUG	
-	fprintf(stderr, "+%i+%i\n", root_x, root_y);
+	printfdf(false, "(): +%i+%i\n", root_x, root_y);
 	
-	fprintf(stderr, "--> figuring out which screen we're on... ");
+	printfdf(false, "(): --> figuring out which screen we're on... ");
 # endif /* DEBUG */
 	iter = mw->xin_info;
 	for(i = 0; i < mw->xin_screens; ++i)
@@ -373,7 +373,7 @@ mainwin_update(MainWin *mw)
 		   root_y >= iter->y_org && root_y < iter->y_org + iter->height)
 		{
 # ifdef DEBUG
-			fprintf(stderr, "screen %i %ix%i+%i+%i\n", iter->screen_number, iter->width, iter->height, iter->x_org, iter->y_org);
+			printfdf(false, "(): screen %i %ix%i+%i+%i\n", iter->screen_number, iter->width, iter->height, iter->x_org, iter->y_org);
 # endif /* DEBUG */
 			break;
 		}
@@ -382,7 +382,7 @@ mainwin_update(MainWin *mw)
 	if(i == mw->xin_screens)
 	{
 # ifdef DEBUG 
-		fprintf(stderr, "unknown\n");
+		printfdf(false, "(): unknown\n");
 # endif /* DEBUG */
 		return;
 	}
@@ -413,7 +413,7 @@ mainwin_map(MainWin *mw) {
 		int ret = XGrabKeyboard(ps->dpy, mw->window, True, GrabModeAsync,
 				GrabModeAsync, CurrentTime);
 		if (Success != ret)
-			printfef("(): Failed to grab keyboard (%d), troubles ahead.", ret);
+			printfef(true, "(): Failed to grab keyboard (%d), troubles ahead.", ret);
 	} */
 	mw->mapped = true;
 }
@@ -513,7 +513,7 @@ mainwin_transform(MainWin *mw, float f)
 
 int
 mainwin_handle(MainWin *mw, XEvent *ev) {
-	// printfef("(): ");
+	printfdf(false, "(): ");
 	session_t *ps = mw->ps;
 
 	switch(ev->type) {
@@ -522,17 +522,17 @@ mainwin_handle(MainWin *mw, XEvent *ev) {
 			break;
 		case KeyPress:
 		case KeyRelease:
-			// printfef("(): KeyPress or KeyRelease");
+			printfdf(false, "(): KeyPress or KeyRelease");
 			// if(mw->client_to_focus)
 			// {
-				// printfef("(): clientwin_handle(mw->client_to_focus, ev);");
+				// printfdf(false, "(): clientwin_handle(mw->client_to_focus, ev);");
 			if(clientwin_handle(mw->client_to_focus, ev))
 				return 1;
 
 			// }
 			// else
 			// {
-			// 	printfef("(): mw->client_to_focus == NULL");				
+			// 	printfdf(false, "(): mw->client_to_focus == NULL");				
 			// }
 			break;
 		case ButtonPress:
@@ -540,12 +540,12 @@ mainwin_handle(MainWin *mw, XEvent *ev) {
 			break;
 		case ButtonRelease:
 			if (mw->pressed_mouse) {
-				printfef("(): Detected mouse button release on main window, "
+				printfdf(false, "(): Detected mouse button release on main window, "
 						"exiting.");
 				return 1;
 			}
 			else
-				printfef("(): ButtonRelease %u ignored.", ev->xbutton.button);
+				printfdf(false, "(): ButtonRelease %u ignored.", ev->xbutton.button);
 			break;
 	}
 

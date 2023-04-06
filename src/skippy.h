@@ -65,40 +65,7 @@
 
 #define MAX_MOUSE_BUTTONS 4
 
-/**
- * @brief Dump raw bytes in HEX format.
- *
- * @param data pointer to raw data
- * @param len length of data
- */
-static inline void
-hexdump(const char *data, int len) {
-  static const int BYTE_PER_LN = 16;
-
-  if (len <= 0)
-    return;
-
-  // Print header
-  printf("%10s:", "Offset");
-  for (int i = 0; i < BYTE_PER_LN; ++i)
-    printf(" %2d", i);
-  putchar('\n');
-
-  // Dump content
-  for (int offset = 0; offset < len; ++offset) {
-    if (!(offset % BYTE_PER_LN))
-      printf("0x%08x:", offset);
-
-    printf(" %02hhx", data[offset]);
-
-    if ((BYTE_PER_LN - 1) == offset % BYTE_PER_LN)
-      putchar('\n');
-  }
-  if (len % BYTE_PER_LN)
-    putchar('\n');
-
-  fflush(stdout);
-}
+extern bool debuglog;
 
 /// @brief Possible return values.
 
@@ -217,7 +184,6 @@ typedef struct {
 	char *config_path;
 	enum progmode mode;
 	bool runAsDaemon;
-	bool synchronize;
 	int focus_initial;
 
 	int layout;
@@ -292,7 +258,6 @@ typedef struct {
 	.config_path = NULL, \
 	.mode = PROGMODE_NORMAL, \
 	.runAsDaemon = false, \
-	.synchronize = false, \
 \
 	.layout = LAYOUT_XD, \
 	.sortByColumn = true, \
@@ -398,21 +363,13 @@ typedef struct {
 	.fd_pipe = -1, \
 }
 
-/// @brief Print out a debug message.
-#define printfd(format, ...) \
-  (fprintf(stdout, format "\n", ## __VA_ARGS__), fflush(stdout))
-
 /// @brief Print out a debug message with function name.
-#define printfdf(format, ...) \
-  (fprintf(stdout, "%s" format "\n", __func__, ## __VA_ARGS__), fflush(stdout))
-
-/// @brief Print out an error message.
-#define printfe(format, ...) \
-  (fprintf(stderr, format "\n", ## __VA_ARGS__), fflush(stderr))
+#define printfdf(alwaysprint, format, ...) \
+  ((alwaysprint) || (debuglog))? fprintf(stdout, "%s" format "\n", __func__, ## __VA_ARGS__):true;
 
 /// @brief Print out an error message with function name.
-#define printfef(format, ...) \
-  printfe("%s" format, __func__, ## __VA_ARGS__)
+#define printfef(alwaysprint, format, ...) \
+  ((alwaysprint) || (debuglog))? fprintf(stderr, "%s" format "\n", __func__, ## __VA_ARGS__):true;
 
 /// @brief Return a value if it's true.
 #define retif(x) do { if (x) return (x); } while (0)
@@ -428,7 +385,7 @@ typedef struct {
 static inline void *
 allocchk_(void *ptr, const char *func_name) {
   if (unlikely(!ptr)) {
-    printfe("%s(): Failed to allocate memory.", func_name);
+    printfef(true, "%s(): Failed to allocate memory.", func_name);
 	exit(RET_BADALLOC);
   }
 
@@ -523,7 +480,7 @@ print_timestamp(session_t *ps) {
 
 	timeval_subtract(&diff, &tm, &ps->time_start);
 
-	printf("[ %5ld.%02ld ] ", diff.tv_sec, diff.tv_usec / 10000);
+	printfef(false, "() [ %5ld.%02ld ] ", diff.tv_sec, diff.tv_usec / 10000);
 }
 
 /**
@@ -885,7 +842,7 @@ check_keysyms(const char *str_err_prefix1, const char *str_err_prefix2, const ch
 		KeySym keysym = key_str_sym(word);
 
 		if (!keysym)
-			printfef("(): %s%s \"%s\" was not recognized as a valid KeySym. Run the program 'xev' to find the correct value.", str_err_prefix1, str_err_prefix2, word);
+			printfef(true, "(): %s%s \"%s\" was not recognized as a valid KeySym. Run the program 'xev' to find the correct value.", str_err_prefix1, str_err_prefix2, word);
 
 		free(word);
   }
@@ -985,7 +942,7 @@ keysyms_arr_keycodes(Display *display, KeySym *keysyms, KeyCode **dest)
   for (int i = 0; i < num_keysyms; i++)
   {
     arr_keycodes[i] = XKeysymToKeycode(display, keysyms[i]);
-    // fprintf(stdout, "i=%i, keysym=%i, keycode=(0x%02lx)\n", i, keysyms[i], arr_keycodes[i]);
+    printfdf(false, "(): i=%i, keysym=%lu, keycode=(0x%02i)", i, keysyms[i], arr_keycodes[i]);
     count++;
   }
   // fputs("\n", stdout); fflush(stdout);
@@ -1096,9 +1053,8 @@ check_keybindings_conflict(const char *config_path, const char *arr1_str, KeySym
     for (int i = 0; i < num_conflicts; i++)
     {
       KeySym keysym = conflicts[i];
-      printfef("(): %s: [bindings] Conflict detected. Remove the duplicate setting. Keybinding: '%s' found in both '%s' and '%s'.", config_path, XKeysymToString(keysym), arr1_str, arr2_str);
-      // fprintf(stdout, "%s   (0x%02lx)\n", XKeysymToString(keysym), keysym);
-      // fputs("\n", stdout);
+      printfdf(true, "(): %s: [bindings] Conflict detected. Remove the duplicate setting. Keybinding: '%s' found in both '%s' and '%s'.", config_path, XKeysymToString(keysym), arr1_str, arr2_str);
+      printfdf(true, "%s   (0x%02lx)\n", XKeysymToString(keysym), keysym);
     }
     free(conflicts);
     return true;
@@ -1108,15 +1064,15 @@ check_keybindings_conflict(const char *config_path, const char *arr1_str, KeySym
 }
 
 #define report_key(ev) \
-	printfef("(): Key %u (%s) occured.", (ev)->xkey.keycode, \
+	printfdf(false, "(): Key %u (%s) occured.", (ev)->xkey.keycode, \
 			ev_key_str(&(ev)->xkey))
 
 #define report_key_ignored(ev) \
-	printfef("(): KeyRelease %u (%s) ignored.", (ev)->xkey.keycode, \
+	printfdf(false, "(): KeyRelease %u (%s) ignored.", (ev)->xkey.keycode, \
 			ev_key_str(&(ev)->xkey))
 
 #define report_key_unbinded(ev) \
-	printfef("(): KeyRelease %u (%s) not binded to anything.", \
+	printfdf(false, "(): KeyRelease %u (%s) not binded to anything.", \
 			(ev)->xkey.keycode, ev_key_str(&(ev)->xkey))
 
 
@@ -1230,10 +1186,10 @@ check_modmasks(const char *str_err_prefix1, const char *str_err_prefix2, const c
 			break;
 
 		int modkeymask = str_key_modifier_int(word);
-		// fprintf(stdout, "%s  %i (0x%02lx)\n", word, modkeymask, modkeymask);
+		printfdf(false, "(): %s  %i (0x%02i)", word, modkeymask, modkeymask);
 
 		if (!modkeymask)
-			printfef("(): %s%s \"%s\" not recognized as a Modifier Key Mask. See: /usr/include/X11/X.h", str_err_prefix1, str_err_prefix2, word);
+			printfef(true, "(): %s%s \"%s\" not recognized as a Modifier Key Mask. See: /usr/include/X11/X.h", str_err_prefix1, str_err_prefix2, word);
 
 		free(word);
   }
@@ -1275,7 +1231,7 @@ modkeymasks_str_enums(const char *s, int** dest)
 	  break;
 
 	int modkeymask = str_key_modifier_int(word);
-	// fprintf(stdout, "%s  %i (0x%02lx)\n", word, modkeymask, modkeymask);
+	printfdf(false, "(): %s  %i (0x%02i)", word, modkeymask, modkeymask);
 
 	// only increment the array counter if the modifier key mask is valid
 	if(modkeymask)
@@ -1316,22 +1272,20 @@ arr_modkeymasks_includes(int *arr_modkeymasks, int modkeymask)
 /**
  * @brief Print a log message if the keyboard event has a modifier key held down
  */
-static inline int
+static inline void
 report_key_modifiers(XKeyEvent *evk)
 {
   // fputs("report_key_modifiers(XKeyEvent *evk)\n", stdout);
-  if (!evk) return 0;
+  if (!evk) return;
 
-  int result = 0;
   int i = 0;
   while (ev_modifier_mask[i])
   {
     if (evk->state & ev_modifier_mask[i])
-      result = printfef("(): Key modifier (%s) is held for key (%s).", ev_modifier_mask_str[i], ev_key_str(evk));
+      printfdf(false,"(): Key modifier (%s) is held for key (%s).", ev_modifier_mask_str[i], ev_key_str(evk));
     i++;
   }
   // fputs("\n", stdout);
-  return result;
 }
 
 #include "img.h"

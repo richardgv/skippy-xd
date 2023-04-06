@@ -243,7 +243,7 @@ clientwin_update(ClientWin *cw) {
 	// if we ever got a thumbnail for the window,
 	// the mode for that window always will be thumbnail
 	cw->mode = clientwin_get_disp_mode(ps, cw, isViewable);
-	// printfdf("(%#010lx): %d", cw->wid_client, cw->mode);
+	printfdf(false, "(): (%#010lx): %d", cw->wid_client, cw->mode);
 
 	return true;
 }
@@ -548,8 +548,6 @@ childwin_focus(ClientWin *cw) {
 
 int
 clientwin_handle(ClientWin *cw, XEvent *ev) {
-	// printfef("(): ");
-
 	if (! cw)
 		return 1;
 
@@ -560,9 +558,9 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 
 	if (ev->type == KeyPress)
 	{
-		//report_key(ev);
-		//report_key_modifiers(evk);
-		fputs("\n", stdout); fflush(stdout);
+		report_key(ev);
+		report_key_modifiers(evk);
+		if (debuglog) fputs("\n", stdout);
 
 		bool reverse_direction = false;
 
@@ -620,7 +618,6 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 
 		else if (arr_keycodes_includes(cw->mainwin->keycodes_ExitCancelOnPress, evk->keycode))
 		{
-			//printfef("(): Quitting.");
 			mw->client_to_focus = mw->client_to_focus_on_cancel;
 			return 1;
 		}
@@ -633,24 +630,20 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 	}
 	else if (ev->type == KeyRelease)
 	{
-		// report_key(ev);
-
-		//report_key(ev);
-		//report_key_modifiers(evk);
-		// fputs("\n", stdout); fflush(stdout);
+		report_key(ev);
+		report_key_modifiers(evk);
+		if (debuglog) fputs("\n", stdout);
 
 		if (arr_keycodes_includes(cw->mainwin->keycodes_ExitSelectOnRelease, evk->keycode))
 		{
-			// printfef("(): if (arr_keycodes_includes(cw->mainwin->keycodes_ExitSelectOnRelease, evk->keycode))");
-			// printfef("(): client_to_focus = %p", (uintptr_t)ps->mainwin->client_to_focus);
+			printfdf(false, "(): if (arr_keycodes_includes(cw->mainwin->keycodes_ExitSelectOnRelease, evk->keycode))");
+			printfdf(false, "(): client_to_focus = %p", ps->mainwin->client_to_focus);
 			// mw->client_to_focus = cw;
-			// printfef("(): client_to_focus = %p", (uintptr_t)ps->mainwin->client_to_focus);
 			return 1;
 		}
 
 		else if (arr_keycodes_includes(cw->mainwin->keycodes_ExitCancelOnRelease, evk->keycode))
 		{
-			//printfef("(): Quitting.");
 			return 1;
 		}
 	}
@@ -661,32 +654,30 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 			cw->mainwin->pressed = cw; */
 	}
 	else if (ev->type == ButtonRelease) {
-		// printfef("(): else if (ev->type == ButtonRelease) {");
 		const unsigned button = ev->xbutton.button;
 		if (cw->mainwin->pressed_mouse) {
 			if (button < MAX_MOUSE_BUTTONS) {
 				int ret = clientwin_action(cw,
 						ps->o.bindings_miwMouse[button]);
 				if (ret) {
-					//printfef("(): Quitting.");
 					return ret;
 				}
 			}
 		}
-		//else
-			//printfef("(): ButtonRelease %u ignored.", button);
+		else
+			printfdf(false, "(): ButtonRelease %u ignored.", button);
 	}
 
 	else if (ev->type == FocusIn) {
-		//printfef("(): else if (ev->type == FocusIn) {");
+		printfdf(false, "(): else if (ev->type == FocusIn) {");
 		XFocusChangeEvent *evf = &ev->xfocus;
 
 		// for debugging XEvents
 		// see: https://tronche.com/gui/x/xlib/events/input-focus/normal-and-grabbed.html
-		//printfef("(): main window id = %#010lx", cw->mainwin->window);
-		//printfefWindowName(ps, "(): client window = ", cw->mainwin->window);
-		//printfef("(): client window id = %#010lx", cw->wid_client);
-		//printfefXFocusChangeEvent(ps, evf);
+		printfdf(false, "(): main window id = %#010lx", cw->mainwin->window);
+		printfdfWindowName(ps, "(): client window = ", cw->mainwin->window);
+		printfdf(false, "(): client window id = %#010lx", cw->wid_client);
+		printfdfXFocusChangeEvent(ps, evf);
 
 		// printfef("(): usleep(10000);");
 		// usleep(10000);
@@ -696,19 +687,19 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 			cw->focused = true;
 
 		clientwin_render(cw);
-		fputs("\n", stdout);
+		if (debuglog) fputs("\n", stdout);
 		XFlush(ps->dpy);
 
 	} else if (ev->type == FocusOut) {
-		//printfef("(): else if (ev->type == FocusOut) {");
+		printfdf(false, "(): else if (ev->type == FocusOut) {");
 		XFocusChangeEvent *evf = &ev->xfocus;
 
 		// for debugging XEvents
 		// see: https://tronche.com/gui/x/xlib/events/input-focus/normal-and-grabbed.html
-		//printfef("(): main window id = %#010lx", cw->mainwin->window);
-		//printfefWindowName(ps, "(): client window = ", cw->mainwin->window);
-		//printfef("(): client window id = %#010lx", cw->wid_client);
-		//printfefXFocusChangeEvent(ps, evf);
+		printfdf(false, "(): main window id = %#010lx", cw->mainwin->window);
+		printfdfWindowName(ps, "(): client window = ", cw->mainwin->window);
+		printfdf(false, "(): client window id = %#010lx", cw->wid_client);
+		printfdfXFocusChangeEvent(ps, evf);
 
 		// printfef("(): usleep(10000);");
 		// usleep(10000);
@@ -718,7 +709,7 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 			cw->focused = false;
 
 		clientwin_render(cw);
-		fputs("\n", stdout);
+		if (debuglog) fputs("\n", stdout);
 		XFlush(ps->dpy);
 
 	} else if(ev->type == EnterNotify) {
@@ -753,7 +744,6 @@ clientwin_action(ClientWin *cw, enum cliop action) {
 		case CLIENTOP_NO:
 			break;
 		case CLIENTOP_FOCUS:
-			//printfef("(): case CLIENTOP_FOCUS:");
 			mw->client_to_focus = cw;
 			return 1;
 		case CLIENTOP_ICONIFY:

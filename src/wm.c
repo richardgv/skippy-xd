@@ -347,14 +347,14 @@ wm_get_stack_sub(session_t *ps, Window root) {
 		// EWMH
 		l = wm_get_stack_fromprop(ps, root, _NET_CLIENT_LIST);
 		if (l) {
-			//printfef("(): Retrieved window stack from _NET_CLIENT_LIST.");
+			printfdf(false, "(): Retrieved window stack from _NET_CLIENT_LIST.");
 			return l;
 		}
 
 		// GNOME WM
 		l = wm_get_stack_fromprop(ps, root, _WIN_CLIENT_LIST);
 		if (l) {
-			//printfef("(): Retrieved window stack from _WIN_CLIENT_LIST.");
+			printfdf(false, "(): Retrieved window stack from _WIN_CLIENT_LIST.");
 			return l;
 		}
 	}
@@ -384,7 +384,7 @@ wm_get_stack_sub(session_t *ps, Window root) {
 			}
 		}
 		sxfree(children);
-		//printfef("(): Retrieved window stack by querying all children.");
+		printfdf(false, "(): Retrieved window stack by querying all children.");
 	}
 
 	return l;
@@ -502,7 +502,7 @@ wm_get_window_title(session_t *ps, Window wid, int *length_return) {
 }
 
 void
-printfefWindowName(session_t *ps, char *prefix_str, Window wid)
+printfdfWindowName(session_t *ps, char *prefix_str, Window wid)
 {
 	int win_title_len = 0;
 	FcChar8 *win_title = wm_get_window_title(ps, wid, &win_title_len);
@@ -510,11 +510,13 @@ printfefWindowName(session_t *ps, char *prefix_str, Window wid)
 	if (! win_title)
 		return;
 
-	if (prefix_str)
-		printfef("%s%s", prefix_str, win_title);
+	if (prefix_str) {
+		printfdf(false, "(): %s%s", prefix_str, win_title);
+	}
 
-	else
-		printfef("%s", win_title);
+	else {
+		printfdf(false, "(): %s", win_title);
+	}
 
 	free(win_title);
 }
@@ -673,10 +675,10 @@ wm_get_focused(session_t *ps) {
 	{
 		int revert_to = 0;
 		if (!XGetInputFocus(ps->dpy, &focused, &revert_to)) {
-			printfef("(): Failed to get current focused window.");
+			printfdf(false, "(): Failed to get current focused window.");
 			return None;
 		}
-		// printfdf("(): Focused window is %#010lx.", focused);
+		printfdf(false, "(): Focused window is %#010lx.", focused);
 	}
 
 	while (focused) {
@@ -698,10 +700,10 @@ wm_get_focused(session_t *ps) {
 				XQueryTree(ps->dpy, focused, &rroot, &parent, &children, &nchildren);
 			sxfree(children);
 			if (!status) {
-				printfef("(): Failed to get parent window of %#010lx.", focused);
+				printfef(false, "(): Failed to get parent window of %#010lx.", focused);
 				return None;
 			}
-			// printfdf("(): Parent window of %#010lx is %#010lx.", focused, parent);
+			printfdf(false, "(): Parent window of %#010lx is %#010lx.", focused, parent);
 			focused = parent;
 			assert(ps->root == rroot);
 		}
