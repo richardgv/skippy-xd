@@ -26,7 +26,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-bool debuglog = true;
+bool debuglog = false;
 
 enum pipe_cmd_t {
 	// Not ordered properly for backward compatibility
@@ -1402,6 +1402,7 @@ parse_args(session_t *ps, int argc, char **argv, bool first_pass) {
 					break;
 				case 'S':
 					debuglog = true;
+					break;
 				// case 't':
 				// 	developer_tests();
 				// 	exit('t' == o ? RET_SUCCESS: RET_BADARG);
