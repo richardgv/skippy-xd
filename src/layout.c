@@ -220,9 +220,24 @@ layout_boxy(MainWin *mw, dlist *windows,
 		slot_width = MIN(slot_width,  cw->src.width);
 		slot_height = MIN(slot_height, cw->src.height);
 
-		CARD32 desktop = wm_get_window_desktop(mw->ps, cw->wid_client)
-			- wm_get_current_desktop(mw->ps);
-		cw->src.x += desktop * mw->width;
+        {
+            int screencount = wm_get_desktops(mw->ps);
+            if (screencount == -1)
+                screencount = 1;
+            int desktop_dim = ceil(sqrt(screencount));
+
+            int win_desktop = wm_get_window_desktop(mw->ps, cw->wid_client);
+            int current_desktop = wm_get_current_desktop(mw->ps);
+
+            int win_desktop_x = win_desktop % desktop_dim;
+            int win_desktop_y = win_desktop / desktop_dim;
+
+            int current_desktop_x = current_desktop % desktop_dim;
+            int current_desktop_y = current_desktop / desktop_dim;
+
+            cw->src.x += (win_desktop_x - current_desktop_x) * (mw->width + mw->distance);
+            cw->src.y += (win_desktop_y - current_desktop_y) * (mw->height + mw->distance);
+        }
 
 		cw->x = cw->src.x;
 		cw->y = cw->src.y;
