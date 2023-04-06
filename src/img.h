@@ -115,7 +115,7 @@ create_pictw_frompixmap(session_t *ps, int width, int height, int depth,
 	pictw_t *pictw = NULL;
 
 	if (!pxmap) {
-		printfef("(%d, %d, %d, %#010lx): Missing pixmap.", width, height, depth, pxmap);
+		printfef(false, "(%d, %d, %d, %#010lx): Missing pixmap.", width, height, depth, pxmap);
 		return NULL;
 	}
 
@@ -126,7 +126,7 @@ create_pictw_frompixmap(session_t *ps, int width, int height, int depth,
 		unsigned rwidth = 0, rheight = 0, rborder_width = 0, rdepth = 0;
 		if (!XGetGeometry(ps->dpy, pxmap,
 				&rroot, &rx, &ry, &rwidth, &rheight, &rborder_width, &rdepth)) {
-			printfef("(%d, %d, %d, %#010lx): Failed to determine pixmap size.", width, height, depth, pxmap);
+			printfef(false, "(%d, %d, %d, %#010lx): Failed to determine pixmap size.", width, height, depth, pxmap);
 			return NULL;
 		}
 		width = rwidth;
@@ -136,14 +136,14 @@ create_pictw_frompixmap(session_t *ps, int width, int height, int depth,
 
 	// Sanity check
 	if (!(width && height && depth)) {
-		printfef("(%d, %d, %d, %#010lx): Failed to get pixmap info.", width, height, depth, pxmap);
+		printfef(false, "(%d, %d, %d, %#010lx): Failed to get pixmap info.", width, height, depth, pxmap);
 		return NULL;
 	}
 
 	// Find X Render format
 	const XRenderPictFormat *rfmt = depth_to_rfmt(ps, depth);
 	if (!rfmt) {
-		printfef("(%d, %d, %d, %#010lx): Failed to find X Render format for depth %d.",
+		printfef(false, "(%d, %d, %d, %#010lx): Failed to find X Render format for depth %d.",
 				width, height, depth, pxmap, depth);
 		return NULL;
 	}
@@ -157,7 +157,7 @@ create_pictw_frompixmap(session_t *ps, int width, int height, int depth,
 
 	if (!(pictw->pict = XRenderCreatePicture(ps->dpy, pictw->pxmap,
 					rfmt, 0, NULL))) {
-		printfef("(%d, %d, %d, %#010lx): Failed to create Picture.",
+		printfef(false, "(%d, %d, %d, %#010lx): Failed to create Picture.",
 				width, height, depth, pxmap);
 		free_pictw(ps, &pictw);
 	}
@@ -172,7 +172,7 @@ static inline pictw_t *
 create_pictw(session_t *ps, int width, int height, int depth) {
 	Pixmap pxmap = XCreatePixmap(ps->dpy, ps->root, width, height, depth);
 	if (!pxmap) {
-		printfef("(%d, %d, %d): Failed to create Pixmap.", width, height, depth);
+		printfef(false, "(%d, %d, %d): Failed to create Pixmap.", width, height, depth);
 		return NULL;
 	}
 
@@ -265,14 +265,14 @@ simg_pixmap_to_pictw(session_t *ps, int width, int height, int depth,
 	pictw_t *pictw = NULL;
 
 	if (!porig) {
-		printfef("(%d, %d, %d, %#010lx, %#010lx): Failed to create picture for pixmap.",
+		printfef(false, "(%d, %d, %d, %#010lx, %#010lx): Failed to create picture for pixmap.",
 				width, height, depth, pxmap, mask);
 		goto simg_pixmap_to_pict_end;
 	}
 
 	if (mask) {
 		if (!(pmask = create_pictw_frompixmap(ps, width, height, depth, mask))) {
-			printfef("(%d, %d, %d, %#010lx, %#010lx): Failed to create picture for mask.",
+			printfef(false, "(%d, %d, %d, %#010lx, %#010lx): Failed to create picture for mask.",
 					width, height, depth, pxmap, mask);
 			goto simg_pixmap_to_pict_end;
 		}
@@ -281,7 +281,7 @@ simg_pixmap_to_pictw(session_t *ps, int width, int height, int depth,
 	}
 
 	if (!(pictw = create_pictw(ps, porig->width, porig->height, (mask ? 32: porig->depth)))) {
-		printfef("(%d, %d, %d, %#010lx, %#010lx): Failed to create target picture.",
+		printfef(false, "(%d, %d, %d, %#010lx, %#010lx): Failed to create target picture.",
 				width, height, depth, pxmap, mask);
 		goto simg_pixmap_to_pict_end;
 	}
@@ -299,7 +299,7 @@ simg_pixmap_to_pictw(session_t *ps, int width, int height, int depth,
 	/*
 	gc = XCreateGC(ps->dpy, pictw->pxmap, 0, 0);
 	if (!gc) {
-		printfef("(%#010lx, %#010lx, %d, %d, %d): Failed to create GC.",
+		printfef(false, "(%#010lx, %#010lx, %d, %d, %d): Failed to create GC.",
 				pxmap, mask, width, height, depth);
 		free_pictw(ps, &pictw);
 		goto simg_data_to_pict_end;
@@ -334,18 +334,18 @@ simg_data_to_pictw(session_t *ps, int width, int height, int depth,
 			depth, ZPixmap, 0, (char *) data, width, height,
 			8, bytes_per_line);
 	if (!img) {
-		printfef("(%d, %d, %d): Failed to create XImage.",
+		printfef(false, "(%d, %d, %d): Failed to create XImage.",
 				width, height, depth);
 		goto simg_data_to_pict_end;
 	}
 	if (!(pictw = create_pictw(ps, width, height, depth))) {
-		printfef("(%d, %d, %d): Failed to create Picture.",
+		printfef(false, "(%d, %d, %d): Failed to create Picture.",
 				width, height, depth);
 		goto simg_data_to_pict_end;
 	}
 	gc = XCreateGC(ps->dpy, pictw->pxmap, 0, 0);
 	if (!gc) {
-		printfef("(%d, %d, %d): Failed to create GC.",
+		printfef(false, "(%d, %d, %d): Failed to create GC.",
 				width, height, depth);
 		free_pictw(ps, &pictw);
 		goto simg_data_to_pict_end;

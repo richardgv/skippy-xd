@@ -41,7 +41,7 @@ config_get_bool(dlist *config, const char *section, const char *key,
 		return true;
 	if (!strcasecmp("false", result))
 		return false;
-	printfe("(%s, %s, %d): Unrecogized boolean value \"%s\".",
+	printfef(true, "(%s, %s, %d): Unrecogized boolean value \"%s\".",
 			section, key, def, result);
 	return def;
 }
@@ -67,17 +67,17 @@ config_get_int(dlist *config, const char *section, const char *key,
 	char *endptr = NULL;
 	int iresult = strtol(result, &endptr, 0);
 	if (!endptr || (*endptr && !isspace(*endptr))) {
-		printfef("(%s, %s, %d): Value \"%s\" is not a valid integer.",
+		printfef(true, "(%s, %s, %d): Value \"%s\" is not a valid integer.",
 			section, key, def, result);
 		return def;
 	}
 	if (iresult > max) {
-		printfef("(%s, %s, %d): Value \"%s\" larger than maximum value %d.",
+		printfef(true, "(%s, %s, %d): Value \"%s\" larger than maximum value %d.",
 			section, key, def, result, max);
 		return max;
 	}
 	if (iresult < min) {
-		printfef("(%s, %s, %d): Value \"%s\" smaller than minimal value %d.",
+		printfef(true, "(%s, %s, %d): Value \"%s\" smaller than minimal value %d.",
 			section, key, def, result, min);
 		return min;
 	}
@@ -105,17 +105,17 @@ config_get_double(dlist *config, const char *section, const char *key,
 	char *endptr = NULL;
 	double dresult = strtod(result, &endptr);
 	if (!endptr || (*endptr && !isspace(*endptr))) {
-		printfef("(%s, %s, %f): Value \"%s\" is not a valid floating-point number.",
+		printfef(true, "(%s, %s, %f): Value \"%s\" is not a valid floating-point number.",
 			section, key, def, result);
 		return def;
 	}
 	if (dresult > max) {
-		printfef("(%s, %s, %f): Value \"%s\" larger than maximum value %f.",
+		printfef(true, "(%s, %s, %f): Value \"%s\" larger than maximum value %f.",
 			section, key, def, result, max);
 		return max;
 	}
 	if (dresult < min) {
-		printfef("(%s, %s, %f): Value \"%s\" smaller than minimal value %f.",
+		printfef(true, "(%s, %s, %f): Value \"%s\" smaller than minimal value %f.",
 			section, key, def, result, min);
 		return min;
 	}

@@ -10,7 +10,7 @@
 
 void
 spng_about(FILE *os) {
-	fprintf(os, "PNG support: Yes\n"
+	printfdf(true, "PNG support: Yes\n"
 			"  Compiled with libpng %s, using %s.\n"
 			"  Compiled with zlib %s, using %s.\n",
 			PNG_LIBPNG_VER_STRING, png_libpng_ver,
@@ -28,16 +28,16 @@ spng_read(session_t *ps, const char *path) {
 	FILE *fp = fopen(path, "rb");
 	bool need_premultiply = false;
 	if (unlikely(!fp)) {
-		printfef("(\"%s\"): Failed to open file.", path);
+		printfef(false, "(\"%s\"): Failed to open file.", path);
 		goto spng_read_end;
 	}
 	if (unlikely(SPNG_SIGBYTES != fread(&sig, 1, SPNG_SIGBYTES, fp))) {
-		printfef("(\"%s\"): Failed to read %d-byte signature.",
+		printfef(false, "(\"%s\"): Failed to read %d-byte signature.",
 				path, SPNG_SIGBYTES);
 		goto spng_read_end;
 	}
 	if (unlikely(png_sig_cmp((png_bytep) sig, 0, SPNG_SIGBYTES))) {
-		printfef("(\"%s\"): PNG signature invalid.", path);
+		printfef(false, "(\"%s\"): PNG signature invalid.", path);
 		goto spng_read_end;
 	}
 	png_ptr = allocchk(png_create_read_struct(PNG_LIBPNG_VER_STRING,
@@ -59,7 +59,7 @@ spng_read(session_t *ps, const char *path) {
 
 		// Scale or strip 16-bit colors
 		if (bit_depth == 16) {
-			printfdf("(\"%s\"): Scaling 16-bit colors.", path);
+			printfdf(false, "(\"%s\"): Scaling 16-bit colors.", path);
 #if PNG_LIBPNG_VER >= 10504
 			png_set_scale_16(png_ptr);
 #else
@@ -76,19 +76,19 @@ spng_read(session_t *ps, const char *path) {
 
 		// Convert palette to RGB
 		if (color_type == PNG_COLOR_TYPE_PALETTE) {
-			printfdf("(\"%s\"): Converting palette PNG to RGB.", path);
+			printfdf(false, "(\"%s\"): Converting palette PNG to RGB.", path);
 			png_set_palette_to_rgb(png_ptr);
 			color_type = PNG_COLOR_TYPE_RGB;
 		}
 
 		if (png_get_valid(png_ptr, info_ptr, PNG_INFO_tRNS)) {
-			printfdf("(\"%s\"): Converting rDNS to full alpha.", path);
+			printfdf(false, "(\"%s\"): Converting rDNS to full alpha.", path);
 			png_set_tRNS_to_alpha(png_ptr);
 		}
 
 		if (color_type == PNG_COLOR_TYPE_GRAY
 				|| PNG_COLOR_TYPE_GRAY_ALPHA == color_type) {
-			printfdf("(\"%s\"): Converting gray (+ alpha) PNG to RGB.", path);
+			printfdf(false, "(\"%s\"): Converting gray (+ alpha) PNG to RGB.", path);
 			png_set_gray_to_rgb(png_ptr);
 			if (PNG_COLOR_TYPE_GRAY == color_type)
 				color_type = PNG_COLOR_TYPE_RGB;
@@ -98,7 +98,7 @@ spng_read(session_t *ps, const char *path) {
 
 		/*
 		if (color_type == PNG_COLOR_TYPE_GRAY && bit_depth < 8) {
-			printfdf("(\"%s\"): Converting 1/2/4 bit gray PNG to 8-bit.", path);
+			printfdf(false, "(\"%s\"): Converting 1/2/4 bit gray PNG to 8-bit.", path);
 #if PNG_LIBPNG_VER >= 10209
 			png_set_expand_gray_1_2_4_to_8(png_ptr);
 #else
@@ -110,7 +110,7 @@ spng_read(session_t *ps, const char *path) {
 
 		// Somehow XImage requires 24-bit visual to use 32 bits per pixel
 		if (color_type == PNG_COLOR_TYPE_RGB) {
-			printfdf("(\"%s\"): Appending filler alpha values.", path);
+			printfdf(false, "(\"%s\"): Appending filler alpha values.", path);
 			png_set_filler(png_ptr, 0xff, PNG_FILLER_AFTER);
 		}
 
@@ -161,7 +161,7 @@ spng_read(session_t *ps, const char *path) {
 				row_pointers[0], rowbytes);
 		png_free(png_ptr, row_pointers[0]);
 		if (unlikely(!pictw)) {
-			printfef("(\"%s\"): Failed to create Picture.", path);
+			printfef(false, "(\"%s\"): Failed to create Picture.", path);
 			goto spng_read_end;
 		}
 	}

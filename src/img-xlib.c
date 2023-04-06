@@ -20,19 +20,19 @@ simg_load_icon(session_t *ps, Window wid, int desired_size) {
 			int wanted_bytes = 0;
 			for (const long *p = prop.data32; p < end; p += wanted_bytes) {
 				if (p + 2 >= end) {
-					printfef("(%#010lx): %d trailing byte(s).", wid, (int) (end - p));
+					printfef(false, "(%#010lx): %d trailing byte(s).", wid, (int) (end - p));
 					break;
 				}
 				width = p[0];
 				height = p[1];
 				if (width <= 0 || height <= 0) {
-					printfef("(%#010lx): (offset %d, width %d, height %d) Invalid width/height.",
+					printfef(false, "(%#010lx): (offset %d, width %d, height %d) Invalid width/height.",
 							wid, (int) (p - prop.data32), width, height);
 					break;
 				}
 				wanted_bytes = 2 + width * height;
 				if ((end - p) < wanted_bytes) {
-					printfef("(%#010lx): (offset %d, width %d, height %d) Not enough bytes (%d/%d).",
+					printfef(false, "(%#010lx): (offset %d, width %d, height %d) Not enough bytes (%d/%d).",
 							wid, (int) (p - prop.data32), width, height, (int) (end - p), wanted_bytes);
 					break;
 				}
@@ -62,9 +62,9 @@ simg_load_icon(session_t *ps, Window wid, int desired_size) {
 					free(converted_data);
 			}
 			if (!pictw)
-				printfef("(%#010lx): Failed to create picture.", wid);
+				printfef(false, "(%#010lx): Failed to create picture.", wid);
 			/* if (pictw)
-				printfdf("(%#010lx): (offset %d, width %d, height %d) Loaded.",
+				printfdf(false, "(%#010lx): (offset %d, width %d, height %d) Loaded.",
 						wid, (int) (best_data - prop.data8), pictw->width, pictw->height); */
 		}
 		free_winprop(&prop);
@@ -104,7 +104,7 @@ simg_load_icon_end:
 	if (pictw && !processed) {
 		pictw = simg_postprocess(ps, pictw, PICTPOSP_SCALEK,
 				desired_size, desired_size, ALIGN_MID, ALIGN_MID, NULL);
-		/* printfdf("(%#010lx): (width %d, height %d) Processed.",
+		/* printfdf(false, "(%#010lx): (width %d, height %d) Processed.",
 				wid, pictw->width, pictw->height); */
 	}
 
