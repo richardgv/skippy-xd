@@ -80,6 +80,8 @@ mainwin_create(session_t *ps) {
 	mw->height = rootattr.height;
 
 	mw = mainwin_reload(ps, mw);
+	if (!mw)
+		goto mainwin_create_err;
 
 	XSetWindowAttributes wattr;
 	wattr.colormap = mw->colormap;
@@ -93,10 +95,9 @@ mainwin_create(session_t *ps) {
 	mw->window = XCreateWindow(dpy, ps->root, 0, 0, mw->width, mw->height, 0,
 			mw->depth, InputOutput, mw->visual,
 			CWBackPixel | CWBorderPixel | CWColormap | CWEventMask | CWOverrideRedirect, &wattr);
-	if (!mw->window) {
-		free(mw);
-		return 0;
-	}
+	if (!mw->window)
+		goto mainwin_create_err;
+
 	wm_wid_set_info(ps, mw->window, "main window", None);
 
 	mainwin_create_pixmap(mw);
@@ -113,6 +114,11 @@ mainwin_create(session_t *ps) {
 	XCompositeRedirectSubwindows (ps->dpy, ps->root, CompositeRedirectAutomatic);
 
 	return mw;
+
+mainwin_create_err:
+	if (mw)
+		free(mw);
+	return NULL;
 }
 
 MainWin *
@@ -248,11 +254,6 @@ mainwin_reload(session_t *ps, MainWin *mw) {
 	}
 	
 	return mw;
-
-mainwin_create_err:
-	if (mw)
-		free(mw);
-	return NULL;
 }
 
 MainWin *
