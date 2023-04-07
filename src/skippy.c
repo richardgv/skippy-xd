@@ -481,15 +481,24 @@ init_paging_layout(MainWin *mw, Window focus, Window leader)
 			ClientWin *cw = clientwin_create(mw, desktopwin);
 			if (!cw) return false;
 
-			clientwin_update(cw);
-			clientwin_update2(cw);
 			cw->slots = desktop_dim * j + i;
+
+			{
+				static const char *PREFIX = "virtual desktop ";
+				const int len = strlen(PREFIX) + 20;
+				char *str = allocchk(malloc(len));
+				snprintf(str, len, "%s%d", PREFIX, cw->slots);
+				wm_wid_set_info(cw->mainwin->ps, cw->mini.window, str, None);
+				free(str);
+			}
+
+			cw->zombie = false;
+			cw->mode = CLIDISP_DESKTOP;
 
 			cw->x = cw->src.x = (i * (mw->width + mw->distance)) * mw->multiplier;
 			cw->y = cw->src.y = (j * (mw->height + mw->distance)) * mw->multiplier;
 			cw->src.width = mw->width;
 			cw->src.height = mw->height;
-printfdf(true,"(): desktop window %d %p %d", cw->slots, cw, cw->mode);
 
 			//clientwin_update_desktopwin(cw);
 			clientwin_move(cw, mw->multiplier, mw->xoff, mw->yoff, 1);
@@ -515,6 +524,35 @@ printfdf(true,"(): desktop window %d %p %d", cw->slots, cw, cw->mode);
 	mw->focuslist = mw->dminis;
 
 	return true;
+}
+
+static void
+desktopwin_map(ClientWin *cw)
+{
+	session_t *ps = cw->mainwin->ps;
+
+	free_damage(ps, &cw->damage);
+	free_pixmap(ps, &cw->pixmap);
+
+	XUnmapWindow(ps->dpy, cw->mini.window);
+	XSetWindowBackgroundPixmap(ps->dpy, cw->mini.window, None);
+
+	XRenderPictureAttributes pa = { .subwindow_mode = IncludeInferiors };
+
+	if (cw->origin)
+		free_picture(ps, &cw->origin);
+	cw->origin = XRenderCreatePicture(ps->dpy,
+			None, cw->mainwin->format, CPSubwindowMode, &pa);
+	XRenderSetPictureFilter(ps->dpy, cw->origin, FilterBest, 0, 0);
+
+	XCompositeRedirectWindow(ps->dpy, cw->src.window,
+			CompositeRedirectAutomatic);
+	cw->redirected = true;
+	
+	clientwin_render(cw);
+
+	XMapWindow(ps->dpy, cw->mini.window);
+	XRaiseWindow(ps->dpy, cw->mini.window);
 }
 
 static inline const char *
@@ -787,8 +825,11 @@ mainloop(session_t *ps, bool activate_on_start) {
 			// Focus the client window only after the main window get unmapped and
 			// keyboard gets ungrabbed.
 			if (mw->client_to_focus) {
-				if (paging)
+				if (paging) {
 					wm_set_desktop_ewmh(ps, mw->client_to_focus->slots);
+					//daemon_count_clients(mw, 0, 0);
+					//mw->client_to_focus = dlist_first(mw->clientondesktop)->data;
+				}
 				else
 					childwin_focus(mw->client_to_focus);
 				mw->client_to_focus = NULL;
@@ -863,7 +904,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 
 					if (paging) {
 						foreach_dlist (mw->dminis) {
-							clientwin_map(((ClientWin *) iter->data));
+							desktopwin_map(((ClientWin *) iter->data));
 						}
 					}
 
@@ -998,9 +1039,11 @@ mainloop(session_t *ps, bool activate_on_start) {
 					if (((ClientWin *) iter->data)->damaged)
 						clientwin_repair(iter->data);
 				}
-				foreach_dlist(mw->dminis) {
-					if (((ClientWin *) iter->data)->damaged)
-						clientwin_repair(iter->data);
+
+				if (paging) {
+					foreach_dlist (mw->dminis) {
+						desktopwin_map(((ClientWin *) iter->data));
+					}
 				}
 				last_rendered = time_in_millis();
 			}

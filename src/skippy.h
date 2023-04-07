@@ -164,6 +164,7 @@ typedef struct {
 } keydef_t;
 
 typedef enum {
+	CLIDISP_DESKTOP = -1,
 	CLIDISP_NONE,
 	CLIDISP_FILLED,
 	CLIDISP_ICON,
