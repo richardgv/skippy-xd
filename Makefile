@@ -58,7 +58,7 @@ INCS = $(shell pkg-config --cflags $(PACKAGES))
 LIBS += -lm $(shell pkg-config --libs $(PACKAGES))
 
 # === Version string ===
-SKIPPYXD_VERSION = "v0.5.2~pre (2018.09.09) - \\\"Puzzlebox\\\" Edition"
+SKIPPYXD_VERSION = "v0.6.0~fung (2023.03.10) - \\\"\\\" Edition"
 CPPFLAGS += -DSKIPPYXD_VERSION=\"${SKIPPYXD_VERSION}\"
 
 # === Recipes ===
