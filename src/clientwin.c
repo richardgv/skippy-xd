@@ -395,7 +395,6 @@ clientwin_repaint(ClientWin *cw, const XRectangle *pbound)
 	}
 
 	// Tinting
-	if (cw->mode >= CLIDISP_ZOMBIE) // tint only thumbnail
 	{
 		// here the client window is being tinted
 		XRenderColor *tint = &cw->mainwin->normalTint;
