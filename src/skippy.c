@@ -452,6 +452,7 @@ init_paging_layout(MainWin *mw, Window focus, Window leader)
 	int current_desktop = wm_get_current_desktop(mw->ps);
 	for (int j=0; j<desktop_dim; j++) {
 		for (int i=0; i<desktop_dim; i++) {
+			int desktop_idx = desktop_dim * j + i;
 			XSetWindowAttributes sattr = {
 				.border_pixel = 0,
 				.background_pixel = 0,
@@ -465,13 +466,9 @@ init_paging_layout(MainWin *mw, Window focus, Window leader)
 			Window desktopwin = XCreateWindow(mw->ps->dpy,
 					mw->window,
 					0, 0, 0, 0,
-					//i * (mw->width + mw->distance), j * (mw->height + mw->distance),
-					//mw->width, mw->height,
 					0, mw->depth, InputOnly, mw->visual,
 					CWColormap | CWBackPixel | CWBorderPixel | CWEventMask | CWOverrideRedirect, &sattr);
 			if (!desktopwin) return false;
-			//XMapWindow(mw->ps->dpy, desktopwin);
-			//XRaiseWindow(mw->ps->dpy, desktopwin);
 
 			if (!mw->desktopwins)
 				mw->desktopwins = dlist_add(NULL, &desktopwin);
@@ -481,7 +478,7 @@ init_paging_layout(MainWin *mw, Window focus, Window leader)
 			ClientWin *cw = clientwin_create(mw, desktopwin);
 			if (!cw) return false;
 
-			cw->slots = desktop_dim * j + i;
+			cw->slots = desktop_idx;
 
 			{
 				static const char *PREFIX = "virtual desktop ";
@@ -500,7 +497,6 @@ init_paging_layout(MainWin *mw, Window focus, Window leader)
 			cw->src.width = mw->width;
 			cw->src.height = mw->height;
 
-			//clientwin_update_desktopwin(cw);
 			clientwin_move(cw, mw->multiplier, mw->xoff, mw->yoff, 1);
 
 			if (!mw->dminis)
@@ -509,8 +505,6 @@ init_paging_layout(MainWin *mw, Window focus, Window leader)
 				dlist_add(mw->dminis, cw);
 
 			XRaiseWindow(mw->ps->dpy, cw->mini.window);
-			//XSelectInput(cw->mainwin->ps->dpy,
-					//desktopwin, SubstructureNotifyMask | StructureNotifyMask);
 
 			if (cw->slots == current_desktop) {
 				mw->client_to_focus = cw;
@@ -537,7 +531,7 @@ desktopwin_map(ClientWin *cw)
 	XUnmapWindow(ps->dpy, cw->mini.window);
 	XSetWindowBackgroundPixmap(ps->dpy, cw->mini.window, None);
 
-	XRenderPictureAttributes pa = { .subwindow_mode = IncludeInferiors };
+	XRenderPictureAttributes pa = { };
 
 	if (cw->origin)
 		free_picture(ps, &cw->origin);
@@ -694,7 +688,7 @@ init_focus(MainWin *mw, Window leader) {
 	ps->o.focus_initial = 0;
 
 	if (!iter)
-		iter = mw->focuslist;
+		return;
 
 	mw->client_to_focus = (ClientWin *) iter->data;
 	mw->client_to_focus_on_cancel = (ClientWin *) iter->data;
@@ -826,6 +820,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 			// keyboard gets ungrabbed.
 			if (mw->client_to_focus) {
 				if (paging) {
+					childwin_focus(mw->client_to_focus);
 					wm_set_desktop_ewmh(ps, mw->client_to_focus->slots);
 					//daemon_count_clients(mw, 0, 0);
 					//mw->client_to_focus = dlist_first(mw->clientondesktop)->data;
