@@ -622,6 +622,12 @@ skippy_activate(MainWin *mw, Window leader, bool paging)
 		mw->xin_active = 0;
 #endif /* CFG_XINERAMA */
 
+	// Map the main window and run our event loop
+	/*if (ps->o.lazyTrans) {
+		mainwin_map(mw);
+		XFlush(ps->dpy);
+	}*/
+
 	mw->client_to_focus = NULL;
 
 	daemon_count_clients(mw, 0, leader);
@@ -649,6 +655,11 @@ skippy_activate(MainWin *mw, Window leader, bool paging)
 
 	foreach_dlist(mw->clients) {
 		ClientWin *cw = iter->data;
+		if (mw->ps->o.lazyTrans)
+		{
+			cw->x += cw->mainwin->x;
+			cw->y += cw->mainwin->y;
+		}
 		cw->x *= mw->multiplier;
 		cw->y *= mw->multiplier;
 	}
@@ -782,7 +793,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 					last_rendered = time_in_millis();
 
 					/* Map the main window and run our event loop */
-					if (!mw->mapped)
+					if (!ps->o.lazyTrans && !mw->mapped)
 						mainwin_map(mw);
 					XFlush(ps->dpy);
 				}
@@ -794,7 +805,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 							ps->o.movePointerOnStart);
 
 					/* Map the main window and run our event loop */
-					if (!mw->mapped)
+					if (!ps->o.lazyTrans && !mw->mapped)
 						mainwin_map(mw);
 					XFlush(ps->dpy);
 				}
@@ -1550,6 +1561,7 @@ load_config_file(session_t *ps)
     config_get_bool_wrap(config, "general", "acceptWMWin", &ps->o.acceptWMWin);
     config_get_double_wrap(config, "general", "updateFreq", &ps->o.updateFreq, -1000.0, 1000.0);
     config_get_int_wrap(config, "general", "animationDuration", &ps->o.animationDuration, 0, 2000);
+    config_get_bool_wrap(config, "general", "lazyTrans", &ps->o.lazyTrans);
     config_get_bool_wrap(config, "general", "includeFrame", &ps->o.includeFrame);
     config_get_bool_wrap(config, "general", "allowUpscale", &ps->o.allowUpscale);
 	config_get_int_wrap(config, "general", "cornerRadius", &ps->o.cornerRadius, 0, INT_MAX);

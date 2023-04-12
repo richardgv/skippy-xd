@@ -197,8 +197,18 @@ mainwin_reload(session_t *ps, MainWin *mw) {
 	else
 		mw->poll_time = (1.0 / 60.0) * 1000.0;
 
-	mw->depth = DefaultDepth(dpy, ps->screen);
-	mw->visual = DefaultVisual(dpy, ps->screen);
+	if (ps->o.lazyTrans) {
+		mw->depth  = 32;
+		mw->visual = ps->argb_visual;
+		if (!mw->visual) {
+			printfef(true, "(): Couldn't find ARGB visual, lazy transparency can't work.");
+			goto mainwin_create_err;
+		}
+	}
+	if (!ps->o.lazyTrans) {
+		mw->depth = DefaultDepth(dpy, ps->screen);
+		mw->visual = DefaultVisual(dpy, ps->screen);
+	}
 
 	mw->colormap = XCreateColormap(dpy, ps->root, mw->visual, AllocNone);
 	mw->format = XRenderFindVisualFormat(dpy, mw->visual);
