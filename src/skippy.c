@@ -623,10 +623,10 @@ skippy_activate(MainWin *mw, Window leader, bool paging)
 #endif /* CFG_XINERAMA */
 
 	// Map the main window and run our event loop
-	/*if (ps->o.lazyTrans) {
+	if (ps->o.lazyTrans) {
 		mainwin_map(mw);
 		XFlush(ps->dpy);
-	}*/
+	}
 
 	mw->client_to_focus = NULL;
 
