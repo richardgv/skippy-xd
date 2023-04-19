@@ -203,6 +203,7 @@ typedef struct {
 	bool switchDesktopOnActivate;
 	bool allowUpscale;
 	bool showAllDesktops;
+	bool showUnmapped;
 	int cornerRadius;
 	int preferredIconSize;
 	client_disp_mode_t *clientDisplayModes;
@@ -280,6 +281,7 @@ typedef struct {
 	.iconFillSpec = PICTSPECT_INIT, \
 	.fillSpec = PICTSPECT_INIT, \
 	.showAllDesktops = false, \
+	.showUnmapped = true, \
 	.buttonImgs = { NULL }, \
 	.background = NULL, \
 	.xinerama_showAll = true, \
