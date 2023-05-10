@@ -1555,7 +1555,7 @@ load_config_file(session_t *ps)
 	config_get_int_wrap(config, "general", "cornerRadius", &ps->o.cornerRadius, 0, INT_MAX);
     config_get_int_wrap(config, "general", "preferredIconSize", &ps->o.preferredIconSize, 1, INT_MAX);
     config_get_bool_wrap(config, "general", "showAllDesktops", &ps->o.showAllDesktops);
-    config_get_bool_wrap(config, "general", "showUnmapped", &ps->o.showUnmapped);
+    config_get_bool_wrap(config, "general", "showMinimized", &ps->o.showMinimized);
     config_get_bool_wrap(config, "general", "movePointerOnStart", &ps->o.movePointerOnStart);
     config_get_bool_wrap(config, "general", "movePointerOnSelect", &ps->o.movePointerOnSelect);
     config_get_bool_wrap(config, "general", "movePointerOnRaise", &ps->o.movePointerOnRaise);

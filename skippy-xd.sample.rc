@@ -92,7 +92,7 @@ allowUpscale = true
 showAllDesktops = true
 
 # Choose wether to show minimized windows
-showUnmapped = true
+showMinimized = true
 
 cornerRadius = 5
 preferredIconSize = 48
