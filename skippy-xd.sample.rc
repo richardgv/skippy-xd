@@ -90,6 +90,10 @@ switchDesktopOnActivate = false
 includeFrame = true
 allowUpscale = true
 showAllDesktops = true
+
+# Choose wether to show minimized windows
+showShadow = true
+
 cornerRadius = 5
 preferredIconSize = 48
 showIconsOnThumbnails = true
