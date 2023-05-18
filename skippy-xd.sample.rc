@@ -112,8 +112,8 @@ opacity = 255
 
 [shadow]
 tint = #040404
-tintOpacity = 164
-opacity = 200
+tintOpacity = 0
+opacity = 128
 
 [tooltip]
 show = true
