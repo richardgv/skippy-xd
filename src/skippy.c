@@ -835,7 +835,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 					XSync(ps->dpy, True);
 					XSync(ps->dpy, False);
 				}
-                childwin_focus(mw->client_to_focus);
+				childwin_focus(mw->client_to_focus);
 				mw->client_to_focus = NULL;
 				refocus = false;
 				pending_damage = false;
