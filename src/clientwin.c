@@ -170,6 +170,8 @@ clientwin_get_disp_mode(session_t *ps, ClientWin *cw, bool isViewable) {
 			case CLIDISP_FILLED:
 			case CLIDISP_NONE:
 				return *p;
+			case CLIDISP_DESKTOP:
+				return *p;
 		}
 	}
 
@@ -282,6 +284,8 @@ clientwin_update2(ClientWin *cw) {
 	clientwin_free_res2(ps, cw);
 
 	switch (cw->mode) {
+		case CLIDISP_DESKTOP:
+			break;
 		case CLIDISP_NONE:
 			break;
 		case CLIDISP_FILLED:
@@ -347,6 +351,9 @@ clientwin_repaint(ClientWin *cw, const XRectangle *pbound)
 	}
 
 	switch (cw->mode) {
+		case CLIDISP_DESKTOP:
+			source = cw->origin;
+			break;
 		case CLIDISP_NONE:
 			break;
 		case CLIDISP_FILLED:
@@ -388,6 +395,7 @@ clientwin_repaint(ClientWin *cw, const XRectangle *pbound)
 			XRenderComposite(ps->dpy, PictOpOver, source, mask,
 					cw->destination, s_x, s_y, 0, 0, s_x, s_y, s_w, s_h);
 		}
+
 		if (CLIDISP_ZOMBIE_ICON == cw->mode || CLIDISP_THUMBNAIL_ICON == cw->mode) {
 			assert(cw->icon_pict && cw->icon_pict->pict);
 			img_composite_params_t params = IMG_COMPOSITE_PARAMS_INIT;
@@ -401,9 +409,7 @@ clientwin_repaint(ClientWin *cw, const XRectangle *pbound)
 	}
 
 	// Tinting
-	if (cw->mode >= CLIDISP_ZOMBIE) // tint only thumbnail
 	{
-		// here the client window is being tinted
 		XRenderColor *tint = &cw->mainwin->normalTint;
 		if (cw->focused)
 			tint = &cw->mainwin->highlightTint;
@@ -458,6 +464,29 @@ void
 clientwin_schedule_repair(ClientWin *cw, XRectangle *area)
 {
 	cw->damaged = true;
+}
+
+void clientwin_round_corners(ClientWin *cw) {
+	session_t* ps = cw->mainwin->ps;
+	int dia = 2 * ps->o.cornerRadius;
+	int w = cw->mini.width;
+	int h = cw->mini.height;
+	XGCValues xgcv;
+	Pixmap mask = XCreatePixmap(ps->dpy, cw->mini.window, w, h, 1);
+	GC shape_gc = XCreateGC(ps->dpy, mask, 0, &xgcv);
+
+	XSetForeground(ps->dpy, shape_gc, 0);
+	XFillRectangle(ps->dpy, mask, shape_gc, 0, 0, w, h);
+	XSetForeground(ps->dpy, shape_gc, 1);
+	XFillArc(ps->dpy, mask, shape_gc, 0, 0, dia, dia, 0, 360 * 64);
+	XFillArc(ps->dpy, mask, shape_gc, w-dia-1, 0, dia, dia, 0, 360 * 64);
+	XFillArc(ps->dpy, mask, shape_gc, 0, h-dia-1, dia, dia, 0, 360 * 64);
+	XFillArc(ps->dpy, mask, shape_gc, w-dia-1, h-dia-1, dia, dia, 0, 360 * 64);
+	XFillRectangle(ps->dpy, mask, shape_gc, ps->o.cornerRadius, 0, w-dia, h);
+	XFillRectangle(ps->dpy, mask, shape_gc, 0, ps->o.cornerRadius, w, h-dia);
+	XShapeCombineMask(ps->dpy, cw->mini.window, ShapeBounding, 0, 0, mask, ShapeSet);
+	XFreePixmap(ps->dpy, mask);
+	XFreeGC(ps->dpy, shape_gc);
 }
 
 void
@@ -764,27 +793,4 @@ clientwin_action(ClientWin *cw, enum cliop action) {
 	}
 
 	return 0;
-}
-
-void clientwin_round_corners(ClientWin *cw) {
-	session_t* ps = cw->mainwin->ps;
-	int dia = 2 * ps->o.cornerRadius;
-	int w = cw->mini.width;
-	int h = cw->mini.height;
-	XGCValues xgcv;
-	Pixmap mask = XCreatePixmap(ps->dpy, cw->mini.window, w, h, 1);
-	GC shape_gc = XCreateGC(ps->dpy, mask, 0, &xgcv);
-
-	XSetForeground(ps->dpy, shape_gc, 0);
-	XFillRectangle(ps->dpy, mask, shape_gc, 0, 0, w, h);
-	XSetForeground(ps->dpy, shape_gc, 1);
-	XFillArc(ps->dpy, mask, shape_gc, 0, 0, dia, dia, 0, 360 * 64);
-	XFillArc(ps->dpy, mask, shape_gc, w-dia-1, 0, dia, dia, 0, 360 * 64);
-	XFillArc(ps->dpy, mask, shape_gc, 0, h-dia-1, dia, dia, 0, 360 * 64);
-	XFillArc(ps->dpy, mask, shape_gc, w-dia-1, h-dia-1, dia, dia, 0, 360 * 64);
-	XFillRectangle(ps->dpy, mask, shape_gc, ps->o.cornerRadius, 0, w-dia, h);
-	XFillRectangle(ps->dpy, mask, shape_gc, 0, ps->o.cornerRadius, w, h-dia);
-	XShapeCombineMask(ps->dpy, cw->mini.window, ShapeBounding, 0, 0, mask, ShapeSet);
-	XFreePixmap(ps->dpy, mask);
-	XFreeGC(ps->dpy, shape_gc);
 }

@@ -50,7 +50,7 @@ struct _mainwin_t {
 	Picture normalPicture, highlightPicture, shadowPicture;
 	
 	ClientWin *pressed, *focus;
-	dlist *clientondesktop, *focuslist;
+	dlist *clientondesktop, *focuslist, *desktopwins, *dminis;
 	struct _Tooltip *tooltip;
 	
 	KeySym *keysyms_Up;

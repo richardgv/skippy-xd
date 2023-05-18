@@ -365,11 +365,11 @@ daemon_count_clients(MainWin *mw, Bool *touched, Window leader)
 	return;
 }
 
-static void
+static bool
 init_layout(MainWin *mw, Window focus, Window leader)
 {
 	if (!mw->clientondesktop)
-		return;
+		return true;
 	
 	dlist_sort(mw->clientondesktop, clientwin_sort_func, 0);
 
@@ -400,14 +400,14 @@ init_layout(MainWin *mw, Window focus, Window leader)
 		mw->yoff = yoff;
 	}
 
-	return;
+	return true;
 }
 
-static void
-init_desktop_layout(MainWin *mw, Window focus, Window leader)
+static bool
+init_paging_layout(MainWin *mw, Window focus, Window leader)
 {
 	if (!mw->clients)
-		return;
+		return true;
 
 	int screencount = wm_get_desktops(mw->ps);
 	if (screencount == -1)
@@ -448,10 +448,105 @@ init_desktop_layout(MainWin *mw, Window focus, Window leader)
 		cw->src.y += (win_desktop_y - current_desktop_y) * (mw->height + mw->distance);
 	}
 
-	dlist_sort(mw->clientondesktop, sort_cw_by_row, 0);
-	mw->focuslist = mw->clientondesktop;
+	// create windows which represent each virtual desktop
+	int current_desktop = wm_get_current_desktop(mw->ps);
+	for (int j=0; j<desktop_dim; j++) {
+		for (int i=0; i<desktop_dim; i++) {
+			int desktop_idx = desktop_dim * j + i;
+			XSetWindowAttributes sattr = {
+				.border_pixel = 0,
+				.background_pixel = 0,
+				.colormap = mw->colormap,
+				/*.event_mask = ButtonPressMask | ButtonReleaseMask | KeyPressMask
+					| KeyReleaseMask | EnterWindowMask | LeaveWindowMask
+					| PointerMotionMask | ExposureMask | FocusChangeMask,*/
+				.override_redirect = false,
+                // exclude window frame
+			};
+			Window desktopwin = XCreateWindow(mw->ps->dpy,
+					mw->window,
+					0, 0, 0, 0,
+					0, mw->depth, InputOnly, mw->visual,
+					CWColormap | CWBackPixel | CWBorderPixel | CWEventMask | CWOverrideRedirect, &sattr);
+			if (!desktopwin) return false;
 
-	return;
+			if (!mw->desktopwins)
+				mw->desktopwins = dlist_add(NULL, &desktopwin);
+			else
+				mw->desktopwins = dlist_add(mw->desktopwins, &desktopwin);
+
+			ClientWin *cw = clientwin_create(mw, desktopwin);
+			if (!cw) return false;
+
+			cw->slots = desktop_idx;
+
+			{
+				static const char *PREFIX = "virtual desktop ";
+				const int len = strlen(PREFIX) + 20;
+				char *str = allocchk(malloc(len));
+				snprintf(str, len, "%s%d", PREFIX, cw->slots);
+				wm_wid_set_info(cw->mainwin->ps, cw->mini.window, str, None);
+				free(str);
+			}
+
+			cw->zombie = false;
+			cw->mode = CLIDISP_DESKTOP;
+
+			cw->x = cw->src.x = (i * (mw->width + mw->distance)) * mw->multiplier;
+			cw->y = cw->src.y = (j * (mw->height + mw->distance)) * mw->multiplier;
+			cw->src.width = mw->width;
+			cw->src.height = mw->height;
+
+			clientwin_move(cw, mw->multiplier, mw->xoff, mw->yoff, 1);
+
+			if (!mw->dminis)
+				mw->dminis = dlist_add(NULL, cw);
+			else
+				dlist_add(mw->dminis, cw);
+
+			XRaiseWindow(mw->ps->dpy, cw->mini.window);
+
+			if (cw->slots == current_desktop) {
+				mw->client_to_focus = cw;
+				mw->revert_focus_win = cw->wid_client;
+				mw->client_to_focus_on_cancel = cw;
+				mw->client_to_focus->focused = 1;
+			}
+		}
+	}
+
+	mw->focuslist = mw->dminis;
+
+	return true;
+}
+
+static void
+desktopwin_map(ClientWin *cw)
+{
+	session_t *ps = cw->mainwin->ps;
+
+	free_damage(ps, &cw->damage);
+	free_pixmap(ps, &cw->pixmap);
+
+	XUnmapWindow(ps->dpy, cw->mini.window);
+	XSetWindowBackgroundPixmap(ps->dpy, cw->mini.window, None);
+
+	XRenderPictureAttributes pa = { };
+
+	if (cw->origin)
+		free_picture(ps, &cw->origin);
+	cw->origin = XRenderCreatePicture(ps->dpy,
+			None, cw->mainwin->format, CPSubwindowMode, &pa);
+	XRenderSetPictureFilter(ps->dpy, cw->origin, FilterBest, 0, 0);
+
+	XCompositeRedirectWindow(ps->dpy, cw->src.window,
+			CompositeRedirectAutomatic);
+	cw->redirected = true;
+	
+	clientwin_render(cw);
+
+	XMapWindow(ps->dpy, cw->mini.window);
+	XRaiseWindow(ps->dpy, cw->mini.window);
 }
 
 static inline const char *
@@ -559,52 +654,45 @@ init_focus(MainWin *mw, Window leader) {
 	session_t *ps = mw->ps;
 
 	// Get the currently focused window and select which mini-window to focus
+	dlist *iter = dlist_find(mw->focuslist, clientwin_cmp_func, (void *) mw->revert_focus_win);
+
+	// check if the user specified --prev or --next on the cmdline
+	if(ps->o.focus_initial)
 	{
-		dlist *iter = dlist_find(mw->focuslist, clientwin_cmp_func, (void *) mw->revert_focus_win);
 
-		// check if the user specified --prev or --next on the cmdline
-		if(ps->o.focus_initial)
+		// ps->mainwin->ignore_next_refocus = 1;
+		// ps->mainwin->ignore_next_refocus = 2;
+		// ps->mainwin->ignore_next_refocus = 4;
+
+
+		if(ps->o.focus_initial == FI_PREV)
 		{
-
-			// ps->mainwin->ignore_next_refocus = 1;
-			// ps->mainwin->ignore_next_refocus = 2;
-			// ps->mainwin->ignore_next_refocus = 4;
-
-
-			if(ps->o.focus_initial == FI_PREV)
+			// here, mw->focuslist is the first (dlist*) item in the list
+			if (iter == mw->focuslist)
+				iter = dlist_last(mw->focuslist);
+			else
 			{
-				// here, mw->focuslist is the first (dlist*) item in the list
-				if (iter == mw->focuslist)
-					iter = dlist_last(mw->focuslist);
-				else
-				{
-					dlist *i = mw->focuslist;
-					for (; i != NULL; i = i->next)
-						if (i->next && i->next == iter)
-							break;
-					iter = i;
-				}
+				dlist *i = mw->focuslist;
+				for (; i != NULL; i = i->next)
+					if (i->next && i->next == iter)
+						break;
+				iter = i;
 			}
-			else if(ps->o.focus_initial == FI_NEXT)
-				iter = iter->next;
-
 		}
+		else if(ps->o.focus_initial == FI_NEXT)
+			iter = iter->next;
 
-		// then clear this flag, so daemon not remember on its next activation
-		ps->o.focus_initial = 0;
-
-		if (!iter)
-			iter = mw->focuslist;
-
-		// mw->focus = (ClientWin *) iter->data;
-		mw->client_to_focus = (ClientWin *) iter->data;
-		mw->client_to_focus_on_cancel = (ClientWin *) iter->data;
-		// mw->focus->focused = 1;
-
-
-		mw->client_to_focus->focused = 1;
-		// focus_miniw(ps, mw->client_to_focus);
 	}
+
+	// then clear this flag, so daemon not remember on its next activation
+	ps->o.focus_initial = 0;
+
+	if (!iter)
+		return;
+
+	mw->client_to_focus = (ClientWin *) iter->data;
+	mw->client_to_focus_on_cancel = (ClientWin *) iter->data;
+	mw->client_to_focus->focused = 1;
 }
 
 static bool
@@ -637,20 +725,18 @@ skippy_activate(MainWin *mw, Window leader, bool paging)
 	}
 
 	if (paging) {
-		init_desktop_layout(mw, mw->revert_focus_win, leader);
-		if (!mw->clientondesktop) {
-			printfef(false, "(): Failed to build layout.");
+		if (!init_paging_layout(mw, mw->revert_focus_win, leader)) {
+			printfef(false, "(): init_paging_layout() failed.");
 			return false;
 		}
-		mw->focuslist = mw->clientondesktop;
 	}
 	else {
-		init_layout(mw, mw->revert_focus_win, leader);
-		if (!mw->clientondesktop) {
-			printfef(false, "(): Failed to build layout.");
+		if (!init_layout(mw, mw->revert_focus_win, leader)) {
+			printfef(false, "(): init_layout() failed.");
 			return false;
 		}
 	}
+
 	init_focus(mw, leader);
 
 	foreach_dlist(mw->clients) {
@@ -744,7 +830,14 @@ mainloop(session_t *ps, bool activate_on_start) {
 			// Focus the client window only after the main window get unmapped and
 			// keyboard gets ungrabbed.
 			if (mw->client_to_focus) {
-				childwin_focus(mw->client_to_focus);
+				if (paging) {
+					childwin_focus(mw->client_to_focus);
+					wm_set_desktop_ewmh(ps, mw->client_to_focus->slots);
+					//daemon_count_clients(mw, 0, 0);
+					//mw->client_to_focus = dlist_first(mw->clientondesktop)->data;
+				}
+				else
+					childwin_focus(mw->client_to_focus);
 				mw->client_to_focus = NULL;
 				refocus = false;
 				pending_damage = false;
@@ -759,6 +852,17 @@ mainloop(session_t *ps, bool activate_on_start) {
 				wm_activate_window(ps, mw->revert_focus_win);
 				refocus = false;
 			}
+
+			// free all mini desktop representations
+			dlist_free_with_func(mw->dminis, (dlist_free_func) clientwin_destroy);
+			mw->dminis = NULL;
+
+			foreach_dlist (mw->desktopwins) {
+				XDestroyWindow(ps->dpy, (Window) (iter->data));
+				//XSelectInput(ps->dpy, (Window) (iter->data), 0);
+			}
+			dlist_free(mw->desktopwins);
+			mw->desktopwins = NULL;
 
 			// Catch all errors, but remove all events
 			XSync(ps->dpy, False);
@@ -803,6 +907,12 @@ mainloop(session_t *ps, bool activate_on_start) {
 					last_rendered = time_in_millis();
 					focus_miniw_adv(ps, mw->client_to_focus,
 							ps->o.movePointerOnStart);
+
+					if (paging) {
+						foreach_dlist (mw->dminis) {
+							desktopwin_map(((ClientWin *) iter->data));
+						}
+					}
 
 					/* Map the main window and run our event loop */
 					if (!ps->o.lazyTrans && !mw->mapped)
@@ -883,9 +993,14 @@ mainloop(session_t *ps, bool activate_on_start) {
 				}
 				else if (mw && (ps->xinfo.damage_ev_base + XDamageNotify == ev.type)) {
 					//printfdf(false, "(): else if (ev.type == XDamageNotify) {");
-					dlist *iter = dlist_find(ps->mainwin->clients, clientwin_cmp_func,
-							(void *) wid);
 					pending_damage = true;
+					dlist *iter = dlist_find(ps->mainwin->clients,
+							clientwin_cmp_func, (void *) wid);
+					if (iter) {
+						((ClientWin *)iter->data)->damaged = true;
+					}
+					iter = dlist_find(ps->mainwin->dminis,
+							clientwin_cmp_func, (void *) wid);
 					if (iter) {
 						((ClientWin *)iter->data)->damaged = true;
 					}
@@ -906,7 +1021,10 @@ mainloop(session_t *ps, bool activate_on_start) {
 				else if (mw && mw->tooltip && wid == mw->tooltip->window)
 					tooltip_handle(mw->tooltip, &ev);
 				else if (mw && wid) {
-					for (dlist *iter = mw->clientondesktop; iter; iter = iter->next) {
+					dlist *iter = mw->clientondesktop;
+					if (paging)
+						iter = mw->dminis;
+					for (; iter; iter = iter->next) {
 						ClientWin *cw = (ClientWin *) iter->data;
 						if (cw->mini.window == wid) {
                             if (!(POLLIN & r_fd[1].revents))
@@ -925,8 +1043,12 @@ mainloop(session_t *ps, bool activate_on_start) {
 				pending_damage = false;
 				foreach_dlist(mw->clientondesktop) {
 					if (((ClientWin *) iter->data)->damaged)
-					{
 						clientwin_repair(iter->data);
+				}
+
+				if (paging) {
+					foreach_dlist (mw->dminis) {
+						desktopwin_map(((ClientWin *) iter->data));
 					}
 				}
 				last_rendered = time_in_millis();
