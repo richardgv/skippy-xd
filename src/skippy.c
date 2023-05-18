@@ -889,16 +889,6 @@ mainloop(session_t *ps, bool activate_on_start) {
 		if (activate_on_start && !mw)
 			return;
 
-		// Poll for events
-		int timeout = ps->mainwin->poll_time;
-		int time_offset = last_rendered - time_in_millis();
-		timeout -= time_offset;
-		if (timeout < 0)
-			timeout = 0;
-		if (pending_damage)
-			timeout = 0;
-		poll(r_fd, (r_fd[1].fd >= 0 ? 2: 1), timeout);
-
 		{
 			// animation!
 			if (mw && animating) {
@@ -1076,6 +1066,16 @@ mainloop(session_t *ps, bool activate_on_start) {
 			last_rendered = time_in_millis();
 			XFlush(ps->dpy);
 		}
+
+		// Poll for events
+		int timeout = ps->mainwin->poll_time;
+		int time_offset = last_rendered - time_in_millis();
+		timeout -= time_offset;
+		if (timeout < 0)
+			timeout = 0;
+		if (pending_damage)
+			timeout = 0;
+		poll(r_fd, (r_fd[1].fd >= 0 ? 2: 1), timeout);
 
 		// Handle daemon commands
 		if (POLLIN & r_fd[1].revents) {
