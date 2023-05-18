@@ -831,13 +831,11 @@ mainloop(session_t *ps, bool activate_on_start) {
 			// keyboard gets ungrabbed.
 			if (mw->client_to_focus) {
 				if (paging) {
-					childwin_focus(mw->client_to_focus);
 					wm_set_desktop_ewmh(ps, mw->client_to_focus->slots);
-					//daemon_count_clients(mw, 0, 0);
-					//mw->client_to_focus = dlist_first(mw->clientondesktop)->data;
+					XSync(ps->dpy, True);
+					XSync(ps->dpy, False);
 				}
-				else
-					childwin_focus(mw->client_to_focus);
+                childwin_focus(mw->client_to_focus);
 				mw->client_to_focus = NULL;
 				refocus = false;
 				pending_damage = false;
