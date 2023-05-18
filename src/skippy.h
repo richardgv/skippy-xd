@@ -195,6 +195,7 @@ typedef struct {
 	bool acceptWMWin;
 	double updateFreq;
 	int animationDuration;;
+	bool lazyTrans;
 	bool includeFrame;
 	char *pipePath;
 	bool movePointerOnStart;
@@ -268,6 +269,7 @@ typedef struct {
 	.acceptWMWin = false, \
 	.updateFreq = 60.0, \
 	.animationDuration = 200, \
+	.lazyTrans = false, \
 	.includeFrame = false, \
 	.pipePath = NULL, \
 	.movePointerOnStart = true, \
