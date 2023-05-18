@@ -84,6 +84,8 @@ enum {
 
 enum progmode {
 	PROGMODE_NORMAL,
+	PROGMODE_ACTV_SWITCHER,
+	PROGMODE_TGG_SWITCHER,
 	PROGMODE_ACTV_EXPOSE,
 	PROGMODE_TGG_EXPOSE,
 	PROGMODE_ACTV_PAGING,
@@ -91,6 +93,12 @@ enum progmode {
 	PROGMODE_DEACTV,
 	PROGMODE_RELOAD_CONFIG,
 	PROGMODE_DM_STOP,
+};
+
+enum layoutmode {
+	LAYOUTMODE_SWITCHER,
+	LAYOUTMODE_EXPOSE,
+	LAYOUTMODE_PAGING,
 };
 
 enum cliop {
@@ -187,8 +195,7 @@ typedef struct {
 	bool runAsDaemon;
 	int focus_initial;
 
-	int layout;
-	bool sortByColumn;
+	int exposeLayout;
 	int distance;
 	bool useNetWMFullscreen;
 	bool ignoreSkipTaskbar;
@@ -261,8 +268,7 @@ typedef struct {
 	.mode = PROGMODE_NORMAL, \
 	.runAsDaemon = false, \
 \
-	.layout = LAYOUT_XD, \
-	.sortByColumn = true, \
+	.exposeLayout = LAYOUT_BOXY, \
 	.distance = 50, \
 	.useNetWMFullscreen = true, \
 	.ignoreSkipTaskbar = false, \

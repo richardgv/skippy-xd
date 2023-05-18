@@ -57,14 +57,9 @@
 
 [general]
 
-# layout=boxy is favoured by expo usage
-# layout=xd is favoured by alt+tab usage
-layout = boxy
-
-# sort by row or sort by column
-# sorting by column is favoured by boxy layout
-# sorting by row is favoured by xd layout
-sortByColumn = true
+# exposeLayout=xd uses the same layout as switcher, maximizing screen estate
+# exposeLayout=boxy tends to preserve window positions, thus guiding the eye more
+exposeLayout = boxy
 
 distance = 50
 useNetWMFullscreen = true
