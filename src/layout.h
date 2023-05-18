@@ -22,7 +22,7 @@
 
 // calculate and populate windows destination positions
 // switches to different layout algorithms based on user/default config
-void layout_run(MainWin *, dlist *, unsigned int *, unsigned int *);
+void layout_run(MainWin *, dlist *, unsigned int *, unsigned int *, enum layoutmode);
 void layout_xd(MainWin *, dlist *, unsigned int *, unsigned int *);
 void layout_boxy(MainWin *, dlist *, unsigned int *, unsigned int *);
 int boxy_affinity(ClientWin *, int, int, int, int, int, int);

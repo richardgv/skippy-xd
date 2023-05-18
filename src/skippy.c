@@ -31,7 +31,9 @@ bool debuglog = false;
 enum pipe_cmd_t {
 	// Not ordered properly for backward compatibility
 	PIPECMD_RELOAD_CONFIG = 0,
-	PIPECMD_ACTIVATE_EXPOSE = 1,
+	PIPECMD_ACTIVATE_SWITCHER = 1,
+	PIPECMD_TOGGLE_SWITCHER,
+	PIPECMD_ACTIVATE_EXPOSE,
 	PIPECMD_TOGGLE_EXPOSE,
 	PIPECMD_ACTIVATE_PAGING,
 	PIPECMD_TOGGLE_PAGING,
@@ -366,7 +368,7 @@ daemon_count_clients(MainWin *mw, Bool *touched, Window leader)
 }
 
 static bool
-init_layout(MainWin *mw, Window focus, Window leader)
+init_layout(MainWin *mw, Window focus, Window leader, enum layoutmode layout)
 {
 	if (!mw->clientondesktop)
 		return true;
@@ -376,14 +378,14 @@ init_layout(MainWin *mw, Window focus, Window leader)
 	/* set up the windows layout */
 	{
 		unsigned int newwidth = 0, newheight = 0;
-		layout_run(mw, mw->clientondesktop, &newwidth, &newheight);
+		layout_run(mw, mw->clientondesktop, &newwidth, &newheight, layout);
 
 		// ordering of client windows list
 		// is important for prev/next window selection
-		if (mw->ps->o.sortByColumn)
-			dlist_sort(mw->clientondesktop, sort_cw_by_column, 0);
-		else
+		if (layout == LAYOUTMODE_SWITCHER)
 			dlist_sort(mw->clientondesktop, sort_cw_by_row, 0);
+		else /*if (layout == LAYOUTMODE_EXPOSE)*/
+			dlist_sort(mw->clientondesktop, sort_cw_by_column, 0);
 		mw->focuslist = mw->clientondesktop;
 
 		float multiplier = (float) (mw->width - 2 * mw->distance) / newwidth;
@@ -696,7 +698,7 @@ init_focus(MainWin *mw, Window leader) {
 }
 
 static bool
-skippy_activate(MainWin *mw, Window leader, bool paging)
+skippy_activate(MainWin *mw, Window leader, enum layoutmode layout)
 {
 	session_t *ps = mw->ps;
 
@@ -724,15 +726,15 @@ skippy_activate(MainWin *mw, Window leader, bool paging)
 		clientwin_update2((ClientWin *) iter->data);
 	}
 
-	if (paging) {
+	if (layout == LAYOUTMODE_PAGING) {
 		if (!init_paging_layout(mw, mw->revert_focus_win, leader)) {
 			printfef(false, "(): init_paging_layout() failed.");
 			return false;
 		}
 	}
 	else {
-		if (!init_layout(mw, mw->revert_focus_win, leader)) {
-			printfef(false, "(): init_layout() failed.");
+		if (!init_layout(mw, mw->revert_focus_win, leader, layout)) {
+			printfef(false, "(): init_expose_layout() failed.");
 			return false;
 		}
 	}
@@ -783,9 +785,23 @@ mainloop(session_t *ps, bool activate_on_start) {
 	bool refocus = false;
 	bool pending_damage = false;
 	long last_rendered = 0L;
-	bool paging = ps->o.mode == PROGMODE_ACTV_PAGING;
+	enum layoutmode layout = LAYOUTMODE_SWITCHER;
 	bool animating = activate;
 	long first_animated = 0L;
+
+	switch (ps->o.mode) {
+		case PROGMODE_ACTV_EXPOSE:
+		case PROGMODE_TGG_EXPOSE:
+			layout = LAYOUTMODE_EXPOSE;
+			break;
+		case PROGMODE_ACTV_PAGING:
+		case PROGMODE_TGG_PAGING:
+			layout = LAYOUTMODE_PAGING;
+			break;
+		default:
+			layout = LAYOUTMODE_SWITCHER;
+			break;
+	}
 
 	struct pollfd r_fd[2] = {
 		{
@@ -808,7 +824,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 			assert(ps->mainwin);
 			activate = false;
 
-			if (skippy_activate(ps->mainwin, None, paging)) {
+			if (skippy_activate(ps->mainwin, None, layout)) {
 				last_rendered = time_in_millis();
 				mw = ps->mainwin;
 				refocus = false;
@@ -830,7 +846,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 			// Focus the client window only after the main window get unmapped and
 			// keyboard gets ungrabbed.
 			if (mw->client_to_focus) {
-				if (paging) {
+				if (layout == LAYOUTMODE_PAGING) {
 					wm_set_desktop_ewmh(ps, mw->client_to_focus->slots);
 					XSync(ps->dpy, True);
 					XSync(ps->dpy, False);
@@ -873,21 +889,12 @@ mainloop(session_t *ps, bool activate_on_start) {
 		if (activate_on_start && !mw)
 			return;
 
-		// Poll for events
-		int timeout = ps->mainwin->poll_time;
-		int time_offset = last_rendered - time_in_millis();
-		timeout -= time_offset;
-		if (timeout < 0)
-			timeout = 0;
-		if (pending_damage)
-			timeout = 0;
-		poll(r_fd, (r_fd[1].fd >= 0 ? 2: 1), timeout);
-
 		{
 			// animation!
 			if (mw && animating) {
 				int timeslice = time_in_millis() - first_animated;
-				if (timeslice < ps->o.animationDuration
+				if (layout != LAYOUTMODE_SWITCHER
+						&& timeslice < ps->o.animationDuration
 						&& timeslice + first_animated >=
 						last_rendered + ps->mainwin->poll_time) {
 					anime(ps->mainwin, ps->mainwin->clients,
@@ -906,7 +913,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 					focus_miniw_adv(ps, mw->client_to_focus,
 							ps->o.movePointerOnStart);
 
-					if (paging) {
+					if (layout == LAYOUTMODE_PAGING) {
 						foreach_dlist (mw->dminis) {
 							desktopwin_map(((ClientWin *) iter->data));
 						}
@@ -1020,7 +1027,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 					tooltip_handle(mw->tooltip, &ev);
 				else if (mw && wid) {
 					dlist *iter = mw->clientondesktop;
-					if (paging)
+					if (layout == LAYOUTMODE_PAGING)
 						iter = mw->dminis;
 					for (; iter; iter = iter->next) {
 						ClientWin *cw = (ClientWin *) iter->data;
@@ -1044,7 +1051,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 						clientwin_repair(iter->data);
 				}
 
-				if (paging) {
+				if (layout == LAYOUTMODE_PAGING) {
 					foreach_dlist (mw->dminis) {
 						desktopwin_map(((ClientWin *) iter->data));
 					}
@@ -1059,6 +1066,16 @@ mainloop(session_t *ps, bool activate_on_start) {
 			last_rendered = time_in_millis();
 			XFlush(ps->dpy);
 		}
+
+		// Poll for events
+		int timeout = ps->mainwin->poll_time;
+		int time_offset = last_rendered - time_in_millis();
+		timeout -= time_offset;
+		if (timeout < 0)
+			timeout = 0;
+		if (pending_damage)
+			timeout = 0;
+		poll(r_fd, (r_fd[1].fd >= 0 ? 2: 1), timeout);
 
 		// Handle daemon commands
 		if (POLLIN & r_fd[1].revents) {
@@ -1081,11 +1098,23 @@ mainloop(session_t *ps, bool activate_on_start) {
 						load_config_file(ps);
 						mainwin_reload(ps, ps->mainwin);
 						break;
+					case PIPECMD_ACTIVATE_SWITCHER:
 					case PIPECMD_ACTIVATE_EXPOSE:
 					case PIPECMD_ACTIVATE_PAGING:
-						paging = piped_input == PIPECMD_ACTIVATE_PAGING;
-						ps->o.mode = paging? PROGMODE_ACTV_PAGING: PROGMODE_ACTV_EXPOSE;
-						printfdf(false, "(): case PIPECMD_ACTIVATE, paging=%d:", paging);
+						if (piped_input == PIPECMD_ACTIVATE_SWITCHER) {
+							ps->o.mode = PROGMODE_ACTV_SWITCHER;
+							layout = LAYOUTMODE_SWITCHER;
+						}
+						else if (piped_input == PIPECMD_ACTIVATE_EXPOSE) {
+							ps->o.mode = PROGMODE_ACTV_EXPOSE;
+							layout = LAYOUTMODE_EXPOSE;
+						}
+						else /* if (piped_input == PIPECMD_ACTIVATE_PAGING) */ {
+							ps->o.mode = PROGMODE_ACTV_PAGING;
+							layout = LAYOUTMODE_PAGING;
+						}
+
+						printfdf(false, "(): case PIPECMD_ACTIVATE, mode=%d", layout);
 						if (ps->mainwin->mapped)
 						{
 							printfdf(false, "(): if (ps->mainwin->mapped)");
@@ -1122,15 +1151,27 @@ mainloop(session_t *ps, bool activate_on_start) {
 						if (mw)
 							die = true;
 						break;
+					case PIPECMD_TOGGLE_SWITCHER:
 					case PIPECMD_TOGGLE_EXPOSE:
 					case PIPECMD_TOGGLE_PAGING:
 						if (mw)
 							die = true;
 						else {
 							animating = activate = true;
-							paging = piped_input == PIPECMD_TOGGLE_PAGING;
-							ps->o.mode = paging? PROGMODE_TGG_PAGING: PROGMODE_TGG_EXPOSE;
+							if (piped_input == PIPECMD_TOGGLE_SWITCHER) {
+								ps->o.mode = PROGMODE_TGG_SWITCHER;
+								layout = LAYOUTMODE_SWITCHER;
+							}
+							else if (piped_input == PIPECMD_TOGGLE_EXPOSE) {
+								ps->o.mode = PROGMODE_TGG_EXPOSE;
+								layout = LAYOUTMODE_EXPOSE;
+							}
+							else /* if (piped_input == PIPECMD_TOGGLE_PAGING) */ {
+								ps->o.mode = PROGMODE_TGG_PAGING;
+								layout = LAYOUTMODE_PAGING;
+							}
 						}
+						printfdf(false, "(): case PIPECMD_TOGGLE, mode=%d", layout);
 						break;
 					case PIPECMD_EXIT_DAEMON:
 						printfdf(false, "(): Exit command received, killing daemon...");
@@ -1196,6 +1237,12 @@ queue_initial_focus_next(const char *pipePath) {
 }
 
 static inline bool
+activate_switcher(const char *pipePath) {
+	printfdf(false, "(): Activating switcher...");
+	return send_command_to_daemon_via_fifo(PIPECMD_ACTIVATE_SWITCHER, pipePath);
+}
+
+static inline bool
 activate_expose(const char *pipePath) {
 	printfdf(false, "(): Activating expose...");
 	return send_command_to_daemon_via_fifo(PIPECMD_ACTIVATE_EXPOSE, pipePath);
@@ -1217,6 +1264,12 @@ static inline bool
 deactivate(const char *pipePath) {
 	printfdf(false, "(): Deactivating...");
 	return send_command_to_daemon_via_fifo(PIPECMD_DEACTIVATE, pipePath);
+}
+
+static inline bool
+toggle_switcher(const char *pipePath) {
+	printfdf(false, "(): Toggling switcher...");
+	return send_command_to_daemon_via_fifo(PIPECMD_TOGGLE_SWITCHER, pipePath);
 }
 
 static inline bool
@@ -1310,11 +1363,13 @@ show_help() {
 			"  --config            - read the specified configuration file.\n"
 			"  --start-daemon      - starts the daemon running.\n"
 			"  --stop-daemon       - stops the daemon running.\n"
+			"  --activate-switcher - connects to daemon and activate switcher.\n"
+			"  --toggle-switcher   - connects to daemon and toggle switcher.\n"
 			"  --activate-expose   - connects to daemon and activate expose.\n"
 			"  --toggle-expose     - connects to daemon and toggle expose.\n"
 			"  --activate-paging   - connects to daemon and activate paging.\n"
 			"  --toggle-paging     - connects to daemon and toggle paging.\n"
-			"  --deactivate        - connects to daemon and deactivate expose or paging.\n"
+			"  --deactivate        - connects to daemon and deactivate switcher, expose or paging.\n"
 			"  --prev              - focus window to previous.\n"
 			"  --next              - focus window to next.\n"
 			// "  --test                      - Temporary development testing. To be removed.\n"
@@ -1473,6 +1528,8 @@ parse_args(session_t *ps, int argc, char **argv, bool first_pass) {
 	enum options {
 		OPT_CONFIG = 256,
 		OPT_CONFIG_RELOAD,
+		OPT_ACTV_SWITCHER,
+		OPT_TGG_SWITCHER,
 		OPT_ACTV_EXPOSE,
 		OPT_TGG_EXPOSE,
 		OPT_ACTV_PAGING,
@@ -1488,6 +1545,8 @@ parse_args(session_t *ps, int argc, char **argv, bool first_pass) {
 		{ "help",                     no_argument,       NULL, 'h' },
 		{ "config",                   required_argument, NULL, OPT_CONFIG },
 		{ "config-reload",            no_argument,       NULL, OPT_CONFIG_RELOAD },
+		{ "activate-switcher",        no_argument,       NULL, OPT_ACTV_SWITCHER },
+		{ "toggle-switcher",          no_argument,       NULL, OPT_TGG_SWITCHER },
 		{ "activate-expose",          no_argument,       NULL, OPT_ACTV_EXPOSE },
 		{ "toggle-expose",            no_argument,       NULL, OPT_TGG_EXPOSE },
 		{ "activate-paging",          no_argument,       NULL, OPT_ACTV_PAGING },
@@ -1544,6 +1603,12 @@ parse_args(session_t *ps, int argc, char **argv, bool first_pass) {
 			case OPT_CONFIG: break;
 			case OPT_CONFIG_RELOAD:
 				ps->o.mode = PROGMODE_RELOAD_CONFIG;
+				break;
+			case OPT_ACTV_SWITCHER:
+				ps->o.mode = PROGMODE_ACTV_SWITCHER;
+				break;
+			case OPT_TGG_SWITCHER:
+				ps->o.mode = PROGMODE_TGG_SWITCHER;
 				break;
 			case OPT_ACTV_EXPOSE:
 				ps->o.mode = PROGMODE_ACTV_EXPOSE;
@@ -1657,23 +1722,22 @@ load_config_file(session_t *ps)
 	}
 
 	{
-		const char *s = config_get(config, "general", "layout", NULL);
+		const char *s = config_get(config, "general", "exposeLayout", NULL);
 		if (s) {
 			if (strcmp(s,"boxy") == 0) {
-				ps->o.layout = LAYOUT_BOXY;
+				ps->o.exposeLayout = LAYOUT_BOXY;
 			}
 			else if (strcmp(s,"xd") == 0) {
-				ps->o.layout = LAYOUT_XD;
+				ps->o.exposeLayout = LAYOUT_XD;
 			}
 			else {
-				ps->o.layout = LAYOUT_BOXY;
+				ps->o.exposeLayout = LAYOUT_BOXY;
 			}
 		}
 		else
-			ps->o.layout = LAYOUT_BOXY;
+			ps->o.exposeLayout = LAYOUT_BOXY;
     }
 
-    config_get_bool_wrap(config, "general", "sortByColumn", &ps->o.sortByColumn);
     config_get_int_wrap(config, "general", "distance", &ps->o.distance, 1, INT_MAX);
     config_get_bool_wrap(config, "general", "useNetWMFullscreen", &ps->o.useNetWMFullscreen);
     config_get_bool_wrap(config, "general", "ignoreSkipTaskbar", &ps->o.ignoreSkipTaskbar);
@@ -1825,6 +1889,7 @@ int main(int argc, char *argv[]) {
 	switch (ps->o.mode) {
 		case PROGMODE_NORMAL:
 			break;
+		case PROGMODE_ACTV_SWITCHER:
 		case PROGMODE_ACTV_EXPOSE:
 		case PROGMODE_ACTV_PAGING:
 			if(ps->o.focus_initial)
@@ -1838,11 +1903,14 @@ int main(int argc, char *argv[]) {
 				// we must pause slightly, otherwise will miss next read() call in this loop()
 				usleep(10000);
 			}
-			if (ps->o.mode == PROGMODE_ACTV_EXPOSE)
+			if (ps->o.mode == PROGMODE_ACTV_SWITCHER)
+				activate_switcher(pipePath);
+			else if (ps->o.mode == PROGMODE_ACTV_EXPOSE)
 				activate_expose(pipePath);
-			else
+			else if (ps->o.mode == PROGMODE_ACTV_PAGING)
 				activate_paging(pipePath);
 			goto main_end;
+		case PROGMODE_TGG_SWITCHER:
 		case PROGMODE_TGG_EXPOSE:
 		case PROGMODE_TGG_PAGING:
 			if(ps->o.focus_initial)
@@ -1855,9 +1923,11 @@ int main(int argc, char *argv[]) {
 				// we must pause slightly, otherwise will miss next read() call in this loop()
 				usleep(10000);
 			}
-			if (PROGMODE_TGG_EXPOSE == ps->o.mode)
+			if (ps->o.mode == PROGMODE_TGG_SWITCHER)
+				toggle_switcher(pipePath);
+			else if (ps->o.mode == PROGMODE_TGG_EXPOSE)
 				toggle_expose(pipePath);
-			else
+			else if (ps->o.mode == PROGMODE_TGG_PAGING)
 				toggle_paging(pipePath);
 			goto main_end;
 		case PROGMODE_DEACTV:
