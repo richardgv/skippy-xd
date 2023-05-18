@@ -113,10 +113,10 @@ clientwin_create(MainWin *mw, Window client) {
 			.event_mask = ButtonPressMask | ButtonReleaseMask | KeyPressMask
 				| KeyReleaseMask | EnterWindowMask | LeaveWindowMask
 				| PointerMotionMask | ExposureMask | FocusChangeMask,
-			.override_redirect = false,
+			.override_redirect = ps->o.lazyTrans,
 		};
 		cw->mini.window = XCreateWindow(ps->dpy,
-				mw->window, 0, 0, 1, 1, 0,
+				(ps->o.lazyTrans ? ps->root : mw->window), 0, 0, 1, 1, 0,
 				mw->depth, InputOutput, mw->visual,
 				CWColormap | CWBackPixel | CWBorderPixel | CWEventMask | CWOverrideRedirect, &sattr);
 	}
@@ -384,11 +384,17 @@ clientwin_repaint(ClientWin *cw, const XRectangle *pbound)
 		else if (cw->zombie)
 			mask = cw->mainwin->shadowPicture;
 
-		XRenderComposite(ps->dpy, PictOpSrc, cw->mainwin->background, None,
-				cw->destination, cw->mini.x + s_x, cw->mini.y + s_y, 0, 0,
-				s_x, s_y, s_w, s_h);
-		XRenderComposite(ps->dpy, PictOpOver, source, mask,
-				cw->destination, s_x, s_y, 0, 0, s_x, s_y, s_w, s_h);
+		if (ps->o.lazyTrans) {
+			XRenderComposite(ps->dpy, PictOpSrc, source, mask,
+					cw->destination, s_x, s_y, 0, 0, s_x, s_y, s_w, s_h);
+		}
+		else {
+			XRenderComposite(ps->dpy, PictOpSrc, cw->mainwin->background, None,
+					cw->destination, cw->mini.x + s_x, cw->mini.y + s_y, 0, 0,
+					s_x, s_y, s_w, s_h);
+			XRenderComposite(ps->dpy, PictOpOver, source, mask,
+					cw->destination, s_x, s_y, 0, 0, s_x, s_y, s_w, s_h);
+		}
 
 		if (CLIDISP_ZOMBIE_ICON == cw->mode || CLIDISP_THUMBNAIL_ICON == cw->mode) {
 			assert(cw->icon_pict && cw->icon_pict->pict);

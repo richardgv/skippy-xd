@@ -74,6 +74,7 @@ updateFreq = 60.0
 # set = 0 to switch off animations
 animationDuration = 200
 
+lazyTrans = false
 pipePath = /tmp/skippy-xd-fifo
 
 # Move the mouse cursor to the next highlighted window, straight after launching skippy
@@ -90,6 +91,10 @@ switchDesktopOnActivate = false
 includeFrame = true
 allowUpscale = true
 showAllDesktops = true
+
+# Choose wether to show minimized windows
+showShadow = true
+
 cornerRadius = 5
 preferredIconSize = 48
 showIconsOnThumbnails = true

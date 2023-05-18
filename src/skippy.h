@@ -196,6 +196,7 @@ typedef struct {
 	bool acceptWMWin;
 	double updateFreq;
 	int animationDuration;;
+	bool lazyTrans;
 	bool includeFrame;
 	char *pipePath;
 	bool movePointerOnStart;
@@ -204,6 +205,7 @@ typedef struct {
 	bool switchDesktopOnActivate;
 	bool allowUpscale;
 	bool showAllDesktops;
+	bool showShadow;
 	int cornerRadius;
 	int preferredIconSize;
 	client_disp_mode_t *clientDisplayModes;
@@ -268,6 +270,7 @@ typedef struct {
 	.acceptWMWin = false, \
 	.updateFreq = 60.0, \
 	.animationDuration = 200, \
+	.lazyTrans = false, \
 	.includeFrame = false, \
 	.pipePath = NULL, \
 	.movePointerOnStart = true, \
@@ -281,6 +284,7 @@ typedef struct {
 	.iconFillSpec = PICTSPECT_INIT, \
 	.fillSpec = PICTSPECT_INIT, \
 	.showAllDesktops = false, \
+	.showShadow = true, \
 	.buttonImgs = { NULL }, \
 	.background = NULL, \
 	.xinerama_showAll = true, \
