@@ -896,7 +896,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 				if (layout != LAYOUTMODE_SWITCHER
 						&& timeslice < ps->o.animationDuration
 						&& timeslice + first_animated >=
-						last_rendered + ps->mainwin->poll_time) {
+						last_rendered + (1000.0 / 60.0)) {
 					anime(ps->mainwin, ps->mainwin->clients,
 						((float)timeslice)/(float)ps->o.animationDuration);
 					last_rendered = time_in_millis();
