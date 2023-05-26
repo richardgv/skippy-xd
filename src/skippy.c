@@ -721,6 +721,10 @@ skippy_activate(MainWin *mw, Window leader, enum layoutmode layout)
 	mw->client_to_focus = NULL;
 
 	daemon_count_clients(mw, 0, leader);
+	if (!mw->clients || !mw->clientondesktop) {
+		return false;
+	}
+
 	foreach_dlist(mw->clients) {
 		clientwin_update((ClientWin *) iter->data);
 		clientwin_update2((ClientWin *) iter->data);
