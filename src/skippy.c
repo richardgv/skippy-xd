@@ -1963,13 +1963,8 @@ int main(int argc, char *argv[]) {
 
 	// Daemon mode
 	if (ps->o.runAsDaemon) {
-		bool flush_file = false;
 
 		printfdf(false, "(): Running as daemon...");
-
-		// Flush file if we could access() it (or, usually, if it exists)
-		if (!access(pipePath, R_OK))
-			flush_file = true;
 
 		{
 			int result = mkfifo(pipePath, S_IRUSR | S_IWUSR);
@@ -1987,9 +1982,10 @@ int main(int argc, char *argv[]) {
 			goto main_end;
 		}
 		assert(ps->fd_pipe >= 0);
-		if (flush_file) {
+
+		{
 			char *buf[BUF_LEN];
-			while (read(ps->fd_pipe, buf, sizeof(buf)) > 0)
+			while (read(ps->fd_pipe, buf, sizeof(buf)))
 				continue;
 			printfdf(false, "(): Finished flushing pipe \"%s\".", pipePath);
 		}
