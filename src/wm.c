@@ -675,8 +675,12 @@ wm_get_focused(session_t *ps) {
 	{
 		int revert_to = 0;
 		if (!XGetInputFocus(ps->dpy, &focused, &revert_to)) {
-			printfdf(false, "(): Failed to get current focused window.");
-			return None;
+			printfdf(false, "(): Currently not focused on any window; trying to find focus...");
+			XSetInputFocus(ps->dpy, PointerRoot, RevertToPointerRoot, CurrentTime);
+			if (!XGetInputFocus(ps->dpy, &focused, &revert_to)) {
+				printfdf(false, "(): Failed to get current focused window.");
+				return None;
+			}
 		}
 		printfdf(false, "(): Focused window is %#010lx.", focused);
 	}
