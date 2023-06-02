@@ -854,6 +854,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 					wm_set_desktop_ewmh(ps, mw->client_to_focus->slots);
 					XSync(ps->dpy, True);
 					XSync(ps->dpy, False);
+					XSetInputFocus(ps->dpy, PointerRoot, RevertToPointerRoot, CurrentTime);
 				}
 				childwin_focus(mw->client_to_focus);
 				mw->client_to_focus = NULL;
