@@ -689,12 +689,15 @@ init_focus(MainWin *mw, Window leader) {
 	// then clear this flag, so daemon not remember on its next activation
 	ps->o.focus_initial = 0;
 
-	if (!iter)
-		return;
-
-	mw->client_to_focus = (ClientWin *) iter->data;
-	mw->client_to_focus_on_cancel = (ClientWin *) iter->data;
-	mw->client_to_focus->focused = 1;
+	if (!iter) {
+		mw->client_to_focus = NULL;
+		mw->client_to_focus_on_cancel = NULL;
+	}
+	else {
+		mw->client_to_focus = (ClientWin *) iter->data;
+		mw->client_to_focus_on_cancel = (ClientWin *) iter->data;
+		mw->client_to_focus->focused = 1;
+	}
 }
 
 static bool
@@ -850,12 +853,8 @@ mainloop(session_t *ps, bool activate_on_start) {
 			// Focus the client window only after the main window get unmapped and
 			// keyboard gets ungrabbed.
 			if (mw->client_to_focus) {
-				if (layout == LAYOUTMODE_PAGING) {
+				if (layout == LAYOUTMODE_PAGING)
 					wm_set_desktop_ewmh(ps, mw->client_to_focus->slots);
-					XSync(ps->dpy, True);
-					XSync(ps->dpy, False);
-					XSetInputFocus(ps->dpy, PointerRoot, RevertToPointerRoot, CurrentTime);
-				}
 				childwin_focus(mw->client_to_focus);
 				mw->client_to_focus = NULL;
 				refocus = false;
