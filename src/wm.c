@@ -676,7 +676,7 @@ wm_get_focused(session_t *ps) {
 		int revert_to = 0;
 		if (!XGetInputFocus(ps->dpy, &focused, &revert_to)) {
 			printfdf(false, "(): Currently not focused on any window; trying to find focus...");
-			XSetInputFocus(ps->dpy, PointerRoot, RevertToPointerRoot, CurrentTime);
+			wm_set_desktop_ewmh(ps, wm_get_current_desktop(ps));
 			if (!XGetInputFocus(ps->dpy, &focused, &revert_to)) {
 				printfdf(false, "(): Failed to get current focused window.");
 				return None;
@@ -688,7 +688,7 @@ wm_get_focused(session_t *ps) {
 	while (focused) {
 		// Discard insane values
 		if (ps->root == focused || PointerRoot == focused)
-			return None;
+			return focused;
 
 		// Check for WM_STATE
 		if (wid_has_prop(ps, focused, XA_WM_STATE))
