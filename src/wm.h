@@ -149,12 +149,6 @@ wm_set_desktop_ewmh(session_t *ps, long desktop) {
 	long data[] = { desktop, CurrentTime };
 	wm_send_clientmsg_ewmh_root(ps, ps->root, _NET_CURRENT_DESKTOP,
 			CARR_LEN(data), data);
-
-	XChangeProperty(ps->dpy, ps->root,
-			XInternAtom(ps->dpy, "_NET_CURRENT_DESKTOP", False),
-			XA_CARDINAL, 32, PropModeReplace, (unsigned char *) &desktop, 1);
-	XSync(ps->dpy, True);
-	XSync(ps->dpy, False);
 }
 
 /**
