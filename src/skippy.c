@@ -327,7 +327,7 @@ update_clients(MainWin *mw, Bool *touched)
 }
 
 static void
-daemon_count_clients(MainWin *mw, Bool *touched, Window leader)
+daemon_count_clients(MainWin *mw, Bool *touched)
 {
 	// given the client table, update the clientondesktop
 	// the difference between mw->clients and mw->clientondesktop
@@ -355,20 +355,64 @@ daemon_count_clients(MainWin *mw, Bool *touched, Window leader)
 			return;
 		}
 
-		if (leader) {
-			mw->clientondesktop = dlist_first(dlist_find_all(tmp, clientwin_check_group_leader_func, (void*)&leader));
-			dlist_free(tmp);
-		}
-		else {
-			mw->clientondesktop = tmp;
-		}
+		mw->clientondesktop = tmp;
 	}
 
 	return;
 }
 
+static void
+init_focus(MainWin *mw, Window leader) {
+	session_t *ps = mw->ps;
+
+	// Get the currently focused window and select which mini-window to focus
+	dlist *iter = dlist_find(mw->focuslist, clientwin_cmp_func, (void *) leader);
+
+	// check if the user specified --prev or --next on the cmdline
+	if(ps->o.focus_initial)
+	{
+
+		// ps->mainwin->ignore_next_refocus = 1;
+		// ps->mainwin->ignore_next_refocus = 2;
+		// ps->mainwin->ignore_next_refocus = 4;
+
+
+		if(ps->o.focus_initial == FI_PREV)
+		{
+			// here, mw->focuslist is the first (dlist*) item in the list
+			if (iter == mw->focuslist)
+				iter = dlist_last(mw->focuslist);
+			else
+			{
+				dlist *i = mw->focuslist;
+				for (; i != NULL; i = i->next)
+					if (i->next && i->next == iter)
+						break;
+				iter = i;
+			}
+		}
+		else if(ps->o.focus_initial == FI_NEXT)
+			iter = iter->next;
+
+	}
+
+	// then clear this flag, so daemon not remember on its next activation
+	ps->o.focus_initial = 0;
+
+	if (!iter) {
+		dlist * first = dlist_first(mw->focuslist);
+		mw->client_to_focus = first->data;
+		mw->client_to_focus_on_cancel = NULL;
+	}
+	else {
+		mw->client_to_focus = (ClientWin *) iter->data;
+		mw->client_to_focus_on_cancel = (ClientWin *) iter->data;
+		mw->client_to_focus->focused = 1;
+	}
+}
+
 static bool
-init_layout(MainWin *mw, Window focus, Window leader, enum layoutmode layout)
+init_layout(MainWin *mw, enum layoutmode layout, Window leader)
 {
 	if (!mw->clientondesktop)
 		return true;
@@ -402,11 +446,13 @@ init_layout(MainWin *mw, Window focus, Window leader, enum layoutmode layout)
 		mw->yoff = yoff;
 	}
 
+	init_focus(mw, leader);
+
 	return true;
 }
 
 static bool
-init_paging_layout(MainWin *mw, Window focus, Window leader)
+init_paging_layout(MainWin *mw, enum layoutmode layout, Window leader)
 {
 	if (!mw->clients)
 		return true;
@@ -510,7 +556,6 @@ init_paging_layout(MainWin *mw, Window focus, Window leader)
 
 			if (cw->slots == current_desktop) {
 				mw->client_to_focus = cw;
-				mw->revert_focus_win = cw->wid_client;
 				mw->client_to_focus_on_cancel = cw;
 				mw->client_to_focus->focused = 1;
 			}
@@ -651,57 +696,8 @@ ev_dump(session_t *ps, const MainWin *mw, const XEvent *ev) {
 	printfdf(false, "(): Event %-13.13s wid %#010lx %s", name, wid, wextra);
 }
 
-static void
-init_focus(MainWin *mw, Window leader) {
-	session_t *ps = mw->ps;
-
-	// Get the currently focused window and select which mini-window to focus
-	dlist *iter = dlist_find(mw->focuslist, clientwin_cmp_func, (void *) mw->revert_focus_win);
-
-	// check if the user specified --prev or --next on the cmdline
-	if(ps->o.focus_initial)
-	{
-
-		// ps->mainwin->ignore_next_refocus = 1;
-		// ps->mainwin->ignore_next_refocus = 2;
-		// ps->mainwin->ignore_next_refocus = 4;
-
-
-		if(ps->o.focus_initial == FI_PREV)
-		{
-			// here, mw->focuslist is the first (dlist*) item in the list
-			if (iter == mw->focuslist)
-				iter = dlist_last(mw->focuslist);
-			else
-			{
-				dlist *i = mw->focuslist;
-				for (; i != NULL; i = i->next)
-					if (i->next && i->next == iter)
-						break;
-				iter = i;
-			}
-		}
-		else if(ps->o.focus_initial == FI_NEXT)
-			iter = iter->next;
-
-	}
-
-	// then clear this flag, so daemon not remember on its next activation
-	ps->o.focus_initial = 0;
-
-	if (!iter) {
-		mw->client_to_focus = NULL;
-		mw->client_to_focus_on_cancel = NULL;
-	}
-	else {
-		mw->client_to_focus = (ClientWin *) iter->data;
-		mw->client_to_focus_on_cancel = (ClientWin *) iter->data;
-		mw->client_to_focus->focused = 1;
-	}
-}
-
 static bool
-skippy_activate(MainWin *mw, Window leader, enum layoutmode layout)
+skippy_activate(MainWin *mw, enum layoutmode layout)
 {
 	session_t *ps = mw->ps;
 
@@ -723,7 +719,7 @@ skippy_activate(MainWin *mw, Window leader, enum layoutmode layout)
 
 	mw->client_to_focus = NULL;
 
-	daemon_count_clients(mw, 0, leader);
+	daemon_count_clients(mw, 0);
 	if (!mw->clients || !mw->clientondesktop) {
 		return false;
 	}
@@ -734,19 +730,17 @@ skippy_activate(MainWin *mw, Window leader, enum layoutmode layout)
 	}
 
 	if (layout == LAYOUTMODE_PAGING) {
-		if (!init_paging_layout(mw, mw->revert_focus_win, leader)) {
-			printfef(false, "(): init_paging_layout() failed.");
+		if (!init_paging_layout(mw, layout, mw->revert_focus_win)) {
+			printfef(false, "(): failed.");
 			return false;
 		}
 	}
 	else {
-		if (!init_layout(mw, mw->revert_focus_win, leader, layout)) {
-			printfef(false, "(): init_expose_layout() failed.");
+		if (!init_layout(mw, layout, mw->revert_focus_win)) {
+			printfef(false, "(): failed.");
 			return false;
 		}
 	}
-
-	init_focus(mw, leader);
 
 	foreach_dlist(mw->clients) {
 		ClientWin *cw = iter->data;
@@ -789,7 +783,6 @@ mainloop(session_t *ps, bool activate_on_start) {
 	MainWin *mw = NULL;
 	bool die = false;
 	bool activate = activate_on_start;
-	bool refocus = false;
 	bool pending_damage = false;
 	long last_rendered = 0L;
 	enum layoutmode layout = LAYOUTMODE_SWITCHER;
@@ -831,10 +824,9 @@ mainloop(session_t *ps, bool activate_on_start) {
 			assert(ps->mainwin);
 			activate = false;
 
-			if (skippy_activate(ps->mainwin, None, layout)) {
+			if (skippy_activate(ps->mainwin, layout)) {
 				last_rendered = time_in_millis();
 				mw = ps->mainwin;
-				refocus = false;
 				pending_damage = false;
 				first_animated = time_in_millis();
 			}
@@ -854,23 +846,26 @@ mainloop(session_t *ps, bool activate_on_start) {
 			// keyboard gets ungrabbed.
 			long new_desktop = -1;
 			if (mw->client_to_focus) {
-				if (layout == LAYOUTMODE_PAGING)
+				if (layout == LAYOUTMODE_PAGING) {
 					new_desktop = mw->client_to_focus->slots;
-				childwin_focus(mw->client_to_focus);
+					dlist *iter = dlist_find(mw->focuslist,
+							clientwin_cmp_func, (void *) mw->revert_focus_win);
+					if (iter) {
+						ClientWin *cw = iter->data;
+						if (cw)
+							childwin_focus(cw);
+					}
+				}
+				else {
+					childwin_focus(mw->client_to_focus);
+				}
 				mw->client_to_focus = NULL;
-				refocus = false;
 				pending_damage = false;
 			}
 
 			// Cleanup
 			dlist_free(mw->clientondesktop);
 			mw->clientondesktop = 0;
-
-			if (refocus && mw->revert_focus_win) {
-				// No idea why. Plain XSetInputFocus() no longer works after ungrabbing.
-				wm_activate_window(ps, mw->revert_focus_win);
-				refocus = false;
-			}
 
 			// free all mini desktop representations
 			dlist_free_with_func(mw->dminis, (dlist_free_func) clientwin_destroy);
@@ -986,7 +981,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 				}
 				else if (mw && ev.type == DestroyNotify) {
 					printfdf(false, "(): else if (ev.type == DestroyNotify) {");
-					daemon_count_clients(ps->mainwin, 0, None);
+					daemon_count_clients(ps->mainwin, 0);
 					if (!mw->clientondesktop) {
 						printfdf(false, "(): Last client window destroyed/unmapped, "
 								"exiting.");
@@ -996,7 +991,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 				}
 				else if (ev.type == MapNotify || ev.type == UnmapNotify) {
 					printfdf(false, "(): else if (ev.type == MapNotify || ev.type == UnmapNotify) {");
-					daemon_count_clients(ps->mainwin, 0, None);
+					daemon_count_clients(ps->mainwin, 0);
 					dlist *iter = (wid ? dlist_find(ps->mainwin->clients, clientwin_cmp_func, (void *) wid): NULL);
 					if (iter) {
 						ClientWin *cw = (ClientWin *) iter->data;
@@ -1994,7 +1989,7 @@ int main(int argc, char *argv[]) {
 			printfdf(false, "(): Finished flushing pipe \"%s\".", pipePath);
 		}
 
-		daemon_count_clients(mw, 0, None);
+		daemon_count_clients(mw, 0);
 
 		foreach_dlist(mw->clients) {
 			clientwin_update((ClientWin *) iter->data);
