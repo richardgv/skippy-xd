@@ -400,7 +400,8 @@ init_focus(MainWin *mw, Window leader) {
 	ps->o.focus_initial = 0;
 
 	if (!iter) {
-		mw->client_to_focus = NULL;
+		dlist * first = dlist_first(mw->focuslist);
+		mw->client_to_focus = first->data;
 		mw->client_to_focus_on_cancel = NULL;
 	}
 	else {

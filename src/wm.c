@@ -688,7 +688,7 @@ wm_get_focused(session_t *ps) {
 	while (focused) {
 		// Discard insane values
 		if (ps->root == focused || PointerRoot == focused)
-			return focused;
+			return ps->mainwin->window;
 
 		// Check for WM_STATE
 		if (wid_has_prop(ps, focused, XA_WM_STATE))
