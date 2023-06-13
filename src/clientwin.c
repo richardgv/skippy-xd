@@ -647,7 +647,7 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 
 		else if (arr_keycodes_includes(cw->mainwin->keycodes_ExitCancelOnPress, evk->keycode))
 		{
-			mw->client_to_focus = mw->client_to_focus_on_cancel;
+			cw->mainwin->refocus = true;
 			return 1;
 		}
 
@@ -673,6 +673,7 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 
 		else if (arr_keycodes_includes(cw->mainwin->keycodes_ExitCancelOnRelease, evk->keycode))
 		{
+			cw->mainwin->refocus = true;
 			return 1;
 		}
 	}

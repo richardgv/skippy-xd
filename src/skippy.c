@@ -702,7 +702,7 @@ skippy_activate(MainWin *mw, enum layoutmode layout)
 	session_t *ps = mw->ps;
 
 	// Do this window before main window gets mapped
-	mw->revert_focus_win = wm_get_focused(ps);
+	Window focus_win = wm_get_focused(ps);
 
 	// Update the main window's geometry (and Xinerama info if applicable)
 	mainwin_update(mw);
@@ -730,13 +730,13 @@ skippy_activate(MainWin *mw, enum layoutmode layout)
 	}
 
 	if (layout == LAYOUTMODE_PAGING) {
-		if (!init_paging_layout(mw, layout, mw->revert_focus_win)) {
+		if (!init_paging_layout(mw, layout, focus_win)) {
 			printfef(false, "(): failed.");
 			return false;
 		}
 	}
 	else {
-		if (!init_layout(mw, layout, mw->revert_focus_win)) {
+		if (!init_layout(mw, layout, focus_win)) {
 			printfef(false, "(): failed.");
 			return false;
 		}
@@ -847,18 +847,18 @@ mainloop(session_t *ps, bool activate_on_start) {
 			long new_desktop = -1;
 			if (mw->client_to_focus) {
 				if (layout == LAYOUTMODE_PAGING) {
-					new_desktop = mw->client_to_focus->slots;
-					dlist *iter = dlist_find(mw->focuslist,
-							clientwin_cmp_func, (void *) mw->revert_focus_win);
-					if (iter) {
-						ClientWin *cw = iter->data;
-						if (cw)
-							childwin_focus(cw);
-					}
+					if (!mw->refocus)
+						new_desktop = mw->client_to_focus->slots;
+					else
+						new_desktop = mw->client_to_focus_on_cancel->slots;
 				}
 				else {
-					childwin_focus(mw->client_to_focus);
+					if (!mw->refocus)
+						childwin_focus(mw->client_to_focus);
+					else if(mw->client_to_focus_on_cancel)
+						childwin_focus(mw->client_to_focus_on_cancel);
 				}
+				mw->refocus = false;
 				mw->client_to_focus = NULL;
 				pending_damage = false;
 			}
@@ -1157,8 +1157,9 @@ mainloop(session_t *ps, bool activate_on_start) {
 					case PIPECMD_TOGGLE_SWITCHER:
 					case PIPECMD_TOGGLE_EXPOSE:
 					case PIPECMD_TOGGLE_PAGING:
-						if (mw)
-							die = true;
+						if (mw) {
+							mw->refocus = die = true;
+						}
 						else {
 							animating = activate = true;
 							if (piped_input == PIPECMD_TOGGLE_SWITCHER) {

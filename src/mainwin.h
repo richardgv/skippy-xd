@@ -86,12 +86,11 @@ struct _mainwin_t {
 	XineramaScreenInfo *xin_info, *xin_active;
 #endif /* CFG_XINERAMA */
 
-	/// @brief Window ID to revert focus to when the main window is unmapped.
-	Window revert_focus_win;
-	/// @brief the originally focused window
-	ClientWin *client_to_focus_on_cancel;
 	/// @brief The client window to eventually focus.
 	ClientWin *client_to_focus;
+	/// @brief the originally focused window
+	ClientWin *client_to_focus_on_cancel;
+	bool refocus;
 	// int ignore_next_refocus;
 	ClientWin *cw_tooltip;
 };
