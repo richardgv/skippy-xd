@@ -284,49 +284,6 @@ anime(
 }
 
 static void
-update_clients(MainWin *mw, Bool *touched)
-{
-	// Update the client table, pick the ones we want and sort them
-	dlist *stack = dlist_first(wm_get_stack(mw->ps));
-	mw->clients = dlist_first(mw->clients);
-
-	if (touched)
-		*touched = False;
-	
-	// Terminate mw->clients that are no longer managed
-	for (dlist *iter = mw->clients; iter; ) {
-		ClientWin *cw = (ClientWin *) iter->data;
-		if (dlist_find_data(stack, (void *) cw->wid_client)) {
-			iter = iter->next;
-		}
-		else {
-			dlist *tmp = iter->next;
-			clientwin_destroy((ClientWin *) iter->data, True);
-			mw->clients = dlist_remove(iter);
-			iter = tmp;
-			if (touched)
-				*touched = True;
-		}
-	}
-	XFlush(mw->ps->dpy);
-
-	// Add new mw->clients
-	foreach_dlist (stack) {
-		ClientWin *cw = (ClientWin *)
-			dlist_find(mw->clients, clientwin_cmp_func, iter->data);
-		if (!cw && ((Window) iter->data) != mw->window) {
-			cw = clientwin_create(mw, (Window)iter->data);
-			if (!cw) continue;
-			mw->clients = dlist_add(mw->clients, cw);
-			if (touched)
-				*touched = True;
-		}
-	}
-
-	dlist_free(stack);
-}
-
-static void
 daemon_count_clients(MainWin *mw, Bool *touched)
 {
 	// given the client table, update the clientondesktop
@@ -335,7 +292,21 @@ daemon_count_clients(MainWin *mw, Bool *touched)
 	// while mw->clientondesktop is only those in current virtual desktop
 	// if that option is user supplied
 
-	update_clients(mw, 0);
+	// remove old client windows
+	dlist_free(mw->clients);
+	// is clientwin_destroy(cw, True) needed?
+	mw->clients = NULL;
+
+	// create new client windows from EWMH or XQueryTree(), in the right z-order
+	dlist *stack = dlist_first(wm_get_stack(mw->ps));
+	foreach_dlist (stack) {
+		if (((Window) iter->data) != mw->window) {
+			ClientWin *cw = clientwin_create(mw, (Window)iter->data);
+			if (!cw) continue;
+			mw->clients = dlist_add(mw->clients, cw);
+		}
+	}
+
 	if (!mw->clients) {
 		printfdf(false, "(): No client windows found.");
 		return;
@@ -369,9 +340,9 @@ init_focus(MainWin *mw, enum layoutmode layout, Window leader) {
 	// is important for prev/next window selection
 	mw->focuslist = dlist_dup(mw->clientondesktop);
 
-	/*if (layout == LAYOUTMODE_SWITCHER)
-		dlist_sort(mw->focuslist, sort_cw_by_row, 0);
-	else*/ if (layout == LAYOUTMODE_EXPOSE)
+	if (layout == LAYOUTMODE_SWITCHER)
+		dlist_reverse(mw->focuslist);
+	else if (layout == LAYOUTMODE_EXPOSE)
 		dlist_sort(mw->focuslist, sort_cw_by_column, 0);
 
 	// Get the currently focused window and select which mini-window to focus

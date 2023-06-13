@@ -343,7 +343,8 @@ static inline dlist *
 wm_get_stack_sub(session_t *ps, Window root) {
 	dlist *l = NULL;
 
-	if (!(ps->o.acceptOvRedir || ps->o.acceptWMWin)) {
+	// does not give info on windows z-order
+	/*if (!(ps->o.acceptOvRedir || ps->o.acceptWMWin)) {
 		// EWMH
 		l = wm_get_stack_fromprop(ps, root, _NET_CLIENT_LIST);
 		if (l) {
@@ -357,9 +358,9 @@ wm_get_stack_sub(session_t *ps, Window root) {
 			printfdf(false, "(): Retrieved window stack from _WIN_CLIENT_LIST.");
 			return l;
 		}
-	}
+	}*/
 
-	// Stupid method
+	// Stupid method, but this gives windows ordered by z-order
 	{
 		Window *children = NULL;
 		unsigned nchildren = 0;
