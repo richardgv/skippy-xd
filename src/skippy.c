@@ -362,8 +362,17 @@ daemon_count_clients(MainWin *mw, Bool *touched)
 }
 
 static void
-init_focus(MainWin *mw, Window leader) {
+init_focus(MainWin *mw, enum layoutmode layout, Window leader) {
 	session_t *ps = mw->ps;
+
+	// ordering of client windows list
+	// is important for prev/next window selection
+	mw->focuslist = dlist_dup(mw->clientondesktop);
+
+	/*if (layout == LAYOUTMODE_SWITCHER)
+		dlist_sort(mw->focuslist, sort_cw_by_row, 0);
+	else*/ if (layout == LAYOUTMODE_EXPOSE)
+		dlist_sort(mw->focuslist, sort_cw_by_column, 0);
 
 	// Get the currently focused window and select which mini-window to focus
 	dlist *iter = dlist_find(mw->focuslist, clientwin_cmp_func, (void *) leader);
@@ -417,20 +426,10 @@ init_layout(MainWin *mw, enum layoutmode layout, Window leader)
 	if (!mw->clientondesktop)
 		return true;
 	
-	dlist_sort(mw->clientondesktop, clientwin_sort_func, 0);
-
 	/* set up the windows layout */
 	{
 		unsigned int newwidth = 0, newheight = 0;
 		layout_run(mw, mw->clientondesktop, &newwidth, &newheight, layout);
-
-		// ordering of client windows list
-		// is important for prev/next window selection
-		if (layout == LAYOUTMODE_SWITCHER)
-			dlist_sort(mw->clientondesktop, sort_cw_by_row, 0);
-		else /*if (layout == LAYOUTMODE_EXPOSE)*/
-			dlist_sort(mw->clientondesktop, sort_cw_by_column, 0);
-		mw->focuslist = mw->clientondesktop;
 
 		float multiplier = (float) (mw->width - 2 * mw->distance) / newwidth;
 		if (multiplier * newheight > mw->height - 2 * mw->distance)
@@ -446,7 +445,7 @@ init_layout(MainWin *mw, enum layoutmode layout, Window leader)
 		mw->yoff = yoff;
 	}
 
-	init_focus(mw, leader);
+	init_focus(mw, layout, leader);
 
 	return true;
 }
@@ -562,7 +561,7 @@ init_paging_layout(MainWin *mw, enum layoutmode layout, Window leader)
 		}
 	}
 
-	mw->focuslist = mw->dminis;
+	mw->focuslist = dlist_dup(mw->dminis);
 
 	return true;
 }
@@ -866,6 +865,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 			// Cleanup
 			dlist_free(mw->clientondesktop);
 			mw->clientondesktop = 0;
+			dlist_free(mw->focuslist);
 
 			// free all mini desktop representations
 			dlist_free_with_func(mw->dminis, (dlist_free_func) clientwin_destroy);
