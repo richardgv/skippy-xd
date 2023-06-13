@@ -702,7 +702,7 @@ skippy_activate(MainWin *mw, enum layoutmode layout)
 	session_t *ps = mw->ps;
 
 	// Do this window before main window gets mapped
-	mw->revert_focus_win = wm_get_focused(ps);
+	Window focus_win = wm_get_focused(ps);
 
 	// Update the main window's geometry (and Xinerama info if applicable)
 	mainwin_update(mw);
@@ -730,13 +730,13 @@ skippy_activate(MainWin *mw, enum layoutmode layout)
 	}
 
 	if (layout == LAYOUTMODE_PAGING) {
-		if (!init_paging_layout(mw, layout, mw->revert_focus_win)) {
+		if (!init_paging_layout(mw, layout, focus_win)) {
 			printfef(false, "(): failed.");
 			return false;
 		}
 	}
 	else {
-		if (!init_layout(mw, layout, mw->revert_focus_win)) {
+		if (!init_layout(mw, layout, focus_win)) {
 			printfef(false, "(): failed.");
 			return false;
 		}
@@ -846,19 +846,10 @@ mainloop(session_t *ps, bool activate_on_start) {
 			// keyboard gets ungrabbed.
 			long new_desktop = -1;
 			if (mw->client_to_focus) {
-				if (layout == LAYOUTMODE_PAGING) {
+				if (layout == LAYOUTMODE_PAGING)
 					new_desktop = mw->client_to_focus->slots;
-					dlist *iter = dlist_find(mw->focuslist,
-							clientwin_cmp_func, (void *) mw->revert_focus_win);
-					if (iter) {
-						ClientWin *cw = iter->data;
-						if (cw)
-							childwin_focus(cw);
-					}
-				}
-				else {
+				else
 					childwin_focus(mw->client_to_focus);
-				}
 				mw->client_to_focus = NULL;
 				pending_damage = false;
 			}

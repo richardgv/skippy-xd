@@ -675,14 +675,9 @@ wm_get_focused(session_t *ps) {
 	{
 		int revert_to = 0;
 		if (!XGetInputFocus(ps->dpy, &focused, &revert_to)) {
-			printfdf(false, "(): Currently not focused on any window; trying to find focus...");
-			wm_set_desktop_ewmh(ps, wm_get_current_desktop(ps));
-			if (!XGetInputFocus(ps->dpy, &focused, &revert_to)) {
-				printfdf(false, "(): Failed to get current focused window.");
-				return None;
-			}
+			printfdf(false, "(): Currently not focused on any window; returning main window...");
+			return ps->mainwin->window;
 		}
-		printfdf(false, "(): Focused window is %#010lx.", focused);
 	}
 
 	while (focused) {
