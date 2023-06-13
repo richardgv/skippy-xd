@@ -846,10 +846,19 @@ mainloop(session_t *ps, bool activate_on_start) {
 			// keyboard gets ungrabbed.
 			long new_desktop = -1;
 			if (mw->client_to_focus) {
-				if (layout == LAYOUTMODE_PAGING)
-					new_desktop = mw->client_to_focus->slots;
-				else
-					childwin_focus(mw->client_to_focus);
+				if (layout == LAYOUTMODE_PAGING) {
+					if (!mw->refocus)
+						new_desktop = mw->client_to_focus->slots;
+					else
+						new_desktop = mw->client_to_focus_on_cancel->slots;
+				}
+				else {
+					if (!mw->refocus)
+						childwin_focus(mw->client_to_focus);
+					else if(mw->client_to_focus_on_cancel)
+						childwin_focus(mw->client_to_focus_on_cancel);
+				}
+				mw->refocus = false;
 				mw->client_to_focus = NULL;
 				pending_damage = false;
 			}
@@ -1148,8 +1157,9 @@ mainloop(session_t *ps, bool activate_on_start) {
 					case PIPECMD_TOGGLE_SWITCHER:
 					case PIPECMD_TOGGLE_EXPOSE:
 					case PIPECMD_TOGGLE_PAGING:
-						if (mw)
-							die = true;
+						if (mw) {
+							mw->refocus = die = true;
+						}
 						else {
 							animating = activate = true;
 							if (piped_input == PIPECMD_TOGGLE_SWITCHER) {

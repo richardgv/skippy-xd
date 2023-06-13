@@ -90,6 +90,7 @@ struct _mainwin_t {
 	ClientWin *client_to_focus;
 	/// @brief the originally focused window
 	ClientWin *client_to_focus_on_cancel;
+	bool refocus;
 	// int ignore_next_refocus;
 	ClientWin *cw_tooltip;
 };
