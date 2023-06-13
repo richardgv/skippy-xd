@@ -284,6 +284,43 @@ anime(
 }
 
 static void
+update_clients(MainWin *mw)
+{
+	// Update the list of windows with correct z-ordering
+	dlist *stack = dlist_first(wm_get_stack(mw->ps));
+	mw->clients = dlist_first(mw->clients);
+
+	// Terminate mw->clients that are no longer managed
+	for (dlist *iter = mw->clients; iter; ) {
+		ClientWin *cw = (ClientWin *) iter->data;
+		if (dlist_find_data(stack, (void *) cw->wid_client)) {
+			iter = iter->next;
+		}
+		else {
+			dlist *tmp = iter->next;
+			clientwin_destroy((ClientWin *) iter->data, True);
+			mw->clients = dlist_remove(iter);
+			iter = tmp;
+		}
+	}
+	XFlush(mw->ps->dpy);
+
+	// Add new mw->clients
+	// This algorithm preserves correct z-order
+	foreach_dlist (stack) {
+		ClientWin *cw = (ClientWin *)
+			dlist_find(mw->clients, clientwin_cmp_func, iter->data);
+		if (!cw && ((Window) iter->data) != mw->window) {
+			cw = clientwin_create(mw, (Window)iter->data);
+			if (!cw) continue;
+			mw->clients = dlist_add(mw->clients, cw);
+		}
+	}
+
+	dlist_free(stack);
+}
+
+static void
 daemon_count_clients(MainWin *mw, Bool *touched)
 {
 	// given the client table, update the clientondesktop
@@ -292,20 +329,7 @@ daemon_count_clients(MainWin *mw, Bool *touched)
 	// while mw->clientondesktop is only those in current virtual desktop
 	// if that option is user supplied
 
-	// remove old client windows
-	dlist_free(mw->clients);
-	// is clientwin_destroy(cw, True) needed?
-	mw->clients = NULL;
-
-	// create new client windows from EWMH or XQueryTree(), in the right z-order
-	dlist *stack = dlist_first(wm_get_stack(mw->ps));
-	foreach_dlist (stack) {
-		if (((Window) iter->data) != mw->window) {
-			ClientWin *cw = clientwin_create(mw, (Window)iter->data);
-			if (!cw) continue;
-			mw->clients = dlist_add(mw->clients, cw);
-		}
-	}
+	update_clients(mw);
 
 	if (!mw->clients) {
 		printfdf(false, "(): No client windows found.");
