@@ -306,22 +306,32 @@ update_clients(MainWin *mw)
 	XFlush(mw->ps->dpy);
 
 	// Add new mw->clients
-	// This algorithm preserves correct z-order
+	// This algorithm preserves correct z-order:
+	// stack is ordered by correct z-order
+	// and we re-order existing or new ClientWin to match that in stack
+	// yes, it is O(n^2) complexity
+	dlist *new_clients = NULL;
+
 	foreach_dlist (stack) {
-		ClientWin *cw = (ClientWin *)
-			dlist_find(mw->clients, clientwin_cmp_func, iter->data);
-		if (!cw && ((Window) iter->data) != mw->window) {
-			cw = clientwin_create(mw, (Window)iter->data);
+		dlist *insert_point = dlist_find(mw->clients, clientwin_cmp_func, iter->data);
+		if (!insert_point && ((Window) iter->data) != mw->window) {
+			ClientWin *cw = clientwin_create(mw, (Window)iter->data);
 			if (!cw) continue;
-			mw->clients = dlist_add(mw->clients, cw);
+			new_clients = dlist_add(new_clients, cw);
+		}
+		else {
+			ClientWin *cw = (ClientWin *) insert_point->data;
+			new_clients = dlist_add(new_clients, cw);
 		}
 	}
 
 	dlist_free(stack);
+	dlist_free(mw->clients);
+	mw->clients = dlist_first(new_clients);
 }
 
 static void
-daemon_count_clients(MainWin *mw, Bool *touched)
+daemon_count_clients(MainWin *mw)
 {
 	// given the client table, update the clientondesktop
 	// the difference between mw->clients and mw->clientondesktop
@@ -713,7 +723,7 @@ skippy_activate(MainWin *mw, enum layoutmode layout)
 
 	mw->client_to_focus = NULL;
 
-	daemon_count_clients(mw, 0);
+	daemon_count_clients(mw);
 	if (!mw->clients || !mw->clientondesktop) {
 		return false;
 	}
@@ -976,7 +986,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 				}
 				else if (mw && ev.type == DestroyNotify) {
 					printfdf(false, "(): else if (ev.type == DestroyNotify) {");
-					daemon_count_clients(ps->mainwin, 0);
+					daemon_count_clients(ps->mainwin);
 					if (!mw->clientondesktop) {
 						printfdf(false, "(): Last client window destroyed/unmapped, "
 								"exiting.");
@@ -986,7 +996,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 				}
 				else if (ev.type == MapNotify || ev.type == UnmapNotify) {
 					printfdf(false, "(): else if (ev.type == MapNotify || ev.type == UnmapNotify) {");
-					daemon_count_clients(ps->mainwin, 0);
+					daemon_count_clients(ps->mainwin);
 					dlist *iter = (wid ? dlist_find(ps->mainwin->clients, clientwin_cmp_func, (void *) wid): NULL);
 					if (iter) {
 						ClientWin *cw = (ClientWin *) iter->data;
@@ -1985,7 +1995,7 @@ int main(int argc, char *argv[]) {
 			printfdf(false, "(): Finished flushing pipe \"%s\".", pipePath);
 		}
 
-		daemon_count_clients(mw, 0);
+		daemon_count_clients(mw);
 
 		foreach_dlist(mw->clients) {
 			clientwin_update((ClientWin *) iter->data);
