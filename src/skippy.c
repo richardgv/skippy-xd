@@ -914,7 +914,8 @@ mainloop(session_t *ps, bool activate_on_start) {
 						mainwin_map(mw);
 					XFlush(ps->dpy);
 				}
-				else if (timeslice >= ps->o.animationDuration) {
+				else if (layout == LAYOUTMODE_SWITCHER
+						|| timeslice >= ps->o.animationDuration) {
 					anime(ps->mainwin, ps->mainwin->clients, 1);
 					animating = false;
 					last_rendered = time_in_millis();
