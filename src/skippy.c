@@ -1124,7 +1124,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 						}
 
 						printfdf(false, "(): case PIPECMD_ACTIVATE, mode=%d", layout);
-						if (ps->mainwin->mapped)
+						if (mw)
 						{
 							printfdf(false, "(): if (ps->mainwin->mapped)");
 							fflush(stdout);fflush(stderr);
@@ -1137,13 +1137,13 @@ mainloop(session_t *ps, bool activate_on_start) {
 							mw->client_to_focus->focused = 0;
 							clientwin_render(mw->client_to_focus);
 
-							if (ps->o.focus_initial == FI_PREV)
+							/*if (ps->o.focus_initial == FI_PREV)
 							{
 								printfdf(false, "(): focus_miniw_prev(ps, mw->client_to_focus);");
 								focus_miniw_prev(ps, mw->client_to_focus);
 							}
 
-							else if (ps->o.focus_initial == FI_NEXT)
+							else if (ps->o.focus_initial == FI_NEXT)*/
 							{
 								printfdf(false, "(): focus_miniw_next(ps, mw->client_to_focus);");
 								focus_miniw_next(ps, mw->client_to_focus);
