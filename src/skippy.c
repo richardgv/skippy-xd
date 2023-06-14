@@ -1154,6 +1154,8 @@ mainloop(session_t *ps, bool activate_on_start) {
 						{
 							printfdf(false, "(): activate = true;");
 							animating = activate = true;
+							if (layout == LAYOUTMODE_SWITCHER)
+								ps->o.focus_initial = FI_NEXT;
 						}
 						break;
 					case PIPECMD_DEACTIVATE:
