@@ -43,8 +43,14 @@ void layout_run(MainWin *mw, dlist *windows,
 	if (layout == LAYOUTMODE_EXPOSE
 			&& mw->ps->o.exposeLayout == LAYOUT_BOXY)
 		layout_boxy(mw, windows, total_width, total_height);
-	else
+	else {
+		// to get the proper z-order based window ordering,
+		// reversing the list of windows is needed
+		dlist_reverse(windows);
 		layout_xd(mw, windows, total_width, total_height);
+		// reversing the linked list again for proper focus ordering
+		dlist_reverse(windows);
+	}
 }
 
 // original legacy layout

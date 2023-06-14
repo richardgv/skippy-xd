@@ -284,15 +284,12 @@ anime(
 }
 
 static void
-update_clients(MainWin *mw, Bool *touched)
+update_clients(MainWin *mw)
 {
-	// Update the client table, pick the ones we want and sort them
+	// Update the list of windows with correct z-ordering
 	dlist *stack = dlist_first(wm_get_stack(mw->ps));
 	mw->clients = dlist_first(mw->clients);
 
-	if (touched)
-		*touched = False;
-	
 	// Terminate mw->clients that are no longer managed
 	for (dlist *iter = mw->clients; iter; ) {
 		ClientWin *cw = (ClientWin *) iter->data;
@@ -304,30 +301,37 @@ update_clients(MainWin *mw, Bool *touched)
 			clientwin_destroy((ClientWin *) iter->data, True);
 			mw->clients = dlist_remove(iter);
 			iter = tmp;
-			if (touched)
-				*touched = True;
 		}
 	}
 	XFlush(mw->ps->dpy);
 
 	// Add new mw->clients
+	// This algorithm preserves correct z-order:
+	// stack is ordered by correct z-order
+	// and we re-order existing or new ClientWin to match that in stack
+	// yes, it is O(n^2) complexity
+	dlist *new_clients = NULL;
+
 	foreach_dlist (stack) {
-		ClientWin *cw = (ClientWin *)
-			dlist_find(mw->clients, clientwin_cmp_func, iter->data);
-		if (!cw && ((Window) iter->data) != mw->window) {
-			cw = clientwin_create(mw, (Window)iter->data);
+		dlist *insert_point = dlist_find(mw->clients, clientwin_cmp_func, iter->data);
+		if (!insert_point && ((Window) iter->data) != mw->window) {
+			ClientWin *cw = clientwin_create(mw, (Window)iter->data);
 			if (!cw) continue;
-			mw->clients = dlist_add(mw->clients, cw);
-			if (touched)
-				*touched = True;
+			new_clients = dlist_add(new_clients, cw);
+		}
+		else {
+			ClientWin *cw = (ClientWin *) insert_point->data;
+			new_clients = dlist_add(new_clients, cw);
 		}
 	}
 
 	dlist_free(stack);
+	dlist_free(mw->clients);
+	mw->clients = dlist_first(new_clients);
 }
 
 static void
-daemon_count_clients(MainWin *mw, Bool *touched)
+daemon_count_clients(MainWin *mw)
 {
 	// given the client table, update the clientondesktop
 	// the difference between mw->clients and mw->clientondesktop
@@ -335,7 +339,8 @@ daemon_count_clients(MainWin *mw, Bool *touched)
 	// while mw->clientondesktop is only those in current virtual desktop
 	// if that option is user supplied
 
-	update_clients(mw, 0);
+	update_clients(mw);
+
 	if (!mw->clients) {
 		printfdf(false, "(): No client windows found.");
 		return;
@@ -362,8 +367,17 @@ daemon_count_clients(MainWin *mw, Bool *touched)
 }
 
 static void
-init_focus(MainWin *mw, Window leader) {
+init_focus(MainWin *mw, enum layoutmode layout, Window leader) {
 	session_t *ps = mw->ps;
+
+	// ordering of client windows list
+	// is important for prev/next window selection
+	mw->focuslist = dlist_dup(mw->clientondesktop);
+
+	if (layout == LAYOUTMODE_SWITCHER)
+		dlist_reverse(mw->focuslist);
+	else if (layout == LAYOUTMODE_EXPOSE)
+		dlist_sort(mw->focuslist, sort_cw_by_column, 0);
 
 	// Get the currently focused window and select which mini-window to focus
 	dlist *iter = dlist_find(mw->focuslist, clientwin_cmp_func, (void *) leader);
@@ -417,20 +431,10 @@ init_layout(MainWin *mw, enum layoutmode layout, Window leader)
 	if (!mw->clientondesktop)
 		return true;
 	
-	dlist_sort(mw->clientondesktop, clientwin_sort_func, 0);
-
 	/* set up the windows layout */
 	{
 		unsigned int newwidth = 0, newheight = 0;
 		layout_run(mw, mw->clientondesktop, &newwidth, &newheight, layout);
-
-		// ordering of client windows list
-		// is important for prev/next window selection
-		if (layout == LAYOUTMODE_SWITCHER)
-			dlist_sort(mw->clientondesktop, sort_cw_by_row, 0);
-		else /*if (layout == LAYOUTMODE_EXPOSE)*/
-			dlist_sort(mw->clientondesktop, sort_cw_by_column, 0);
-		mw->focuslist = mw->clientondesktop;
 
 		float multiplier = (float) (mw->width - 2 * mw->distance) / newwidth;
 		if (multiplier * newheight > mw->height - 2 * mw->distance)
@@ -446,7 +450,7 @@ init_layout(MainWin *mw, enum layoutmode layout, Window leader)
 		mw->yoff = yoff;
 	}
 
-	init_focus(mw, leader);
+	init_focus(mw, layout, leader);
 
 	return true;
 }
@@ -562,7 +566,7 @@ init_paging_layout(MainWin *mw, enum layoutmode layout, Window leader)
 		}
 	}
 
-	mw->focuslist = mw->dminis;
+	mw->focuslist = dlist_dup(mw->dminis);
 
 	return true;
 }
@@ -719,7 +723,7 @@ skippy_activate(MainWin *mw, enum layoutmode layout)
 
 	mw->client_to_focus = NULL;
 
-	daemon_count_clients(mw, 0);
+	daemon_count_clients(mw);
 	if (!mw->clients || !mw->clientondesktop) {
 		return false;
 	}
@@ -866,6 +870,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 			// Cleanup
 			dlist_free(mw->clientondesktop);
 			mw->clientondesktop = 0;
+			dlist_free(mw->focuslist);
 
 			// free all mini desktop representations
 			dlist_free_with_func(mw->dminis, (dlist_free_func) clientwin_destroy);
@@ -909,7 +914,8 @@ mainloop(session_t *ps, bool activate_on_start) {
 						mainwin_map(mw);
 					XFlush(ps->dpy);
 				}
-				else if (timeslice >= ps->o.animationDuration) {
+				else if (layout == LAYOUTMODE_SWITCHER
+						|| timeslice >= ps->o.animationDuration) {
 					anime(ps->mainwin, ps->mainwin->clients, 1);
 					animating = false;
 					last_rendered = time_in_millis();
@@ -981,7 +987,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 				}
 				else if (mw && ev.type == DestroyNotify) {
 					printfdf(false, "(): else if (ev.type == DestroyNotify) {");
-					daemon_count_clients(ps->mainwin, 0);
+					daemon_count_clients(ps->mainwin);
 					if (!mw->clientondesktop) {
 						printfdf(false, "(): Last client window destroyed/unmapped, "
 								"exiting.");
@@ -991,7 +997,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 				}
 				else if (ev.type == MapNotify || ev.type == UnmapNotify) {
 					printfdf(false, "(): else if (ev.type == MapNotify || ev.type == UnmapNotify) {");
-					daemon_count_clients(ps->mainwin, 0);
+					daemon_count_clients(ps->mainwin);
 					dlist *iter = (wid ? dlist_find(ps->mainwin->clients, clientwin_cmp_func, (void *) wid): NULL);
 					if (iter) {
 						ClientWin *cw = (ClientWin *) iter->data;
@@ -1990,7 +1996,7 @@ int main(int argc, char *argv[]) {
 			printfdf(false, "(): Finished flushing pipe \"%s\".", pipePath);
 		}
 
-		daemon_count_clients(mw, 0);
+		daemon_count_clients(mw);
 
 		foreach_dlist(mw->clients) {
 			clientwin_update((ClientWin *) iter->data);
