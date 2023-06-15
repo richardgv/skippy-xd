@@ -49,8 +49,7 @@ clientwin_validate_func(dlist *l, void *data) {
 #endif
 
 	if (!ps->o.showAllDesktops
-			&& ps->o.mode != PROGMODE_ACTV_PAGING
-			&& ps->o.mode != PROGMODE_TGG_PAGING) {
+			&& ps->o.mode != PROGMODE_PAGING) {
 		CARD32 desktop = (*(CARD32 *)data),
 			w_desktop = wm_get_window_desktop(ps, cw->wid_client);
 
