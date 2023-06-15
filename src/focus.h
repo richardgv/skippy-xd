@@ -103,8 +103,6 @@ focus_miniw_adv(session_t *ps, ClientWin *cw, bool move_ptr) {
 	}
 	assert(cw->mini.window);
 
-	clientwin_render(cw);
-
 	if (move_ptr)
 	{
 		printfdf(false, "(): if (move_ptr)");
