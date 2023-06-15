@@ -785,11 +785,13 @@ mainloop(session_t *ps, bool activate_on_start) {
 	bool activate = activate_on_start;
 	bool pending_damage = false;
 	long last_rendered = 0L;
-	enum layoutmode layout = LAYOUTMODE_SWITCH;
+	enum layoutmode layout = LAYOUTMODE_EXPOSE;
 	bool animating = activate;
 	long first_animated = 0L;
 
 	switch (ps->o.mode) {
+		case PROGMODE_SWITCH:
+			layout = LAYOUTMODE_SWITCH;
 		case PROGMODE_EXPOSE:
 			layout = LAYOUTMODE_EXPOSE;
 			break;
@@ -797,7 +799,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 			layout = LAYOUTMODE_PAGING;
 			break;
 		default:
-			layout = LAYOUTMODE_SWITCH;
+			layout = LAYOUTMODE_EXPOSE;
 			break;
 	}
 
