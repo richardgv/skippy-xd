@@ -1106,14 +1106,16 @@ mainloop(session_t *ps, bool activate_on_start) {
 					case PIPECMD_EXPOSE:
 					case PIPECMD_PAGING:
 						if (mw) {
-							if (piped_input != PIPECMD_SWITCH) {
+							if (piped_input != PIPECMD_SWITCH
+									&& piped_input != PIPECMD_SWITCH_PREV) {
 								mw->refocus = die = true;
 								break;
 							}
 						}
 
 						animating = activate = true;
-						if (piped_input == PIPECMD_SWITCH) {
+						if (piped_input == PIPECMD_SWITCH
+								|| piped_input == PIPECMD_SWITCH_PREV) {
 							ps->o.mode = PROGMODE_SWITCH;
 							layout = LAYOUTMODE_SWITCH;
 						}
@@ -1810,15 +1812,16 @@ int main(int argc, char *argv[]) {
 		case PROGMODE_NORMAL:
 			break;
 		case PROGMODE_SWITCH:
+			activate_switch(pipePath);
+			goto main_end;
 		case PROGMODE_SWITCH_PREV:
+			activate_switch_prev(pipePath);
+			goto main_end;
 		case PROGMODE_EXPOSE:
+			activate_expose(pipePath);
+			goto main_end;
 		case PROGMODE_PAGING:
-			if (ps->o.mode == PROGMODE_SWITCH)
-				activate_switch(pipePath);
-			else if (ps->o.mode == PROGMODE_EXPOSE)
-				activate_expose(pipePath);
-			else if (ps->o.mode == PROGMODE_PAGING)
-				activate_paging(pipePath);
+			activate_paging(pipePath);
 			goto main_end;
 		case PROGMODE_RELOAD_CONFIG:
 			queue_reload_config(pipePath);
