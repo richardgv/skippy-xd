@@ -379,7 +379,7 @@ init_focus(MainWin *mw, enum layoutmode layout, Window leader) {
 	dlist *iter = dlist_find(mw->focuslist, clientwin_cmp_func, (void *) leader);
 
 	// check if the user specified --prev or --next on the cmdline
-	if(ps->o.focus_initial)
+	if(ps->o.focus_initial && iter)
 	{
 
 		// ps->mainwin->ignore_next_refocus = 1;
