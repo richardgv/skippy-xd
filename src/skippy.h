@@ -208,7 +208,8 @@ typedef struct {
 	bool movePointerOnRaise;
 	bool switchDesktopOnActivate;
 	bool allowUpscale;
-	bool showAllDesktops;
+	bool switchShowAllDesktops;
+	bool exposeShowAllDesktops;
 	bool showShadow;
 	int cornerRadius;
 	int preferredIconSize;
@@ -286,7 +287,8 @@ typedef struct {
 	.clientDisplayModes = NULL, \
 	.iconFillSpec = PICTSPECT_INIT, \
 	.fillSpec = PICTSPECT_INIT, \
-	.showAllDesktops = false, \
+	.switchShowAllDesktops = true, \
+	.exposeShowAllDesktops = false, \
 	.showShadow = true, \
 	.buttonImgs = { NULL }, \
 	.background = NULL, \
