@@ -560,8 +560,17 @@ init_paging_layout(MainWin *mw, enum layoutmode layout, Window leader)
 
 			if (cw->slots == current_desktop) {
 				mw->client_to_focus = cw;
-				mw->client_to_focus_on_cancel = cw;
 				mw->client_to_focus->focused = 1;
+
+				{
+					dlist *iter = dlist_find(mw->clientondesktop, clientwin_cmp_func, (void *) leader);
+					if (!iter) {
+						mw->client_to_focus_on_cancel = NULL;
+					}
+					else {
+						mw->client_to_focus_on_cancel = (ClientWin *) iter->data;
+					}
+				}
 			}
 		}
 	}
@@ -853,8 +862,15 @@ mainloop(session_t *ps, bool activate_on_start) {
 				if (layout == LAYOUTMODE_PAGING) {
 					if (!mw->refocus)
 						new_desktop = mw->client_to_focus->slots;
-					else
-						new_desktop = mw->client_to_focus_on_cancel->slots;
+					else {
+						if(mw->client_to_focus_on_cancel)
+							childwin_focus(mw->client_to_focus_on_cancel);
+					}
+					if (new_desktop == wm_get_current_desktop(ps)) {
+						new_desktop = -1;
+						if(mw->client_to_focus_on_cancel)
+							childwin_focus(mw->client_to_focus_on_cancel);
+					}
 				}
 				else {
 					if (!mw->refocus)
