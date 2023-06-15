@@ -1141,8 +1141,8 @@ mainloop(session_t *ps, bool activate_on_start) {
 							// 1st highlighted win, so we manually unfocus it here first, before moving on
 							// to focus and highlight the next window... it's probably because we miss the Xev
 							// since we are not in the right place in the main loop, cant unwind the call stack
-							mw->client_to_focus->focused = 0;
-							clientwin_render(mw->client_to_focus);
+							//mw->client_to_focus->focused = 0;
+							//clientwin_render(mw->client_to_focus);
 
 							if (piped_input == PIPECMD_SWITCH_PREV)
 							{
