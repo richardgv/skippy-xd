@@ -84,19 +84,16 @@ enum {
 
 enum progmode {
 	PROGMODE_NORMAL,
-	PROGMODE_ACTV_SWITCHER,
-	PROGMODE_TGG_SWITCHER,
-	PROGMODE_ACTV_EXPOSE,
-	PROGMODE_TGG_EXPOSE,
-	PROGMODE_ACTV_PAGING,
-	PROGMODE_TGG_PAGING,
-	PROGMODE_DEACTV,
+	PROGMODE_SWITCH,
+	PROGMODE_SWITCH_PREV,
+	PROGMODE_EXPOSE,
+	PROGMODE_PAGING,
 	PROGMODE_RELOAD_CONFIG,
 	PROGMODE_DM_STOP,
 };
 
 enum layoutmode {
-	LAYOUTMODE_SWITCHER,
+	LAYOUTMODE_SWITCH,
 	LAYOUTMODE_EXPOSE,
 	LAYOUTMODE_PAGING,
 };
@@ -211,7 +208,8 @@ typedef struct {
 	bool movePointerOnRaise;
 	bool switchDesktopOnActivate;
 	bool allowUpscale;
-	bool showAllDesktops;
+	bool switchShowAllDesktops;
+	bool exposeShowAllDesktops;
 	bool showShadow;
 	int cornerRadius;
 	int preferredIconSize;
@@ -289,7 +287,8 @@ typedef struct {
 	.clientDisplayModes = NULL, \
 	.iconFillSpec = PICTSPECT_INIT, \
 	.fillSpec = PICTSPECT_INIT, \
-	.showAllDesktops = false, \
+	.switchShowAllDesktops = true, \
+	.exposeShowAllDesktops = false, \
 	.showShadow = true, \
 	.buttonImgs = { NULL }, \
 	.background = NULL, \
