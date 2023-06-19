@@ -203,9 +203,7 @@ typedef struct {
 	bool lazyTrans;
 	bool includeFrame;
 	char *pipePath;
-	bool movePointerOnStart;
-	bool movePointerOnSelect;
-	bool movePointerOnRaise;
+	bool movePointer;
 	bool switchDesktopOnActivate;
 	bool allowUpscale;
 	bool switchShowAllDesktops;
@@ -277,9 +275,7 @@ typedef struct {
 	.lazyTrans = false, \
 	.includeFrame = false, \
 	.pipePath = NULL, \
-	.movePointerOnStart = true, \
-	.movePointerOnSelect = true, \
-	.movePointerOnRaise = true, \
+	.movePointer = false, \
 	.switchDesktopOnActivate = false, \
 	.allowUpscale = true, \
 	.cornerRadius = 0, \

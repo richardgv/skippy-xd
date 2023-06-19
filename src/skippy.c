@@ -932,7 +932,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 					animating = false;
 					last_rendered = time_in_millis();
 					focus_miniw_adv(ps, mw->client_to_focus,
-							ps->o.movePointerOnStart);
+							ps->o.movePointer);
 
 					if (layout == LAYOUTMODE_PAGING) {
 						foreach_dlist (mw->dminis) {
@@ -1697,9 +1697,7 @@ load_config_file(session_t *ps)
     config_get_bool_wrap(config, "general", "switchShowAllDesktops", &ps->o.switchShowAllDesktops);
     config_get_bool_wrap(config, "general", "exposeShowAllDesktops", &ps->o.exposeShowAllDesktops);
     config_get_bool_wrap(config, "general", "showShadow", &ps->o.showShadow);
-    config_get_bool_wrap(config, "general", "movePointerOnStart", &ps->o.movePointerOnStart);
-    config_get_bool_wrap(config, "general", "movePointerOnSelect", &ps->o.movePointerOnSelect);
-    config_get_bool_wrap(config, "general", "movePointerOnRaise", &ps->o.movePointerOnRaise);
+    config_get_bool_wrap(config, "general", "movePointer", &ps->o.movePointer);
     config_get_bool_wrap(config, "general", "switchDesktopOnActivate", &ps->o.switchDesktopOnActivate);
     config_get_bool_wrap(config, "xinerama", "showAll", &ps->o.xinerama_showAll);
     config_get_int_wrap(config, "normal", "tintOpacity", &ps->o.normal_tintOpacity, 0, 256);

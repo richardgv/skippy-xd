@@ -566,7 +566,7 @@ void
 childwin_focus(ClientWin *cw) {
 	session_t * const ps = cw->mainwin->ps;
 
-	if (ps->o.movePointerOnRaise)
+	if (ps->o.movePointer)
 		XWarpPointer(ps->dpy, None, cw->wid_client,
 				0, 0, 0, 0, cw->src.width / 2, cw->src.height / 2);
 	XRaiseWindow(ps->dpy, cw->wid_client);
