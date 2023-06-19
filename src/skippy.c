@@ -1698,7 +1698,6 @@ load_config_file(session_t *ps)
     config_get_bool_wrap(config, "general", "exposeShowAllDesktops", &ps->o.exposeShowAllDesktops);
     config_get_bool_wrap(config, "general", "showShadow", &ps->o.showShadow);
     config_get_bool_wrap(config, "general", "movePointer", &ps->o.movePointer);
-    config_get_bool_wrap(config, "general", "switchDesktopOnActivate", &ps->o.switchDesktopOnActivate);
     config_get_bool_wrap(config, "xinerama", "showAll", &ps->o.xinerama_showAll);
     config_get_int_wrap(config, "normal", "tintOpacity", &ps->o.normal_tintOpacity, 0, 256);
     config_get_int_wrap(config, "normal", "opacity", &ps->o.normal_opacity, 0, 256);

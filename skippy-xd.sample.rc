@@ -57,6 +57,10 @@
 
 [general]
 
+background =
+lazyTrans = false
+pipePath = /tmp/skippy-xd-fifo
+
 distance = 50
 useNetWMFullscreen = true
 ignoreSkipTaskbar = true
@@ -64,9 +68,6 @@ updateFreq = 60.0
 
 # set = 0 to switch off animations
 animationDuration = 200
-
-lazyTrans = false
-pipePath = /tmp/skippy-xd-fifo
 
 # exposeLayout=xd uses the same layout as switcher, maximizing screen estate
 # exposeLayout=boxy tends to preserve window positions, thus guiding the eye more
@@ -78,11 +79,11 @@ exposeShowAllDesktops = false
 # Move the mouse cursor when skippy is activated
 movePointer = false
 
-switchDesktopOnActivate = false
 includeFrame = true
 allowUpscale = true
 
-# Choose whether to show minimized windows
+# Choose whether to show shadow windows: windows that are minimized,
+# shaded, or on other virtual desktops
 showShadow = true
 
 cornerRadius = 5
@@ -90,7 +91,6 @@ preferredIconSize = 48
 showIconsOnThumbnails = true
 iconFillSpec = orig mid mid #00FFFF
 fillSpec = orig mid mid #FFFFFF
-background =
 
 [xinerama]
 showAll = true

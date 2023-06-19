@@ -204,7 +204,6 @@ typedef struct {
 	bool includeFrame;
 	char *pipePath;
 	bool movePointer;
-	bool switchDesktopOnActivate;
 	bool allowUpscale;
 	bool switchShowAllDesktops;
 	bool exposeShowAllDesktops;
@@ -276,7 +275,6 @@ typedef struct {
 	.includeFrame = false, \
 	.pipePath = NULL, \
 	.movePointer = false, \
-	.switchDesktopOnActivate = false, \
 	.allowUpscale = true, \
 	.cornerRadius = 0, \
 	.preferredIconSize = 48, \
