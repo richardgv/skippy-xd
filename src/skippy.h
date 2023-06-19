@@ -195,7 +195,6 @@ typedef struct {
 	int exposeLayout;
 	int distance;
 	bool useNetWMFullscreen;
-	bool ignoreSkipTaskbar;
 	bool acceptOvRedir;
 	bool acceptWMWin;
 	double updateFreq;
@@ -266,7 +265,6 @@ typedef struct {
 	.exposeLayout = LAYOUT_BOXY, \
 	.distance = 50, \
 	.useNetWMFullscreen = true, \
-	.ignoreSkipTaskbar = false, \
 	.acceptOvRedir = false, \
 	.acceptWMWin = false, \
 	.updateFreq = 60.0, \

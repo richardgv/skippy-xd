@@ -1684,7 +1684,6 @@ load_config_file(session_t *ps)
 
     config_get_int_wrap(config, "general", "distance", &ps->o.distance, 1, INT_MAX);
     config_get_bool_wrap(config, "general", "useNetWMFullscreen", &ps->o.useNetWMFullscreen);
-    config_get_bool_wrap(config, "general", "ignoreSkipTaskbar", &ps->o.ignoreSkipTaskbar);
     config_get_bool_wrap(config, "general", "acceptOvRedir", &ps->o.acceptOvRedir);
     config_get_bool_wrap(config, "general", "acceptWMWin", &ps->o.acceptWMWin);
     config_get_double_wrap(config, "general", "updateFreq", &ps->o.updateFreq, -1000.0, 1000.0);

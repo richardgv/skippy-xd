@@ -609,8 +609,7 @@ wm_validate_window(session_t *ps, Window wid) {
 			long v = prop.data32[i];
 			if (!ps->o.showShadow && _NET_WM_STATE_HIDDEN == v)
 				result = false;
-			else if (ps->o.ignoreSkipTaskbar
-					&& _NET_WM_STATE_SKIP_TASKBAR == v)
+			else if (_NET_WM_STATE_SKIP_TASKBAR == v)
 				result = false;
 			else if (_NET_WM_STATE_SHADED == v)
 				result = false;
@@ -626,7 +625,7 @@ wm_validate_window(session_t *ps, Window wid) {
 			result = false;
 		free_winprop(&prop);
 
-		if (result && ps->o.ignoreSkipTaskbar) {
+		if (result) {
 			prop = wid_get_prop(ps, wid, _WIN_HINTS, 1, XA_CARDINAL, 0);
 			if (winprop_get_int(&prop) & WIN_HINTS_SKIP_TASKBAR)
 				result = false;
