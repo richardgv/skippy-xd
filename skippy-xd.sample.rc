@@ -38,12 +38,6 @@
 #   "close-icccm" (close window with ICCCM method), "close-ewmh" (close
 #   window with EWMH method), or "destroy" (forcefully destroy the window).
 #
-# - [bindings] key* = is a list of valid XWindows KeySym identifiers, case
-#   sensitive and <space> seperated list. Run the program 'xev' to find them.
-#
-# - [bindings] modifierKeyMasks* = is a list of valid XWindows modifier key
-#   bitmask identifiers, as defined in the /usr/include/X11/X.h header file.
-#
 
 [general]
 
