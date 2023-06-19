@@ -63,9 +63,6 @@ struct _mainwin_t {
 	KeySym *keysyms_ExitCancelOnRelease;
 	KeySym *keysyms_ExitSelectOnPress;
 	KeySym *keysyms_ExitSelectOnRelease;
-	KeySym *keysyms_ReverseDirection;
-
-	int *modifierKeyMasks_ReverseDirection;
 
 	KeyCode *keycodes_Up;
 	KeyCode *keycodes_Down;
@@ -77,7 +74,6 @@ struct _mainwin_t {
 	KeyCode *keycodes_ExitCancelOnRelease;
 	KeyCode *keycodes_ExitSelectOnPress;
 	KeyCode *keycodes_ExitSelectOnRelease;
-	KeyCode *keycodes_ReverseDirection;
 
 	bool mapped;
 
