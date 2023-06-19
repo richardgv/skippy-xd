@@ -9,29 +9,19 @@
 # - colors can be anything XAllocNamedColor can handle
 #   (like "black" or "#000000")
 #
-# - distance is a relative number, and is scaled according to the scale
-#   factor applied to windows
-#
 # - fonts are Xft font descriptions
 #
 # - booleans are "true" or anything but "true" (-> false)
 #
 # - opacity is an integer in the range of 0-255
 #
-# - brighness is a floating point number (with 0.0 as neutral)
-#
-# - if the update frequency is a negative value, the mini-windows will only
-#   be updated when they're explicitly rendered (like, when they gain or
-#   lose focus). otherwise updateFreq is how many updates per second (fps)
-#
-# - the 'shadowText' option can be a color or 'none', in which case the
-#   drop-shadow effect is disabled
+# - brightness is a floating point number (with 0.0 as neutral)
 #
 # - Picture specification:
 #   [WIDTHxHEIGHT] [orig|scale|scalek|tile] [left|mid|right] [left|mid|right]
 #   [COLOR|#FFFFFFFF] [PATH]
 #
-# - keysUp, keywDown, eysLeft, keysRight:
+# - keysUp, keysDown, keysLeft, keysRight:
 #   selects the window in the direction compared to the current selected window,
 #   without wrapping
 #
@@ -57,40 +47,58 @@
 
 [general]
 
-distance = 50
-useNetWMFullscreen = true
-ignoreSkipTaskbar = true
+# File path of skippy-xd pipe daemon communication
+pipePath = /tmp/skippy-xd-fifo
+
+# Background picture when skippy-xd is activated
+background =
+
+# Frequency to update pixmaps
 updateFreq = 60.0
 
-# set = 0 to switch off animations
+# Allow other compositors such as picom handle transparency
+lazyTrans = false
+
+# Move the mouse cursor when skippy is activated
+movePointer = false
+
+# Set = 0 to switch off animations
+# for switch, there is never animation
 animationDuration = 200
 
-lazyTrans = false
-pipePath = /tmp/skippy-xd-fifo
+# Relative minimal distance between windows
+distance = 50
+
+# Whether to display window frames
+includeFrame = true
+
+# Whether to show the window bigger than its original size
+allowUpscale = true
+
+# Choose whether to show shadow windows:
+# windows that are minimized, shaded, or on other virtual desktops
+showShadow = true
 
 # exposeLayout=xd uses the same layout as switcher, maximizing screen estate
 # exposeLayout=boxy tends to preserve window positions, thus guiding the eye more
 exposeLayout = boxy
 
+# For switch and expose,
+# Whether to limit window select on current virtual desktop
+# Or allow window selection on all virtual desktops
+# Paging always show all desktops
 switchShowAllDesktops = true
 exposeShowAllDesktops = false
 
-# Move the mouse cursor when skippy is activated
-movePointer = false
-
-switchDesktopOnActivate = false
-includeFrame = true
-allowUpscale = true
-
-# Choose whether to show minimized windows
-showShadow = true
-
+# Show window previews with rounded corners,
+# with corner radius in pixels
 cornerRadius = 5
+
+# Icon visual parameters
 preferredIconSize = 48
 showIconsOnThumbnails = true
 iconFillSpec = orig mid mid #00FFFF
 fillSpec = orig mid mid #FFFFFF
-background =
 
 [xinerama]
 showAll = true
@@ -137,5 +145,3 @@ keysExitCancelOnPress = Escape BackSpace x q
 keysExitCancelOnRelease =
 keysExitSelectOnPress = Return space
 keysExitSelectOnRelease = Super_L Super_R Alt_L Alt_R ISO_Level3_Shift
-keysReverseDirection = Tab
-modifierKeyMasksReverseDirection = ShiftMask ControlMask

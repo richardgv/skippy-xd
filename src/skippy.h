@@ -195,7 +195,6 @@ typedef struct {
 	int exposeLayout;
 	int distance;
 	bool useNetWMFullscreen;
-	bool ignoreSkipTaskbar;
 	bool acceptOvRedir;
 	bool acceptWMWin;
 	double updateFreq;
@@ -204,7 +203,6 @@ typedef struct {
 	bool includeFrame;
 	char *pipePath;
 	bool movePointer;
-	bool switchDesktopOnActivate;
 	bool allowUpscale;
 	bool switchShowAllDesktops;
 	bool exposeShowAllDesktops;
@@ -255,8 +253,6 @@ typedef struct {
 	char *bindings_keysExitCancelOnRelease;
 	char *bindings_keysExitSelectOnPress;
 	char *bindings_keysExitSelectOnRelease;
-	char *bindings_keysReverseDirection;
-	char *bindings_modifierKeyMasksReverseDirection;
 } options_t;
 
 #define OPTIONST_INIT { \
@@ -267,7 +263,6 @@ typedef struct {
 	.exposeLayout = LAYOUT_BOXY, \
 	.distance = 50, \
 	.useNetWMFullscreen = true, \
-	.ignoreSkipTaskbar = false, \
 	.acceptOvRedir = false, \
 	.acceptWMWin = false, \
 	.updateFreq = 60.0, \
@@ -276,7 +271,6 @@ typedef struct {
 	.includeFrame = false, \
 	.pipePath = NULL, \
 	.movePointer = false, \
-	.switchDesktopOnActivate = false, \
 	.allowUpscale = true, \
 	.cornerRadius = 0, \
 	.preferredIconSize = 48, \

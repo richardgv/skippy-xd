@@ -158,11 +158,6 @@ static inline void
 wm_activate_window(session_t *ps, Window wid) {
 	if (!wid) return;
 
-	if (ps->o.switchDesktopOnActivate) {
-		long tgt = wm_get_window_desktop(ps, wid);
-		if (tgt >= 0)
-			wm_set_desktop_ewmh(ps, tgt);
-	}
 	// Order is important, to avoid "intelligent" WMs fixing our focus stealing
 	wm_activate_window_ewmh(ps, wid);
 	XSetInputFocus(ps->dpy, wid, RevertToParent, CurrentTime);

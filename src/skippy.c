@@ -1642,8 +1642,6 @@ load_config_file(session_t *ps)
     ps->o.bindings_keysExitCancelOnRelease = mstrdup(config_get(config, "bindings", "keysExitCancelOnRelease", ""));
     ps->o.bindings_keysExitSelectOnPress = mstrdup(config_get(config, "bindings", "keysExitSelectOnPress", "Return space"));
     ps->o.bindings_keysExitSelectOnRelease = mstrdup(config_get(config, "bindings", "keysExitSelectOnRelease", "Super_L Super_R Alt_L Alt_R ISO_Level3_Shift"));
-    ps->o.bindings_keysReverseDirection = mstrdup(config_get(config, "bindings", "keysReverseDirection", "Tab"));
-    ps->o.bindings_modifierKeyMasksReverseDirection = mstrdup(config_get(config, "bindings", "modifierKeyMasksReverseDirection", "ShiftMask ControlMask"));
 
     // print an error message for any key bindings that aren't recognized
     check_keysyms(ps->o.config_path, ": [bindings] keysUp =", ps->o.bindings_keysUp);
@@ -1656,8 +1654,6 @@ load_config_file(session_t *ps)
     check_keysyms(ps->o.config_path, ": [bindings] keysExitCancelOnRelease =", ps->o.bindings_keysExitCancelOnRelease);
     check_keysyms(ps->o.config_path, ": [bindings] keysExitSelectOnPress =", ps->o.bindings_keysExitSelectOnPress);
     check_keysyms(ps->o.config_path, ": [bindings] keysExitSelectOnRelease =", ps->o.bindings_keysExitSelectOnRelease);
-    check_keysyms(ps->o.config_path, ": [bindings] keysReverseDirection =", ps->o.bindings_keysReverseDirection);
-    check_modmasks(ps->o.config_path, ": [bindings] modifierKeyMasksReverseDirection =", ps->o.bindings_modifierKeyMasksReverseDirection);
 
 	if (!parse_cliop(ps, config_get(config, "bindings", "miwMouse1", "focus"), &ps->o.bindings_miwMouse[1])
 			|| !parse_cliop(ps, config_get(config, "bindings", "miwMouse2", "close-ewmh"), &ps->o.bindings_miwMouse[2])
@@ -1684,7 +1680,6 @@ load_config_file(session_t *ps)
 
     config_get_int_wrap(config, "general", "distance", &ps->o.distance, 1, INT_MAX);
     config_get_bool_wrap(config, "general", "useNetWMFullscreen", &ps->o.useNetWMFullscreen);
-    config_get_bool_wrap(config, "general", "ignoreSkipTaskbar", &ps->o.ignoreSkipTaskbar);
     config_get_bool_wrap(config, "general", "acceptOvRedir", &ps->o.acceptOvRedir);
     config_get_bool_wrap(config, "general", "acceptWMWin", &ps->o.acceptWMWin);
     config_get_double_wrap(config, "general", "updateFreq", &ps->o.updateFreq, -1000.0, 1000.0);
@@ -1698,7 +1693,6 @@ load_config_file(session_t *ps)
     config_get_bool_wrap(config, "general", "exposeShowAllDesktops", &ps->o.exposeShowAllDesktops);
     config_get_bool_wrap(config, "general", "showShadow", &ps->o.showShadow);
     config_get_bool_wrap(config, "general", "movePointer", &ps->o.movePointer);
-    config_get_bool_wrap(config, "general", "switchDesktopOnActivate", &ps->o.switchDesktopOnActivate);
     config_get_bool_wrap(config, "xinerama", "showAll", &ps->o.xinerama_showAll);
     config_get_int_wrap(config, "normal", "tintOpacity", &ps->o.normal_tintOpacity, 0, 256);
     config_get_int_wrap(config, "normal", "opacity", &ps->o.normal_opacity, 0, 256);
@@ -1941,8 +1935,6 @@ main_end:
 			free(ps->o.bindings_keysExitCancelOnRelease);
 			free(ps->o.bindings_keysExitSelectOnPress);
 			free(ps->o.bindings_keysExitSelectOnRelease);
-			free(ps->o.bindings_keysReverseDirection);
-			free(ps->o.bindings_modifierKeyMasksReverseDirection);
 		}
 
 		if (ps->fd_pipe >= 0)
