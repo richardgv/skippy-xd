@@ -261,6 +261,106 @@ parse_pictspec_end:
 	return true;
 }
 
+static inline const char *
+ev_dumpstr_type(const XEvent *ev) {
+	switch (ev->type) {
+		CASESTRRET(KeyPress);
+		CASESTRRET(KeyRelease);
+		CASESTRRET(ButtonPress);
+		CASESTRRET(ButtonRelease);
+		CASESTRRET(MotionNotify);
+		CASESTRRET(EnterNotify);
+		CASESTRRET(LeaveNotify);
+		CASESTRRET(FocusIn);
+		CASESTRRET(FocusOut);
+		CASESTRRET(KeymapNotify);
+		CASESTRRET(Expose);
+		CASESTRRET(GraphicsExpose);
+		CASESTRRET(NoExpose);
+		CASESTRRET(CirculateRequest);
+		CASESTRRET(ConfigureRequest);
+		CASESTRRET(MapRequest);
+		CASESTRRET(ResizeRequest);
+		CASESTRRET(CirculateNotify);
+		CASESTRRET(ConfigureNotify);
+		CASESTRRET(CreateNotify);
+		CASESTRRET(DestroyNotify);
+		CASESTRRET(GravityNotify);
+		CASESTRRET(MapNotify);
+		CASESTRRET(MappingNotify);
+		CASESTRRET(ReparentNotify);
+		CASESTRRET(UnmapNotify);
+		CASESTRRET(VisibilityNotify);
+		CASESTRRET(ColormapNotify);
+		CASESTRRET(ClientMessage);
+		CASESTRRET(PropertyNotify);
+		CASESTRRET(SelectionClear);
+		CASESTRRET(SelectionNotify);
+		CASESTRRET(SelectionRequest);
+	}
+
+	return "Unknown";
+}
+
+static inline Window
+ev_window(session_t *ps, const XEvent *ev) {
+#define T_SETWID(type, ele) case type: return ev->ele.window
+	switch (ev->type) {
+		case KeyPress:
+		T_SETWID(KeyRelease, xkey);
+		case ButtonPress:
+		T_SETWID(ButtonRelease, xbutton);
+		T_SETWID(MotionNotify, xmotion);
+		case EnterNotify:
+		T_SETWID(LeaveNotify, xcrossing);
+		case FocusIn:
+		T_SETWID(FocusOut, xfocus);
+		T_SETWID(KeymapNotify, xkeymap);
+		T_SETWID(Expose, xexpose);
+		case GraphicsExpose: return ev->xgraphicsexpose.drawable;
+		case NoExpose: return ev->xnoexpose.drawable;
+		T_SETWID(CirculateNotify, xcirculate);
+		T_SETWID(ConfigureNotify, xconfigure);
+		T_SETWID(CreateNotify, xcreatewindow);
+		T_SETWID(DestroyNotify, xdestroywindow);
+		T_SETWID(GravityNotify, xgravity);
+		T_SETWID(MapNotify, xmap);
+		T_SETWID(MappingNotify, xmapping);
+		T_SETWID(ReparentNotify, xreparent);
+		T_SETWID(UnmapNotify, xunmap);
+		T_SETWID(VisibilityNotify, xvisibility);
+		T_SETWID(ColormapNotify, xcolormap);
+		T_SETWID(ClientMessage, xclient);
+		T_SETWID(PropertyNotify, xproperty);
+		T_SETWID(SelectionClear, xselectionclear);
+		case SelectionNotify: return ev->xselection.requestor;
+	}
+#undef T_SETWID
+	if (ps->xinfo.damage_ev_base + XDamageNotify == ev->type)
+	  return ((XDamageNotifyEvent *) ev)->drawable;
+
+	printfef(false, "(): Failed to find window for event type %d. Troubles ahead.",
+			ev->type);
+
+	return ev->xany.window;
+}
+
+static inline void
+ev_dump(session_t *ps, const MainWin *mw, const XEvent *ev) {
+	if (!ev || (ps->xinfo.damage_ev_base + XDamageNotify) == ev->type) return;
+	// if (MotionNotify == ev->type) return;
+
+	const char *name = ev_dumpstr_type(ev);
+
+	Window wid = ev_window(ps, ev);
+	const char *wextra = "";
+	if (ps->root == wid) wextra = "(Root)";
+	if (mw && mw->window == wid) wextra = "(Main)";
+
+	print_timestamp(ps);
+	printfdf(false, "(): Event %-13.13s wid %#010lx %s", name, wid, wextra);
+}
+
 static void
 anime(
 	MainWin *mw,
@@ -603,106 +703,6 @@ desktopwin_map(ClientWin *cw)
 
 	XMapWindow(ps->dpy, cw->mini.window);
 	XRaiseWindow(ps->dpy, cw->mini.window);
-}
-
-static inline const char *
-ev_dumpstr_type(const XEvent *ev) {
-	switch (ev->type) {
-		CASESTRRET(KeyPress);
-		CASESTRRET(KeyRelease);
-		CASESTRRET(ButtonPress);
-		CASESTRRET(ButtonRelease);
-		CASESTRRET(MotionNotify);
-		CASESTRRET(EnterNotify);
-		CASESTRRET(LeaveNotify);
-		CASESTRRET(FocusIn);
-		CASESTRRET(FocusOut);
-		CASESTRRET(KeymapNotify);
-		CASESTRRET(Expose);
-		CASESTRRET(GraphicsExpose);
-		CASESTRRET(NoExpose);
-		CASESTRRET(CirculateRequest);
-		CASESTRRET(ConfigureRequest);
-		CASESTRRET(MapRequest);
-		CASESTRRET(ResizeRequest);
-		CASESTRRET(CirculateNotify);
-		CASESTRRET(ConfigureNotify);
-		CASESTRRET(CreateNotify);
-		CASESTRRET(DestroyNotify);
-		CASESTRRET(GravityNotify);
-		CASESTRRET(MapNotify);
-		CASESTRRET(MappingNotify);
-		CASESTRRET(ReparentNotify);
-		CASESTRRET(UnmapNotify);
-		CASESTRRET(VisibilityNotify);
-		CASESTRRET(ColormapNotify);
-		CASESTRRET(ClientMessage);
-		CASESTRRET(PropertyNotify);
-		CASESTRRET(SelectionClear);
-		CASESTRRET(SelectionNotify);
-		CASESTRRET(SelectionRequest);
-	}
-
-	return "Unknown";
-}
-
-static inline Window
-ev_window(session_t *ps, const XEvent *ev) {
-#define T_SETWID(type, ele) case type: return ev->ele.window
-	switch (ev->type) {
-		case KeyPress:
-		T_SETWID(KeyRelease, xkey);
-		case ButtonPress:
-		T_SETWID(ButtonRelease, xbutton);
-		T_SETWID(MotionNotify, xmotion);
-		case EnterNotify:
-		T_SETWID(LeaveNotify, xcrossing);
-		case FocusIn:
-		T_SETWID(FocusOut, xfocus);
-		T_SETWID(KeymapNotify, xkeymap);
-		T_SETWID(Expose, xexpose);
-		case GraphicsExpose: return ev->xgraphicsexpose.drawable;
-		case NoExpose: return ev->xnoexpose.drawable;
-		T_SETWID(CirculateNotify, xcirculate);
-		T_SETWID(ConfigureNotify, xconfigure);
-		T_SETWID(CreateNotify, xcreatewindow);
-		T_SETWID(DestroyNotify, xdestroywindow);
-		T_SETWID(GravityNotify, xgravity);
-		T_SETWID(MapNotify, xmap);
-		T_SETWID(MappingNotify, xmapping);
-		T_SETWID(ReparentNotify, xreparent);
-		T_SETWID(UnmapNotify, xunmap);
-		T_SETWID(VisibilityNotify, xvisibility);
-		T_SETWID(ColormapNotify, xcolormap);
-		T_SETWID(ClientMessage, xclient);
-		T_SETWID(PropertyNotify, xproperty);
-		T_SETWID(SelectionClear, xselectionclear);
-		case SelectionNotify: return ev->xselection.requestor;
-	}
-#undef T_SETWID
-	if (ps->xinfo.damage_ev_base + XDamageNotify == ev->type)
-	  return ((XDamageNotifyEvent *) ev)->drawable;
-
-	printfef(false, "(): Failed to find window for event type %d. Troubles ahead.",
-			ev->type);
-
-	return ev->xany.window;
-}
-
-static inline void
-ev_dump(session_t *ps, const MainWin *mw, const XEvent *ev) {
-	if (!ev || (ps->xinfo.damage_ev_base + XDamageNotify) == ev->type) return;
-	// if (MotionNotify == ev->type) return;
-
-	const char *name = ev_dumpstr_type(ev);
-
-	Window wid = ev_window(ps, ev);
-	const char *wextra = "";
-	if (ps->root == wid) wextra = "(Root)";
-	if (mw && mw->window == wid) wextra = "(Main)";
-
-	print_timestamp(ps);
-	printfdf(false, "(): Event %-13.13s wid %#010lx %s", name, wid, wextra);
 }
 
 static bool
