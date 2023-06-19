@@ -121,7 +121,7 @@ focus_miniw_adv(session_t *ps, ClientWin *cw, bool move_ptr) {
 
 static inline void
 focus_miniw(session_t *ps, ClientWin *cw) {
-	focus_miniw_adv(ps, cw, ps->o.movePointerOnSelect);
+	focus_miniw_adv(ps, cw, ps->o.movePointer);
 }
 
 /**
