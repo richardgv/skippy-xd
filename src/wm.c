@@ -560,7 +560,7 @@ void
 wm_set_fullscreen(session_t *ps, Window window,
 		int x, int y, unsigned width, unsigned height) {
 	Display *dpy = ps->dpy;
-	if (ps->o.useNetWMFullscreen && ps->has_ewmh_fullscreen) {
+	if (ps->has_ewmh_fullscreen) {
 		Atom props[] = {
 			_NET_WM_STATE_FULLSCREEN,
 			_NET_WM_STATE_SKIP_TASKBAR,

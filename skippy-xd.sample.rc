@@ -62,7 +62,6 @@ lazyTrans = false
 pipePath = /tmp/skippy-xd-fifo
 
 distance = 50
-useNetWMFullscreen = true
 ignoreSkipTaskbar = true
 updateFreq = 60.0
 
