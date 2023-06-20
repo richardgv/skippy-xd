@@ -542,6 +542,21 @@ mainwin_handle(MainWin *mw, XEvent *ev) {
 			break;
 		case ButtonRelease:
 			if (mw->pressed_mouse) {
+				const unsigned button = ev->xbutton.button;
+				if (button < MAX_MOUSE_BUTTONS) {
+					enum cliop action = ps->o.bindings_miwMouse[button];
+					if (action == CLIENTOP_PREV) {
+						focus_miniw_prev(ps, mw->client_to_focus);
+						return 0;
+					}
+					else if (action == CLIENTOP_NEXT) {
+						focus_miniw_next(ps, mw->client_to_focus);
+						return 0;
+					}
+					else if (action == CLIENTOP_NO) {
+						return 0;
+					}
+				}
 				printfdf(false, "(): Detected mouse button release on main window, "
 						"exiting.");
 				return 1;

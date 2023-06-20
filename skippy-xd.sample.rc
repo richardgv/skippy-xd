@@ -36,7 +36,8 @@
 # - [bindings] for miwMouse[1,2,3] can bind to "no" (do nothing), "focus"
 #   (focus to window), "iconify", "shade-ewmh" (toggle window shade state),
 #   "close-icccm" (close window with ICCCM method), "close-ewmh" (close
-#   window with EWMH method), or "destroy" (forcefully destroy the window).
+#   window with EWMH method), or "destroy" (forcefully destroy the window),
+#   "keysPrev" to focus on previous window, "keysNext" to focus on next window.
 #
 # - [bindings] key* = is a list of valid XWindows KeySym identifiers, case
 #   sensitive and <space> seperated list. Run the program 'xev' to find them.
@@ -135,6 +136,8 @@ font = fixed-11:weight=bold
 miwMouse1 = focus
 miwMouse2 = close-ewmh
 miwMouse3 = iconify
+miwMouse4 = keysNext
+miwMouse5 = keysPrev
 keysUp = Up w
 keysDown = Down s
 keysLeft = Left a

@@ -792,6 +792,12 @@ clientwin_action(ClientWin *cw, enum cliop action) {
 		case CLIENTOP_DESTROY:
 			XDestroyWindow(cw->mainwin->ps->dpy, wid);
 			break;
+		case CLIENTOP_PREV:
+			focus_miniw_prev(ps, cw->mainwin->client_to_focus);
+			break;
+		case CLIENTOP_NEXT:
+			focus_miniw_next(ps, cw->mainwin->client_to_focus);
+			break;
 	}
 
 	return 0;

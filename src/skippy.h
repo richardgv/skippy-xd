@@ -63,7 +63,7 @@
 
 #include "dlist.h"
 
-#define MAX_MOUSE_BUTTONS 4
+#define MAX_MOUSE_BUTTONS 6
 
 extern bool debuglog;
 
@@ -106,6 +106,8 @@ enum cliop {
 	CLIENTOP_CLOSE_ICCCM,
 	CLIENTOP_CLOSE_EWMH,
 	CLIENTOP_DESTROY,
+	CLIENTOP_PREV,
+	CLIENTOP_NEXT,
 };
 
 enum align {

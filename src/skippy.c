@@ -47,13 +47,15 @@ session_t *ps_g = NULL;
 static bool
 parse_cliop(session_t *ps, const char *str, enum cliop *dest) {
 	static const char * const STRS_CLIENTOP[] = {
-		[	CLIENTOP_NO						] = "no",
+		[	CLIENTOP_NO					] = "no",
 		[	CLIENTOP_FOCUS				] = "focus",
 		[	CLIENTOP_ICONIFY			] = "iconify",
-		[	CLIENTOP_SHADE_EWMH		] = "shade-ewmh",
-		[	CLIENTOP_CLOSE_ICCCM	] = "close-icccm",
-		[	CLIENTOP_CLOSE_EWMH		] = "close-ewmh",
+		[	CLIENTOP_SHADE_EWMH			] = "shade-ewmh",
+		[	CLIENTOP_CLOSE_ICCCM		] = "close-icccm",
+		[	CLIENTOP_CLOSE_EWMH			] = "close-ewmh",
 		[	CLIENTOP_DESTROY			] = "destroy",
+		[	CLIENTOP_PREV				] = "keysPrev",
+		[	CLIENTOP_NEXT				] = "keysNext",
 	};
 	for (int i = 0; i < sizeof(STRS_CLIENTOP) / sizeof(STRS_CLIENTOP[0]); ++i)
 		if (!strcmp(STRS_CLIENTOP[i], str)) {
@@ -1661,7 +1663,9 @@ load_config_file(session_t *ps)
 
 	if (!parse_cliop(ps, config_get(config, "bindings", "miwMouse1", "focus"), &ps->o.bindings_miwMouse[1])
 			|| !parse_cliop(ps, config_get(config, "bindings", "miwMouse2", "close-ewmh"), &ps->o.bindings_miwMouse[2])
-			|| !parse_cliop(ps, config_get(config, "bindings", "miwMouse3", "iconify"), &ps->o.bindings_miwMouse[3])) {
+			|| !parse_cliop(ps, config_get(config, "bindings", "miwMouse3", "iconify"), &ps->o.bindings_miwMouse[3])
+			|| !parse_cliop(ps, config_get(config, "bindings", "miwMouse4", "keysNext"), &ps->o.bindings_miwMouse[4])
+			|| !parse_cliop(ps, config_get(config, "bindings", "miwMouse5", "keysPrev"), &ps->o.bindings_miwMouse[5])) {
 		return RET_BADARG;
 	}
 
