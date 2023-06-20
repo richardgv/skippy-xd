@@ -965,6 +965,21 @@ mainloop(session_t *ps, bool activate_on_start) {
 
 				if (mw && MotionNotify == ev.type)
 				{
+					// when mouse move within a client window, focus on it
+					if (wid) {
+						dlist *iter = mw->clientondesktop;
+						if (layout == LAYOUTMODE_PAGING)
+							iter = mw->dminis;
+						for (; iter; iter = iter->next) {
+							ClientWin *cw = (ClientWin *) iter->data;
+							if (cw->mini.window == wid) {
+								if (!(POLLIN & r_fd[1].revents)) {
+									die = clientwin_handle(cw, &ev);
+								}
+							}
+						}
+					}
+
 					// Speed up responsiveness when the user is moving the mouse around
 					// The queue gets filled up with consquetive MotionNotify events
 					// discard all except the last MotionNotify event in a contiguous block of MotionNotify events

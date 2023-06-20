@@ -583,7 +583,6 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 	session_t *ps = mw->ps;
 	XKeyEvent * const evk = &ev->xkey;
 
-
 	if (ev->type == KeyPress)
 	{
 		report_key(ev);
@@ -599,49 +598,49 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 		if (arr_keycodes_includes(cw->mainwin->keycodes_Up, evk->keycode))
 		{
 			if(reverse_direction)
-				focus_down(cw);
+				focus_down(cw->mainwin->client_to_focus);
 			else
-				focus_up(cw);
+				focus_up(cw->mainwin->client_to_focus);
 		}
 
 		else if (arr_keycodes_includes(cw->mainwin->keycodes_Down, evk->keycode))
 		{
 			if(reverse_direction)
-				focus_up(cw);
+				focus_up(cw->mainwin->client_to_focus);
 			else
-				focus_down(cw);
+				focus_down(cw->mainwin->client_to_focus);
 		}
 
 		else if (arr_keycodes_includes(cw->mainwin->keycodes_Left, evk->keycode))
 		{
 			if(reverse_direction)
-				focus_right(cw);
+				focus_right(cw->mainwin->client_to_focus);
 			else
-				focus_left(cw);
+				focus_left(cw->mainwin->client_to_focus);
 		}
 
 		else if (arr_keycodes_includes(cw->mainwin->keycodes_Right, evk->keycode))
 		{
 			if(reverse_direction)
-				focus_left(cw);
+				focus_left(cw->mainwin->client_to_focus);
 			else
-				focus_right(cw);
+				focus_right(cw->mainwin->client_to_focus);
 		}
 
 		else if (arr_keycodes_includes(cw->mainwin->keycodes_Prev, evk->keycode))
 		{
 			if(reverse_direction)
-				focus_miniw_next(ps, cw);
+				focus_miniw_next(ps, cw->mainwin->client_to_focus);
 			else
-				focus_miniw_prev(ps, cw);
+				focus_miniw_prev(ps, cw->mainwin->client_to_focus);
 		}
 
 		else if (arr_keycodes_includes(cw->mainwin->keycodes_Next, evk->keycode))
 		{
 			if(reverse_direction)
-				focus_miniw_prev(ps, cw);
+				focus_miniw_prev(ps, cw->mainwin->client_to_focus);
 			else
-				focus_miniw_next(ps, cw);
+				focus_miniw_next(ps, cw->mainwin->client_to_focus);
 		}
 
 		else if (arr_keycodes_includes(cw->mainwin->keycodes_ExitCancelOnPress, evk->keycode))
@@ -652,7 +651,7 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 
 		else if (arr_keycodes_includes(cw->mainwin->keycodes_ExitSelectOnPress, evk->keycode))
 		{
-			mw->client_to_focus = cw;
+			mw->client_to_focus = cw->mainwin->client_to_focus;
 			return 1;
 		}
 	}
@@ -741,8 +740,12 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 		if (debuglog) fputs("\n", stdout);
 		XFlush(ps->dpy);
 
-	} else if(ev->type == EnterNotify) {
+	} else if(ev->type == MotionNotify) {
+		printfdf(false, "(): else if (ev->type == MotionNotify) {");
+
 		XSetInputFocus(ps->dpy, cw->mini.window, RevertToParent, CurrentTime);
+		cw->mainwin->client_to_focus = cw;
+
 		if (cw->mainwin->tooltip) {
 			cw->mainwin->cw_tooltip = cw;
 			int win_title_len = 0;
@@ -757,7 +760,7 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 			}
 		}
 	} else if(ev->type == LeaveNotify) {
-		// XSetInputFocus(ps->dpy, mw->window, RevertToParent, CurrentTime);
+		printfdf(false, "(): else if (ev->type == LeaveNotify) {");
 		cw->mainwin->cw_tooltip = NULL;
 		if(cw->mainwin->tooltip)
 			tooltip_unmap(cw->mainwin->tooltip);
