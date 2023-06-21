@@ -236,7 +236,6 @@ typedef struct {
 	bool tooltip_followsMouse;
 	int tooltip_offsetX;
 	int tooltip_offsetY;
-	enum align tooltip_align;
 	char *tooltip_border;
 	char *tooltip_background;
 	int tooltip_opacity;
@@ -298,9 +297,8 @@ typedef struct {
 	.shadow_opacity = 128, \
 	.tooltip_show = true, \
 	.tooltip_followsMouse = true, \
-	.tooltip_offsetX = 20, \
+	.tooltip_offsetX = 0, \
 	.tooltip_offsetY = 20, \
-	.tooltip_align = ALIGN_LEFT, \
 	.tooltip_border = NULL, \
 	.tooltip_background = NULL, \
 	.tooltip_opacity = 128, \

@@ -1727,8 +1727,6 @@ load_config_file(session_t *ps)
     config_get_bool_wrap(config, "tooltip", "followsMouse", &ps->o.tooltip_followsMouse);
     config_get_int_wrap(config, "tooltip", "offsetX", &ps->o.tooltip_offsetX, INT_MIN, INT_MAX);
     config_get_int_wrap(config, "tooltip", "offsetY", &ps->o.tooltip_offsetY, INT_MIN, INT_MAX);
-    if (!parse_align_full(ps, config_get(config, "tooltip", "align", "left"), &ps->o.tooltip_align))
-        return RET_BADARG;
     config_get_int_wrap(config, "tooltip", "tintOpacity", &ps->o.highlight_tintOpacity, 0, 256);
     config_get_int_wrap(config, "tooltip", "opacity", &ps->o.tooltip_opacity, 0, 256);
     {
