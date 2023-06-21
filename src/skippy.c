@@ -1012,7 +1012,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 
 					if (mw->tooltip && ps->o.tooltip_followsMouse)
 						tooltip_move(mw->tooltip,
-								ev.xmotion.x_root, ev.xmotion.y_root);
+								ev.xmotion.x_root, ev.xmotion.y_root, mw->client_to_focus);
 				}
 				else if (mw && ev.type == DestroyNotify) {
 					printfdf(false, "(): else if (ev.type == DestroyNotify) {");

@@ -163,7 +163,7 @@ tooltip_create(MainWin *mw) {
 }
 
 void
-tooltip_map(Tooltip *tt, int mouse_x, int mouse_y,
+tooltip_map(Tooltip *tt, int mouse_x, int mouse_y, ClientWin *cw,
 		FcChar8 *text, int len)
 {
 	session_t * const ps = tt->mainwin->ps;
@@ -187,7 +187,7 @@ tooltip_map(Tooltip *tt, int mouse_x, int mouse_y,
 	tt->width = tt->extents.width + 8;
 	tt->height = tt->font_height + 5 + (tt->shadow.pixel ? 2 : 0);
 	XResizeWindow(ps->dpy, tt->window, tt->width, tt->height);
-	tooltip_move(tt, mouse_x, mouse_y);
+	tooltip_move(tt, mouse_x, mouse_y, cw);
 	
 	if(tt->text)
 		free(tt->text);
@@ -202,13 +202,17 @@ tooltip_map(Tooltip *tt, int mouse_x, int mouse_y,
 }
 
 void
-tooltip_move(Tooltip *tt, int mouse_x, int mouse_y) {
+tooltip_move(Tooltip *tt, int mouse_x, int mouse_y, ClientWin *cw) {
 
 	session_t *ps = tt->mainwin->ps;
 	int x = ps->o.tooltip_offsetX, y = ps->o.tooltip_offsetY;
 	if (ps->o.tooltip_followsMouse) {
 		x += mouse_x;
 		y += mouse_y;
+	}
+	else {
+		x += cw->mini.x + cw->mini.width/2;
+		y += cw->mini.y + cw->mini.height/2;
 	}
 	switch (ps->o.tooltip_align) {
 		case ALIGN_LEFT: break;
