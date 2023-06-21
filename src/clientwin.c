@@ -718,6 +718,21 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 		if (debuglog) fputs("\n", stdout);
 		XFlush(ps->dpy);
 
+		cw->mainwin->cw_tooltip = cw;
+		if (cw->mainwin->tooltip) {
+			cw->mainwin->cw_tooltip = cw;
+			int win_title_len = 0;
+			FcChar8 *win_title = wm_get_window_title(ps, cw->wid_client, &win_title_len);
+			if (!win_title)
+				win_title = wm_get_window_title(ps, cw->mini.window, &win_title_len);
+			if (win_title) {
+				tooltip_map(cw->mainwin->tooltip,
+						ev->xcrossing.x_root, ev->xcrossing.y_root, cw,
+						win_title, win_title_len);
+				free(win_title);
+			}
+		}
+
 	} else if (ev->type == FocusOut) {
 		printfdf(false, "(): else if (ev->type == FocusOut) {");
 		XFocusChangeEvent *evf = &ev->xfocus;
@@ -745,20 +760,6 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 
 		XSetInputFocus(ps->dpy, cw->mini.window, RevertToParent, CurrentTime);
 		cw->mainwin->client_to_focus = cw;
-
-		if (cw->mainwin->tooltip) {
-			cw->mainwin->cw_tooltip = cw;
-			int win_title_len = 0;
-			FcChar8 *win_title = wm_get_window_title(ps, cw->wid_client, &win_title_len);
-			if (!win_title)
-				win_title = wm_get_window_title(ps, cw->mini.window, &win_title_len);
-			if (win_title) {
-				tooltip_map(cw->mainwin->tooltip,
-						ev->xcrossing.x_root, ev->xcrossing.y_root, cw,
-						win_title, win_title_len);
-				free(win_title);
-			}
-		}
 	} else if(ev->type == LeaveNotify) {
 		printfdf(false, "(): else if (ev->type == LeaveNotify) {");
 		cw->mainwin->cw_tooltip = NULL;

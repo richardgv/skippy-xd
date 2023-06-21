@@ -1003,12 +1003,11 @@ mainloop(session_t *ps, bool activate_on_start) {
 					// mw->ignore_next_refocus = 0;
 
 					// we also need to refocus here
-					if(mw->cw_tooltip && (mw->cw_tooltip != mw->client_to_focus))
-					{
-						focus_miniw(ps, mw->cw_tooltip);
-						clientwin_render(mw->client_to_focus);
-					}
-
+					//if(mw->cw_tooltip && (mw->cw_tooltip != mw->client_to_focus))
+					//{
+						//focus_miniw(ps, mw->cw_tooltip);
+						//clientwin_render(mw->client_to_focus);
+					//}
 
 					if (mw->tooltip && ps->o.tooltip_followsMouse)
 						tooltip_move(mw->tooltip,
