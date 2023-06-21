@@ -763,7 +763,7 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 	} else if(ev->type == LeaveNotify) {
 		printfdf(false, "(): else if (ev->type == LeaveNotify) {");
 		cw->mainwin->cw_tooltip = NULL;
-		if(cw->mainwin->tooltip)
+		if(ps->o.tooltip_followsMouse && cw->mainwin->tooltip)
 			tooltip_unmap(cw->mainwin->tooltip);
 	}
 	return 0;
