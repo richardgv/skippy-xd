@@ -116,6 +116,7 @@ parse_pict_posp_mode(session_t *ps, const char *str, enum pict_posp_mode *dest) 
 	printfef(true, "() (\"%s\"): Unrecognized operation.", str);
 	return 0;
 }
+
 static inline int
 parse_color_sub(const char *s, unsigned short *dest) {
 	static const int SEG = 2;
@@ -1690,8 +1691,14 @@ load_config_file(session_t *ps)
 
     config_get_int_wrap(config, "general", "distance", &ps->o.distance, 1, INT_MAX);
     config_get_bool_wrap(config, "general", "useNetWMFullscreen", &ps->o.useNetWMFullscreen);
-    config_get_bool_wrap(config, "general", "acceptOvRedir", &ps->o.acceptOvRedir);
-    config_get_bool_wrap(config, "general", "acceptWMWin", &ps->o.acceptWMWin);
+	{
+		ps->o.clientList = 0;
+		const char *tmp = config_get(config, "general", "clientList", NULL);
+		if (tmp && strcmp(tmp, "_NET_CLIENT_LIST") == 0)
+			ps->o.clientList = 1;
+		if (tmp && strcmp(tmp, "_WIN_CLIENT_LIST") == 0)
+			ps->o.clientList = 2;
+	}
     config_get_double_wrap(config, "general", "updateFreq", &ps->o.updateFreq, -1000.0, 1000.0);
     config_get_int_wrap(config, "general", "animationDuration", &ps->o.animationDuration, 0, 2000);
     config_get_bool_wrap(config, "general", "lazyTrans", &ps->o.lazyTrans);

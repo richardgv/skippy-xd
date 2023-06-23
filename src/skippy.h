@@ -197,8 +197,7 @@ typedef struct {
 	int exposeLayout;
 	int distance;
 	bool useNetWMFullscreen;
-	bool acceptOvRedir;
-	bool acceptWMWin;
+	int clientList;
 	double updateFreq;
 	int animationDuration;;
 	bool lazyTrans;
@@ -265,8 +264,7 @@ typedef struct {
 	.exposeLayout = LAYOUT_BOXY, \
 	.distance = 50, \
 	.useNetWMFullscreen = true, \
-	.acceptOvRedir = false, \
-	.acceptWMWin = false, \
+	.clientList = 0, \
 	.updateFreq = 60.0, \
 	.animationDuration = 200, \
 	.lazyTrans = false, \

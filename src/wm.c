@@ -344,48 +344,48 @@ wm_get_stack_sub(session_t *ps, Window root) {
 	dlist *l = NULL;
 
 	// does not give info on windows z-order
-	/*if (!(ps->o.acceptOvRedir || ps->o.acceptWMWin)) {
+	switch (ps->o.clientList) {
 		// EWMH
-		l = wm_get_stack_fromprop(ps, root, _NET_CLIENT_LIST);
-		if (l) {
+		case 1:
 			printfdf(false, "(): Retrieved window stack from _NET_CLIENT_LIST.");
-			return l;
-		}
+			return wm_get_stack_fromprop(ps, root, _NET_CLIENT_LIST);
 
 		// GNOME WM
-		l = wm_get_stack_fromprop(ps, root, _WIN_CLIENT_LIST);
-		if (l) {
+		case 2:
 			printfdf(false, "(): Retrieved window stack from _WIN_CLIENT_LIST.");
-			return l;
-		}
-	}*/
+			return wm_get_stack_fromprop(ps, root, _WIN_CLIENT_LIST);
 
-	// Stupid method, but this gives windows ordered by z-order
-	{
-		Window *children = NULL;
-		unsigned nchildren = 0;
-		Window rroot = None, rparent = None;
-		if (XQueryTree(ps->dpy, root, &rroot, &rparent,
-					&children, &nchildren) && nchildren && children) {
-			// Fluxbox sets override-redirect on its frame windows,
-			// so we can't skip override-redirect windows.
-			for (int i = 0; i < nchildren; ++i) {
-				Window wid = children[i];
-				Window client = wm_find_client(ps, wid);
-				if (!client && (ps->o.acceptOvRedir || ps->o.acceptWMWin)) {
-					XWindowAttributes attr = { };
-					if (XGetWindowAttributes(ps->dpy, wid, &attr)
-						&& ((attr.override_redirect && ps->o.acceptOvRedir)
-								|| (!attr.override_redirect && ps->o.acceptWMWin))) {
-						client = wid;
-					}
+		// Stupid method, but this gives windows ordered by z-order
+		default:
+		{
+			Window *children = NULL;
+			unsigned nchildren = 0;
+			Window rroot = None, rparent = None;
+			if (XQueryTree(ps->dpy, root, &rroot, &rparent,
+						&children, &nchildren) && nchildren && children) {
+				// Fluxbox sets override-redirect on its frame windows,
+				// so we can't skip override-redirect windows.
+				for (int i = 0; i < nchildren; ++i) {
+					Window wid = children[i];
+					Window client = wm_find_client(ps, wid);
+					// both obsolete config options
+					// ps->o.acceptOvRedir and ps->o.acceptWMWin were always false
+					// hence this loop never runs
+					/*if (!client && (ps->o.acceptOvRedir || ps->o.acceptWMWin)) {
+						XWindowAttributes attr = { };
+						if (XGetWindowAttributes(ps->dpy, wid, &attr)
+							&& ((attr.override_redirect && ps->o.acceptOvRedir)
+									|| (!attr.override_redirect && ps->o.acceptWMWin))) {
+							client = wid;
+						}
+					}*/
+					if (client)
+						l = dlist_add(l, (void *) client);
 				}
-				if (client)
-					l = dlist_add(l, (void *) client);
 			}
+			sxfree(children);
+			printfdf(false, "(): Retrieved window stack by querying all children.");
 		}
-		sxfree(children);
-		printfdf(false, "(): Retrieved window stack by querying all children.");
 	}
 
 	return l;

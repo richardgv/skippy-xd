@@ -51,6 +51,10 @@
 # File path of skippy-xd pipe daemon communication
 pipePath = /tmp/skippy-xd-fifo
 
+# Depending on your window manager, you may want to choose between
+# XQueryTree, _NET_CLIENT_LIST, _WIN_CLIENT_LIST
+clientList = XQueryTree
+
 # Background picture when skippy-xd is activated
 background =
 
