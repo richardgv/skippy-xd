@@ -933,8 +933,6 @@ mainloop(session_t *ps, bool activate_on_start) {
 					anime(ps->mainwin, ps->mainwin->clients, 1);
 					animating = false;
 					last_rendered = time_in_millis();
-					focus_miniw_adv(ps, mw->client_to_focus,
-							ps->o.movePointer);
 
 					if (layout == LAYOUTMODE_PAGING) {
 						foreach_dlist (mw->dminis) {
@@ -946,6 +944,11 @@ mainloop(session_t *ps, bool activate_on_start) {
 					if (!ps->o.lazyTrans && !mw->mapped)
 						mainwin_map(mw);
 					XFlush(ps->dpy);
+
+					XSync(ps->dpy, False);
+					XSync(ps->dpy, True);
+					focus_miniw_adv(ps, mw->client_to_focus,
+							ps->o.movePointer);
 				}
 
 				continue; // while animating, do not allow user actions
@@ -997,21 +1000,6 @@ mainloop(session_t *ps, bool activate_on_start) {
 
 						num_events--;
 					}
-
-					// the mouse has moved
-					// refocus enable
-					// mw->ignore_next_refocus = 0;
-
-					// we also need to refocus here
-					//if(mw->cw_tooltip && (mw->cw_tooltip != mw->client_to_focus))
-					//{
-						//focus_miniw(ps, mw->cw_tooltip);
-						//clientwin_render(mw->client_to_focus);
-					//}
-
-					if (mw->tooltip && ps->o.tooltip_followsMouse)
-						tooltip_move(mw->tooltip,
-								ev.xmotion.x_root, ev.xmotion.y_root, mw->client_to_focus);
 				}
 				else if (mw && ev.type == DestroyNotify) {
 					printfdf(false, "(): else if (ev.type == DestroyNotify) {");
@@ -1723,7 +1711,6 @@ load_config_file(session_t *ps)
     config_get_int_wrap(config, "shadow", "tintOpacity", &ps->o.shadow_tintOpacity, 0, 256);
     config_get_int_wrap(config, "shadow", "opacity", &ps->o.shadow_opacity, 0, 256);
     config_get_bool_wrap(config, "tooltip", "show", &ps->o.tooltip_show);
-    config_get_bool_wrap(config, "tooltip", "followsMouse", &ps->o.tooltip_followsMouse);
     config_get_int_wrap(config, "tooltip", "offsetX", &ps->o.tooltip_offsetX, INT_MIN, INT_MAX);
     config_get_int_wrap(config, "tooltip", "offsetY", &ps->o.tooltip_offsetY, INT_MIN, INT_MAX);
     config_get_int_wrap(config, "tooltip", "tintOpacity", &ps->o.highlight_tintOpacity, 0, 256);

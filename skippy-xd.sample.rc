@@ -121,9 +121,8 @@ opacity = 128
 
 [tooltip]
 show = true
-followsMouse = true
-offsetX = 20
-offsetY = 20
+offsetX = 0
+offsetY = 5
 border = #ffffff
 background = #404040
 opacity = 128

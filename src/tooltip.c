@@ -207,14 +207,9 @@ tooltip_move(Tooltip *tt, int mouse_x, int mouse_y, ClientWin *cw) {
 	session_t *ps = tt->mainwin->ps;
 	int x = ps->o.tooltip_offsetX,
 		y = ps->o.tooltip_offsetY;
-	if (ps->o.tooltip_followsMouse) {
-		x += mouse_x;
-		y += mouse_y;
-	}
-	else {
-		x += cw->mini.x + cw->mini.width/2 - tt->width / 2;
-		y += cw->mini.y + cw->mini.height;
-	}
+
+    x += cw->mini.x + cw->mini.width/2 - tt->width / 2;
+    y += cw->mini.y + cw->mini.height;
 
 	x = MIN(MAX(0, x), tt->mainwin->x + tt->mainwin->width - tt->width);
 	y = MIN(MAX(0, y), tt->mainwin->y + tt->mainwin->height - tt->height);

@@ -98,6 +98,7 @@ int clientwin_check_group_leader_func(dlist *l, void *data);
 void clientwin_render(ClientWin *);
 void clientwin_schedule_repair(ClientWin *cw, XRectangle *area);
 void clientwin_repair(ClientWin *cw);
+void clientwin_tooltip(ClientWin *cw, XEvent *ev);
 void childwin_focus(ClientWin *cw);
 
 #endif /* SKIPPY_CLIENT_H */
