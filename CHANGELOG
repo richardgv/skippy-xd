@@ -1,5 +1,14 @@
 Skippy-XD changelog
 
+0.7.0 -- "Popsicle" (23 Jun 2023) ~/felixfung
+ - New paging mode
+ - New command line parameters
+ - Named pipe name postfixed with X session ID
+ - Bug fixes particularly polishing around focus logic
+ - Proper z-order management
+ - Support mouse scroll wheel
+ - Tooltip shows on bottom of windows
+
 0.6.0~fung -- "" (10 Mar 2023) ~/felixfung
  - Thumbnail displays for iconized or otherwise unmapped windows
  - Animation when activating skippy
