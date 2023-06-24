@@ -682,21 +682,41 @@ init_paging_layout(MainWin *mw, enum layoutmode layout, Window leader)
 static void
 desktopwin_map(ClientWin *cw)
 {
-	session_t *ps = cw->mainwin->ps;
+	MainWin *mw = cw->mainwin;
+	session_t *ps = mw->ps;
 
 	free_damage(ps, &cw->damage);
 	free_pixmap(ps, &cw->pixmap);
 
 	XUnmapWindow(ps->dpy, cw->mini.window);
-	XSetWindowBackgroundPixmap(ps->dpy, cw->mini.window, None);
 
 	XRenderPictureAttributes pa = { };
 
 	if (cw->origin)
 		free_picture(ps, &cw->origin);
 	cw->origin = XRenderCreatePicture(ps->dpy,
-			None, cw->mainwin->format, CPSubwindowMode, &pa);
+			mw->window, mw->format, CPSubwindowMode, &pa);
 	XRenderSetPictureFilter(ps->dpy, cw->origin, FilterBest, 0, 0);
+
+	{
+		float matrix[9];
+		matrix[0] = 1.0;
+		matrix[1] = 0.0;
+		matrix[2] = cw->x + mw->xoff;
+		matrix[3] = 0.0;
+		matrix[4] = 1.0;
+		matrix[5] = cw->y + mw->yoff;
+		matrix[6] = 0.0;
+		matrix[7] = 0.0;
+		matrix[8] = 1.0;
+
+		XTransform transform;
+		for (int j=0; j<3; j++)
+			for (int i=0; i<3; i++)
+				transform.matrix[j][i] = matrix[j*3+i];
+
+		XRenderSetPictureTransform(ps->dpy, cw->origin, &transform);
+	}
 
 	XCompositeRedirectWindow(ps->dpy, cw->src.window,
 			CompositeRedirectAutomatic);
@@ -1100,6 +1120,18 @@ mainloop(session_t *ps, bool activate_on_start) {
 		if (pending_damage)
 			timeout = 0;
 		poll(r_fd, (r_fd[1].fd >= 0 ? 2: 1), timeout);
+
+		// force refresh focused desktop tint
+		// not great solution at all...
+		{
+			static int counter = 0;
+			if (mw && layout == LAYOUTMODE_PAGING && counter == 0) {
+				foreach_dlist (mw->dminis) {
+					desktopwin_map(((ClientWin *) iter->data));
+				}
+			}
+			counter = (counter + 1) % 10;
+		}
 
 		// Handle daemon commands
 		if (POLLIN & r_fd[1].revents) {
