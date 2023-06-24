@@ -738,7 +738,7 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 		if (debuglog) fputs("\n", stdout);
 		XFlush(ps->dpy);
 
-		clientwin_tooltip(cw, ev);
+		clientwin_tooltip(cw->mainwin->client_to_focus, ev);
 	} else if (ev->type == FocusOut) {
 		printfdf(false, "(): else if (ev->type == FocusOut) {");
 		XFocusChangeEvent *evf = &ev->xfocus;
