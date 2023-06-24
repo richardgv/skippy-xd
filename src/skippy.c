@@ -946,8 +946,6 @@ mainloop(session_t *ps, bool activate_on_start) {
 						mainwin_map(mw);
 					XFlush(ps->dpy);
 
-					XSync(ps->dpy, False);
-					XSync(ps->dpy, True);
 					focus_miniw_adv(ps, mw->client_to_focus,
 							ps->o.movePointer);
 				}
