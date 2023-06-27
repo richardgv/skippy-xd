@@ -440,11 +440,6 @@ daemon_count_clients(MainWin *mw)
 
 	update_clients(mw);
 
-	if (!mw->clients) {
-		printfdf(false, "(): No client windows found.");
-		return;
-	}
-
 	dlist_free(mw->clientondesktop);
 	mw->clientondesktop = NULL;
 
@@ -454,10 +449,6 @@ daemon_count_clients(MainWin *mw)
 
 		dlist *tmp = dlist_first(dlist_find_all(mw->clients,
 					(dlist_match_func) clientwin_validate_func, &desktop));
-		if (!tmp) {
-			printfdf(false, "(): No client window on current desktop found.");
-			return;
-		}
 
 		mw->clientondesktop = tmp;
 	}
@@ -557,9 +548,6 @@ init_layout(MainWin *mw, enum layoutmode layout, Window leader)
 static bool
 init_paging_layout(MainWin *mw, enum layoutmode layout, Window leader)
 {
-	if (!mw->clients)
-		return true;
-
 	int screencount = wm_get_desktops(mw->ps);
 	if (screencount == -1)
 		screencount = 1;
@@ -752,7 +740,7 @@ skippy_activate(MainWin *mw, enum layoutmode layout)
 	mw->client_to_focus = NULL;
 
 	daemon_count_clients(mw);
-	if (!mw->clients || !mw->clientondesktop) {
+	if ((!mw->clients || !mw->clientondesktop) && layout != LAYOUTMODE_PAGING) {
 		return false;
 	}
 
