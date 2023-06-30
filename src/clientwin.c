@@ -702,6 +702,7 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 			cw->mainwin->pressed = cw; */
 	}
 	else if (ev->type == ButtonRelease) {
+		printfdf(false, "(): else if (ev->type == ButtonRelease) {");
 		const unsigned button = ev->xbutton.button;
 		if (cw->mainwin->pressed_mouse) {
 			if (button < MAX_MOUSE_BUTTONS) {
@@ -731,10 +732,11 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 		// usleep(10000);
 
 		// if (evf->detail == NotifyWhileGrabbed)
-		if (evf->detail == NotifyNonlinear)
+		if (evf->detail == NotifyNonlinear || evf->detail == NotifyAncestor)
 			cw->focused = true;
 
 		clientwin_render(cw);
+
 		if (debuglog) fputs("\n", stdout);
 		XFlush(ps->dpy);
 
@@ -754,18 +756,21 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 		// usleep(10000);
 
 		// if (evf->detail == NotifyWhileGrabbed)
-		if (evf->detail == NotifyNonlinear)
+		if (evf->detail == NotifyNonlinear || evf->detail == NotifyPointer)
 			cw->focused = false;
 
 		clientwin_render(cw);
+
 		if (debuglog) fputs("\n", stdout);
 		XFlush(ps->dpy);
 
 	} else if(ev->type == MotionNotify) {
 		printfdf(false, "(): else if (ev->type == MotionNotify) {");
 
-		XSetInputFocus(ps->dpy, cw->mini.window, RevertToParent, CurrentTime);
-		cw->mainwin->client_to_focus = cw;
+		if (cw->mainwin->client_to_focus != cw) {
+			XSetInputFocus(ps->dpy, cw->mini.window, RevertToParent, CurrentTime);
+			cw->mainwin->client_to_focus = cw;
+		}
 	} else if(ev->type == LeaveNotify) {
 		printfdf(false, "(): else if (ev->type == LeaveNotify) {");
 		cw->mainwin->cw_tooltip = NULL;

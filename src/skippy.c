@@ -709,6 +709,8 @@ desktopwin_map(ClientWin *cw)
 	XCompositeRedirectWindow(ps->dpy, cw->src.window,
 			CompositeRedirectAutomatic);
 	cw->redirected = true;
+
+	cw->focused = cw == mw->client_to_focus;
 	
 	clientwin_render(cw);
 
@@ -1064,10 +1066,17 @@ mainloop(session_t *ps, bool activate_on_start) {
 					for (; iter; iter = iter->next) {
 						ClientWin *cw = (ClientWin *) iter->data;
 						if (cw->mini.window == wid) {
-                            if (!(POLLIN & r_fd[1].revents))
-                            {
-							    die = clientwin_handle(cw, &ev);
-                            }
+							if (!(POLLIN & r_fd[1].revents)
+									&& ((layout != LAYOUTMODE_PAGING)
+									|| (ev.type != Expose
+									&& ev.type != GraphicsExpose
+									&& ev.type != EnterNotify
+									&& ev.type != LeaveNotify))) {
+								die = clientwin_handle(cw, &ev);
+								if (layout == LAYOUTMODE_PAGING
+									&& ev.type != MotionNotify){
+									desktopwin_map(cw);}
+							}
 							break;
 						}
 					}
@@ -1111,13 +1120,11 @@ mainloop(session_t *ps, bool activate_on_start) {
 
 		// force refresh focused desktop tint
 		// not great solution at all...
+		if (mw && layout == LAYOUTMODE_PAGING)
 		{
 			static int counter = 0;
-			if (mw && layout == LAYOUTMODE_PAGING && counter == 0) {
-				foreach_dlist (mw->dminis) {
-					desktopwin_map(((ClientWin *) iter->data));
-				}
-			}
+			if(counter == 0)
+				pending_damage = true;
 			counter = (counter + 1) % 10;
 		}
 
