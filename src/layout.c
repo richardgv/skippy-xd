@@ -194,12 +194,20 @@ layout_xd(MainWin *mw, dlist *windows,
 //       move windows to right/down, sorted by "affinity":
 //       which is the number of slots in that direction minus those
 //           in opposite direction, times the windows' number of slots
-//       so the the higher the affinity, the further from the original slot
+//       so the higher the affinity, the further from the original slot
 //    b. contract:
-//       loop slots left->right, top->bottom, for each free slot,
-//       compare window below, window rightside, window below and right side
-//       to current slot, sorted by affinity,
-//       and whether current slots can fit the window
+//       because expansion goes only to right and down,
+//       we often get layouts in top-left half e.g.
+//
+//        o o o o
+//        o o
+//        o
+//
+//       rotate contract row/column
+//       routine is grab rightmost/tpomost bottom/rightmost slot,
+//       move right/down while slot above/left is empty
+//       then move up/left
+//
 // 4. END LOOP when no windows have been moved
 // 5. move windows to slots
 //
@@ -207,6 +215,14 @@ layout_xd(MainWin *mw, dlist *windows,
 // normal window has aspect ratio around (2.5,1)
 // dramatic aspect ratio defined as aspect ratio bigger than 10
 // so aspect ratio of (25,1) or (1,4)
+
+#ifndef ASPECT_TOLERANCE
+#define ASPECT_TOLERANCE 1.4
+#endif
+
+#ifndef TRIANGULAR_TOLERANCE
+#define TRIANGULAR_TOLERANCE 0.7
+#endif
 
 void
 layout_boxy(MainWin *mw, dlist *windows,
@@ -271,7 +287,7 @@ layout_boxy(MainWin *mw, dlist *windows,
 
 // main calculation loop
 bool recalculate = true;
-do
+for (int max_iterations=0; recalculate && max_iterations<100; max_iterations++)
 {
 	recalculate = false;
 
@@ -418,8 +434,8 @@ do
 		for (int i=slot_maxx-1; !recalculate && i>=slot_minx; i--) {
 			if (slot2n[(j-slot_miny) * (slot_maxx - slot_minx) + i-slot_minx] > 1) {
 				recalculate = true;
-				//printfdf("(): Collision on slot (%d,%d) with %d windows",
-						//i, j, slot2n[(j-slot_miny) * (slot_maxx - slot_minx) + i-slot_minx]);
+				printfdf(false,"(): Collision on slot (%d,%d) with %d windows",
+						i, j, slot2n[(j-slot_miny) * (slot_maxx - slot_minx) + i-slot_minx]);
 
 				// insert new row or column
 				// based on estimated used screen aspect ratio
@@ -427,7 +443,7 @@ do
 				int ii = i, jj = j + 1;
 				float estimated_aspect = (float) (slot_width * slot_maxx)
 					/ (float) (slot_height * slot_maxy);
-				if (estimated_aspect < screen_aspect * 1.4) {
+				if (estimated_aspect < screen_aspect * ASPECT_TOLERANCE) {
 					ii = i + 1;
 					jj = j;
 				}
@@ -438,27 +454,43 @@ do
 				foreach_dlist (slot2cw[(j-slot_miny) * (slot_maxx - slot_minx) + i-slot_minx]) {
 					ClientWin *slotw = (ClientWin*) iter->data;
 					int affinity = boxy_affinity(slotw, slot_width, slot_height, i, j, ii-i, jj-j);
+					if (affinity > max_affinity) {
+						max_affinity = affinity;
+						moving_window = slotw;
+					}
 					max_affinity = MAX(max_affinity, affinity);
-					//printfdf("(): window %p has affinity %d", slotw, affinity);
+					printfdf(false,"(): window %p has affinity %d", slotw, affinity);
 				}
-				//printfdf("(): affinity: %d", max_affinity);
+
+				{
+					int slotx  = floor((float) moving_window->x / (float) slot_width);
+					int sloty  = floor((float) moving_window->y / (float) slot_height);
+					int slotxx = slotx + ceil((float) moving_window->src.width / (float) slot_width);
+					int slotyy = sloty + ceil((float) moving_window->src.height / (float) slot_height);
+					if (slotxx == slotx)
+						slotxx++;
+					if (slotyy == sloty)
+						slotyy++;
+
+					printfdf(false,"(): moving window %p (%d,%d) -> (%d,%d) which has size (%d,%d)",
+							moving_window, slotx, sloty, slotx+ii-i, sloty+jj-j, slotxx-slotx, slotyy-sloty);
+				}
 
 				// move window to right/down
-				foreach_dlist (slot2cw[(j-slot_miny) * (slot_maxx - slot_minx) + i-slot_minx]) {
-					ClientWin *slotw = (ClientWin*) iter->data;
-					if (boxy_affinity(slotw, slot_width, slot_height, i, j, ii-i, jj-j)
-							== max_affinity) {
-						moving_window = slotw;
+				//foreach_dlist (slot2cw[(j-slot_miny) * (slot_maxx - slot_minx) + i-slot_minx]) {
+					//ClientWin *slotw = (ClientWin*) iter->data;
+					//if (boxy_affinity(slotw, slot_width, slot_height, i, j, ii-i, jj-j)
+							//== max_affinity) {
 
 						//printfdf("(): moving window %p: (%d,%d) -> (%d,%d)", slotw, i, j, ii, jj);
 						moving_window->x += (ii - i) * slot_width;
 						moving_window->y += (jj - j) * slot_height;
-						goto move_window;
-					}
-				}
-move_window:
+						//goto move_window;
+					//}
+				//}
+//move_window:
 				// move all windows right/down of move_window
-				foreach_dlist (windows) {
+				/*foreach_dlist (windows) {
 					ClientWin *cw = (ClientWin*) iter->data;
 					int cw_slotx = floor((float) cw->x / (float) slot_width);
 					int cw_sloty = floor((float) cw->y / (float) slot_height);
@@ -473,7 +505,7 @@ move_window:
 							cw->y += slot_height;
 						}
 					}
-				}
+				}*/
 			}
 		}
 	}
@@ -485,7 +517,7 @@ move_window:
 	// to current slot, sorted by affinity,
 	// and whether current slots can fit the window
 	//
-	for (int j=slot_miny; !recalculate && j<slot_maxy; j++) {
+	/*for (int j=slot_miny; !recalculate && j<slot_maxy; j++) {
 		for (int i=slot_minx; !recalculate && i<slot_maxx; i++) {
 			if (slot2n[(j-slot_miny) * (slot_maxx - slot_minx) + i-slot_minx] == 0) {
 				//printfdf("(): free slot for compacting at (%d %d)",i, j);
@@ -591,15 +623,156 @@ move_window:
 				}
 			}
 		}
+	}*/
+
+	// rotate contraction to solve triangular non-optimal
+	{
+		// check triangular score
+		int top_left_occupancy = 0;
+		int total_occupancy = 0;
+		for (int j=slot_miny; j<slot_maxy; j++) {
+			for (int i=slot_minx; i<slot_maxx; i++) {
+				int slot_occupancy = slot2n[(j-slot_miny) * (slot_maxx - slot_minx) + i-slot_minx] > 0;
+				total_occupancy += slot_occupancy;
+				if ((slot_maxx - slot_minx) * (j - slot_miny)
+						+ (slot_maxy - slot_miny) * (i - slot_minx)
+						< (slot_maxx - slot_minx) * (slot_maxy - slot_miny) + 1){
+					printfdf(false,"(): (%d,%d) in top left", i,j);
+					top_left_occupancy += slot_occupancy;
+				}
+			}
+		}
+		float occupancy_ratio = (float)top_left_occupancy / (float)total_occupancy;
+		printfdf(false,"(): top left occupancy: %d total occupancy: %d triangular ratio: %f",
+				top_left_occupancy, total_occupancy, occupancy_ratio);
+
+		// if too triangular, perform rotate contraction
+		if (occupancy_ratio > TRIANGULAR_TOLERANCE) {
+
+			// determine whether to perform row or column rotate contraction
+			int pivotx = 0, pivoty = 0, ii = 0, jj = 0;
+			bool pivoted = false;
+			float estimated_aspect = (float) (slot_width * slot_maxx)
+				/ (float) (slot_height * slot_maxy);
+            printfdf(false,"(): aspect %f %f",estimated_aspect, screen_aspect*ASPECT_TOLERANCE);
+			if (estimated_aspect < screen_aspect * ASPECT_TOLERANCE) {
+				ii = 1;
+				for (int j=slot_maxy-1; j>slot_miny && !pivoted; j--) {
+					for (int i=slot_maxx-1; i>=slot_minx && !pivoted; i--) {
+						if (slot2n[(j-slot_miny) * (slot_maxx - slot_minx) + i-slot_minx] > 0) {
+							printfdf(false,"(): perform row rotate contraction at (%d,%d)",
+									i, j);
+							pivotx = i;
+							pivoty = j;
+							pivoted = true;
+						}
+					}
+				}
+			}
+			else {
+				jj = 1;
+				for (int i=slot_maxx-1; i>slot_minx && !pivoted; i--) {
+					for (int j=slot_maxy-1; j>=slot_miny && !pivoted; j--) {
+						if (slot2n[(j-slot_miny) * (slot_maxx - slot_minx) + i-slot_minx] > 0) {
+							printfdf(false,"(): perform column rotate contraction at (%d,%d)",
+									i, j);
+							pivotx = i;
+							pivoty = j;
+							pivoted = true;
+						}
+					}
+				}
+			}
+
+			// rotate contraction:
+			// identify next empty slot as target
+			int targetx = pivotx, targety = pivoty;
+			
+			while (targetx-jj < slot_maxx-1 && targety-ii < slot_maxy-1
+					&& slot2n[(targety-ii -slot_miny) * (slot_maxx - slot_minx)
+					+ targetx-jj -slot_minx] > 0) { // notice swapping and -ve of ii,jj
+				targetx += ii;
+				targety += jj;
+			}
+
+			if (!(targetx == pivotx && targety == pivoty)
+					&& targetx-jj >= 0
+					&& targety-ii >= 0
+					&& slot2n[(targety-ii -slot_miny) * (slot_maxx - slot_minx)
+					+ targetx-jj -slot_minx] == 0) { // notice swapping and -ve of ii,jj
+				targetx -= jj;
+				targety -= ii;
+
+				// find window from pivot slot to move, associated with max affinity
+				ClientWin *moving_window = NULL;
+				int max_affinity = INT_MIN;
+				foreach_dlist (slot2cw[(pivoty-slot_miny) * (slot_maxx - slot_minx)
+						+ pivotx-slot_minx]) {
+					ClientWin *slotw = (ClientWin*) iter->data;
+					int affinity = boxy_affinity(slotw, slot_width, slot_height,
+							pivotx, pivoty,
+							targetx - pivotx, targety - pivoty);
+					if (affinity > max_affinity) {
+						bool collision = false;
+						{
+							int slotx_old  = floor((float) slotw->x / (float) slot_width);
+							int sloty_old  = floor((float) slotw->y / (float) slot_height);
+							int slotxx_old = slotx_old + ceil((float) slotw->src.width / (float) slot_width);
+							int slotyy_old = sloty_old + ceil((float) slotw->src.height / (float) slot_height);
+							if (slotxx_old == slotx_old)
+								slotxx_old++;
+							if (slotyy_old == sloty_old)
+								slotyy_old++;
+
+							int slotx_new = slotx_old + targetx - pivotx;
+							int sloty_new = slotx_old + targety - pivoty;
+							int slotxx_new = slotx_old + targetx - pivotx;
+							int slotyy_new = slotx_old + targety - pivoty;
+
+							for (int j=sloty_new; !collision && j<slotyy_new && j<slot_maxy; j++) {
+								for (int i=slotx_new; !collision && i<slotxx_new && i<slot_maxx; i++) {
+									if (slot2n[(j-slot_miny) * (slot_maxx - slot_minx) + i-slot_minx] > 0) {
+										if (slot2n[(j-slot_miny) * (slot_maxx - slot_minx) + i-slot_minx] == 1
+												&& slotx_old <= i && i <= slotxx_old
+												&& sloty_old <= j && j <= slotyy_old) {
+											// do not count own window slots
+											continue;
+										}
+										printfdf(false,"(): collision at (%d,%d), window dimensions (%d,%d,%d,%d)",
+												i,j, slotx_old, sloty_old, slotxx_old-slotx_old, slotyy_old-sloty_old);
+										collision = true;
+									}
+								}
+							}
+						}
+						if (!collision) {
+							max_affinity = affinity;
+							moving_window = slotw;
+						}
+					}
+					max_affinity = MAX(max_affinity, affinity);
+					printfdf(false,"(): window %p has affinity %d", slotw, affinity);
+				}
+
+				// move window
+				if (moving_window != NULL) {
+					printfdf(false,"(): rotate contraction from (%d,%d) -> (%d,%d)",
+							pivotx, pivoty, targetx, targety);
+					recalculate = true;
+					moving_window->x += (targetx - pivotx) *slot_width;
+					moving_window->y += (targety - pivoty) *slot_height;
+				}
+			}
+		}
 	}
 
-	if (recalculate) {
+	if (recalculate && max_iterations<100-1) {
 		for (int i=0; i<number_of_slots; i++)
 			dlist_free (slot2cw[i]);
 		free(slot2cw);
 		free(slot2n);
 	}
-} while (recalculate);
+}
 
 	// move windows to slots,
 	// from the 2D array calculate the centre of window and move
@@ -688,7 +861,7 @@ int boxy_affinity(
 					  + (float)jj * (slotyy - (float)y - (float)y + sloty));
 }
 
-int middleOfThree(int a, int b, int c)
+/*int middleOfThree(int a, int b, int c)
 {
 	// x is positive if a is greater than b.
 	// x is negative if b is greater than a.
@@ -708,4 +881,4 @@ int middleOfThree(int a, int b, int c)
 		return c;
 	else
 		return a;
-}
+}*/
