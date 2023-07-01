@@ -673,10 +673,10 @@ int boxy_affinity(
 		)
 {
 	// cw->src.x cw->src.y should be taken into account also
-	int slotx  = floor((float) cw->x / (float) slot_width);
-	int sloty  = floor((float) cw->y / (float) slot_height);
-	int slotxx = slotx + ceil((float) cw->src.width / (float) slot_width);
-	int slotyy = sloty + ceil((float) cw->src.height / (float) slot_height);
+	float slotx  = (float) cw->x / (float) slot_width;
+	float sloty  = (float) cw->y / (float) slot_height;
+	float slotxx = slotx + (float) cw->src.width / (float) slot_width;
+	float slotyy = sloty + (float) cw->src.height / (float) slot_height;
 
 	/*if (ii!=0 && ii * slotx < x)
 		return INT_MIN;
@@ -684,8 +684,8 @@ int boxy_affinity(
 		return INT_MIN;*/
 	//printfdf("(): affinity for window %p (%d,%d)->(%d,%d) (%d,%d,%d,%d)",
 			//cw, x,y,x+ii,y+jj,slotx,sloty,slotxx,slotyy);
-	return cw->slots * (ii * (slotxx - x - x + slotx)
-					  + jj * (slotyy - y - y + sloty));
+	return (int)((float)ii * (slotxx - (float)x - (float)x + slotx)
+					  + (float)jj * (slotyy - (float)y - (float)y + sloty));
 }
 
 int middleOfThree(int a, int b, int c)
