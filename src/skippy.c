@@ -464,10 +464,10 @@ init_focus(MainWin *mw, enum layoutmode layout, Window leader) {
 	// is important for prev/next window selection
 	mw->focuslist = dlist_dup(mw->clientondesktop);
 
-	if (layout == LAYOUTMODE_SWITCH)
-		dlist_reverse(mw->focuslist);
-	else if (layout == LAYOUTMODE_EXPOSE)
+	if (layout == LAYOUTMODE_EXPOSE && ps->o.exposeLayout == LAYOUT_BOXY)
 		dlist_sort(mw->focuslist, sort_cw_by_column, 0);
+	else
+		dlist_reverse(mw->focuslist);
 
 	// Get the currently focused window and select which mini-window to focus
 	dlist *iter = dlist_find(mw->focuslist, clientwin_cmp_func, (void *) leader);
