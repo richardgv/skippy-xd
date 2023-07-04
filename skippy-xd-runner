@@ -15,21 +15,20 @@
 #   skippy-xd-runner <args>
 #
 # The available commands are:
-#  [no command]        - activate expose once without daemon.
-#  --config-reload     - reload configuration file; currently the file path must remain unchanged.
-#  --config            - read the specified configuration file.
-#  --start-daemon      - starts the daemon running.
-#  --stop-daemon       - stops the daemon running.
-#  --activate-expose   - connects to daemon and activate expose.
-#  --toggle-expose     - connects to daemon and toggle expose.
-#  --activate-paging   - connects to daemon and activate paging.
-#  --toggle-paging     - connects to daemon and toggle paging.
-#  --deactivate        - connects to daemon and deactivate expose or paging.
-#  --prev              - focus window to previous.
-#  --next              - focus window to next.
-#  
-#  --help              - show this message.
-#   -S                          - Synchronize X operation (debugging).
+# [no command]        - activate expose once without daemon.
+# --help              - show this message.
+# -S                  - enable debugging logs.
+
+# --config            - read configuration file from path.
+# --config-reload     - reload configuration file from the previous path.
+
+# --start-daemon      - runs as daemon mode.
+# --stop-daemon       - terminates skippy-xd daemon.
+
+# --switch            - connects to daemon and switch to next window.
+# --switch-prev       - connects to daemon and switch to previous window.
+# --expose            - connects to daemon and activate expose.
+# --paging            - connects to daemon and activate paging.
 #
 #
 #
@@ -45,7 +44,7 @@ _kill_skippy() {
 
 }
 
-
+  
 _parse_args()
 {
   while [ "$1" ]; do
@@ -53,19 +52,23 @@ _parse_args()
 
     case $arg in
 
-      --config-reload)                            _config_reload=true ;;
-      --config)                                   shift && _config="$1" ;;
-      --start-daemon|--start)                     _start_daemon=true ;;
-      --stop-daemon|--stop)                       _stop_daemon=true ;;
-      --activate-expose|--activate)               _activate_expose=true ;;
-      --toggle-expose|--toggle)                   _toggle_expose=true ;;
-      --activate-paging|--activate)               _activate_paging=true ;;
-      --toggle-paging|--toggle)                   _toggle_paging=true ;;
-      --deactivate|--deactivate)                  _deactivate=true ;;
-      --prev)                                     _prev=true ;;
-      --next)                                     _next=true ;;
       --help|-h)                                  _help=true ;;
       -S)                                         _sync=true ;;
+
+      --config)                                   shift && _config="$1" ;;
+      --config-reload)                            _config_reload=true ;;
+
+      --start-daemon|--start)                     _start_daemon=true ;;
+      --stop-daemon|--stop)                       _stop_daemon=true ;;
+
+      --switch)                                   _activate=true; _next=true ;;
+      --switch-prev)                              _activate=true; _prev=true ;;
+
+      --expose)                                   _activate=true; _expose=true ;;
+      --paging)                                   _activate=true; _paging=true ;;
+
+      --toggle)                                   _toggle=true ;;
+      --deactivate)                               _deactivate=true ;;
 
     esac
 
@@ -73,24 +76,20 @@ _parse_args()
   done
 
   unset _first_arg
-  if [ "$_activate_expose" ]; then
-    _first_arg="--activate-expose"
+  if [ "$_next" ]; then
+    _first_arg="--switch"
   fi
 
-  if [ "$_toggle_expose" ]; then
-    _first_arg="--toggle-expose"
+  if [ "$_prev" ]; then
+    _first_arg="--switch-prev"
   fi
 
-  if [ "$_activate_paging" ]; then
-    _first_arg="--activate-paging"
+  if [ "$_expose" ]; then
+    _first_arg="--expose"
   fi
 
-  if [ "$_toggle_paging" ]; then
-    _first_arg="--toggle-paging"
-  fi
-
-  if [ "$_deactivate" ]; then
-    _first_arg="--deactivate"
+  if [ "$_paging" ]; then
+    _first_arg="--paging"
   fi
 
   if [ "$_first_arg" ]; then
@@ -100,16 +99,21 @@ _parse_args()
 
 _main()
 {
-  lastActivationTimeoutSeconds=1
+  # if [ "$(command -v xdotool)" ]; then
+  #   if xdotool search -class --onlyvisible skippy-xd > /dev/null; then
+  #     echo "ignored. skippy is already open / active"
+  #     exit 1
+  #   fi
+  # fi
 
-  psSkippyActivateExposeOut="`pgrep -f 'skippy-xd --activate-expose'`"
-  psSkippyToggleExposeOut="`pgrep -f 'skippy-xd --toggle-expose'`"
-  psSkippyActivatePagingOut="`pgrep -f 'skippy-xd --activate-paging'`"
-  psSkippyTogglePagingOut="`pgrep -f 'skippy-xd --toggle-paging'`"
-  psSkippyDeactivateOut="`pgrep -f 'skippy-xd --deactivate'`"
+  lastActivationTimeoutSeconds=1
+  psSkippyAltTabOut="`pgrep -f 'skippy-xd --switch'`"
+  psSkippyAltTabOut="$psSkippyAltTabOut `pgrep -f 'skippy-xd --switch-prev'`"
+  psSkippyExposeOut="`pgrep -f 'skippy-xd --expose'`"
+  psSkippyPagingOut="`pgrep -f 'skippy-xd --paging'`"
 
   _other_clients=0
-  for pid in $psSkippyActivateExposeOut $psSkippyToggleExposeOut $psSkippyActivatePagingOut $psSkippyTogglePagingOut $psSkippyDeactivateOut; do
+  for pid in $psSkippyAltTabOut $psSkippyExposeOut $psSkippyPagingOut; do
     ptime="$(ps -o etimes= -p "$pid")"
     if [ "$ptime" -ge "$lastActivationTimeoutSeconds" ]; then
       _killall=true
