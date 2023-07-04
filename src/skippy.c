@@ -480,6 +480,8 @@ init_focus(MainWin *mw, enum layoutmode layout, Window leader) {
 		// ps->mainwin->ignore_next_refocus = 2;
 		// ps->mainwin->ignore_next_refocus = 4;
 
+		// remember what was the currently focused window (before this activation of skippy)
+		mw->client_to_focus_on_cancel = (ClientWin *) iter->data;
 
 		if(ps->o.focus_initial == FI_PREV)
 		{
@@ -510,7 +512,6 @@ init_focus(MainWin *mw, enum layoutmode layout, Window leader) {
 	}
 	else {
 		mw->client_to_focus = (ClientWin *) iter->data;
-		mw->client_to_focus_on_cancel = (ClientWin *) iter->data;
 		mw->client_to_focus->focused = 1;
 	}
 }
