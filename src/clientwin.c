@@ -611,8 +611,8 @@ clientwin_handle(ClientWin *cw, XEvent *ev) {
 
 		bool reverse_direction = false;
 
-		if (arr_modkeymasks_includes(cw->mainwin->modifierKeyMasks_ReverseDirection, evk->state))
-			if(arr_keycodes_includes(cw->mainwin->keycodes_ReverseDirection, evk->keycode))
+		if (arr_modkeymasks_includes(cw->mainwin->modifierKeyMasks_ReverseDirection, evk->state) ||
+				arr_keycodes_includes(cw->mainwin->keycodes_ReverseDirection, evk->keycode))
 				reverse_direction = true;
 
 		if (arr_keycodes_includes(cw->mainwin->keycodes_Up, evk->keycode))
