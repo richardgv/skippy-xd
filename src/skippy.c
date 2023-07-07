@@ -472,6 +472,12 @@ init_focus(MainWin *mw, enum layoutmode layout, Window leader) {
 	// Get the currently focused window and select which mini-window to focus
 	dlist *iter = dlist_find(mw->focuslist, clientwin_cmp_func, (void *) leader);
 
+	// remember what was the currently focused window (before this activation of skippy)
+	if (iter)
+		mw->client_to_focus_on_cancel = (ClientWin *) iter->data;
+	else
+		mw->client_to_focus_on_cancel = NULL;
+
 	// check if the user specified --prev or --next on the cmdline
 	if(ps->o.focus_initial && iter)
 	{
@@ -479,9 +485,6 @@ init_focus(MainWin *mw, enum layoutmode layout, Window leader) {
 		// ps->mainwin->ignore_next_refocus = 1;
 		// ps->mainwin->ignore_next_refocus = 2;
 		// ps->mainwin->ignore_next_refocus = 4;
-
-		// remember what was the currently focused window (before this activation of skippy)
-		mw->client_to_focus_on_cancel = (ClientWin *) iter->data;
 
 		if(ps->o.focus_initial == FI_PREV)
 		{
