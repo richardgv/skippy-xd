@@ -814,6 +814,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 	enum layoutmode layout = LAYOUTMODE_EXPOSE;
 	bool animating = activate;
 	long first_animated = 0L;
+	long paging_last_forced_update = 0;
 
 	switch (ps->o.mode) {
 		case PROGMODE_SWITCH:
@@ -1035,18 +1036,18 @@ mainloop(session_t *ps, bool activate_on_start) {
 					}
 				}
 				else if (mw && (ps->xinfo.damage_ev_base + XDamageNotify == ev.type)) {
-					//printfdf(false, "(): else if (ev.type == XDamageNotify) {");
+					printfdf(false, "(): else if (ev.type == XDamageNotify) {");
 					pending_damage = true;
 					dlist *iter = dlist_find(ps->mainwin->clients,
 							clientwin_cmp_func, (void *) wid);
 					if (iter) {
 						((ClientWin *)iter->data)->damaged = true;
 					}
-					iter = dlist_find(ps->mainwin->dminis,
-							clientwin_cmp_func, (void *) wid);
-					if (iter) {
-						((ClientWin *)iter->data)->damaged = true;
-					}
+					//iter = dlist_find(ps->mainwin->dminis,
+							//clientwin_cmp_func, (void *) wid);
+					//if (iter) {
+						//((ClientWin *)iter->data)->damaged = true;
+					//}
 				}
 				else if (mw && wid == mw->window)
 					die = mainwin_handle(mw, &ev);
@@ -1089,7 +1090,7 @@ mainloop(session_t *ps, bool activate_on_start) {
 
 			// Do delayed painting if it's active
 			if (mw && pending_damage && !die) {
-				//printfdf(false, "(): delayed painting");
+				printfdf(false, "(): delayed painting");
 				pending_damage = false;
 				foreach_dlist(mw->clientondesktop) {
 					if (((ClientWin *) iter->data)->damaged)
@@ -1126,10 +1127,10 @@ mainloop(session_t *ps, bool activate_on_start) {
 		// not great solution at all...
 		if (mw && layout == LAYOUTMODE_PAGING)
 		{
-			static int counter = 0;
-			if(counter == 0)
+			if (time_in_millis() - paging_last_forced_update > 10) {
 				pending_damage = true;
-			counter = (counter + 1) % 10;
+				paging_last_forced_update = time_in_millis();
+			}
 		}
 
 		// Handle daemon commands
