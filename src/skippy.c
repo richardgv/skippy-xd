@@ -593,8 +593,8 @@ init_paging_layout(MainWin *mw, enum layoutmode layout, Window leader)
 
 	// create windows which represent each virtual desktop
 	int current_desktop = wm_get_current_desktop(mw->ps);
-	for (int j=0; j<desktop_dim; j++) {
-		for (int i=0; i<desktop_dim; i++) {
+	for (int j=0, k=0; j<desktop_dim; j++) {
+		for (int i=0; i<desktop_dim && k<screencount; i++) {
 			int desktop_idx = desktop_dim * j + i;
 			XSetWindowAttributes sattr = {
 				.border_pixel = 0,
@@ -663,6 +663,7 @@ init_paging_layout(MainWin *mw, enum layoutmode layout, Window leader)
 					}
 				}
 			}
+			k++;
 		}
 	}
 
