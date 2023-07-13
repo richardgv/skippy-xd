@@ -557,9 +557,15 @@ init_paging_layout(MainWin *mw, enum layoutmode layout, Window leader)
 		screencount = 1;
 	int desktop_dim = ceil(sqrt(screencount));
 
+	// the paging layout is rectangular
+	// such that screenwidth == ceil(sqrt(screencount))
+	// and the screenheight == ceil(screencount / screenwidth)
+	int screenwidth = desktop_dim;
+	int screenheight = ceil((float)screencount / (float)screenwidth);
+
     {
-		int totalwidth = desktop_dim * (mw->width + mw->distance) - mw->distance;
-		int totalheight = desktop_dim * (mw->height + mw->distance) - mw->distance;
+		int totalwidth = screenwidth * (mw->width + mw->distance) - mw->distance;
+		int totalheight = screenheight * (mw->height + mw->distance) - mw->distance;
 
 		float multiplier = (float) (mw->width - 1 * mw->distance) / (float) totalwidth;
 		if (multiplier * totalheight > mw->height - 1 * mw->distance)
@@ -578,11 +584,11 @@ init_paging_layout(MainWin *mw, enum layoutmode layout, Window leader)
 		int win_desktop = wm_get_window_desktop(mw->ps, cw->wid_client);
 		int current_desktop = wm_get_current_desktop(mw->ps);
 
-		int win_desktop_x = win_desktop % desktop_dim;
-		int win_desktop_y = win_desktop / desktop_dim;
+		int win_desktop_x = win_desktop % screenwidth;
+		int win_desktop_y = win_desktop / screenwidth;
 
-		int current_desktop_x = current_desktop % desktop_dim;
-		int current_desktop_y = current_desktop / desktop_dim;
+		int current_desktop_x = current_desktop % screenwidth;
+		int current_desktop_y = current_desktop / screenwidth;
 
 		cw->x = cw->src.x + win_desktop_x * (mw->width + mw->distance);
 		cw->y = cw->src.y + win_desktop_y * (mw->height + mw->distance);
@@ -593,9 +599,9 @@ init_paging_layout(MainWin *mw, enum layoutmode layout, Window leader)
 
 	// create windows which represent each virtual desktop
 	int current_desktop = wm_get_current_desktop(mw->ps);
-	for (int j=0, k=0; j<desktop_dim; j++) {
-		for (int i=0; i<desktop_dim && k<screencount; i++) {
-			int desktop_idx = desktop_dim * j + i;
+	for (int j=0, k=0; j<screenheight; j++) {
+		for (int i=0; i<screenwidth && k<screencount; i++) {
+			int desktop_idx = screenwidth * j + i;
 			XSetWindowAttributes sattr = {
 				.border_pixel = 0,
 				.background_pixel = 0,
