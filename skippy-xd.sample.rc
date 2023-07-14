@@ -150,5 +150,11 @@ keysExitCancelOnPress = Escape BackSpace x q
 keysExitCancelOnRelease =
 keysExitSelectOnPress = Return space
 keysExitSelectOnRelease = Super_L Super_R Alt_L Alt_R ISO_Level3_Shift
-keysReverseDirection = Tab
+
+# Put here the modifier keys that (when held) reverses the direction of skippy's navigation keys (prev, next, up, down)
+# Normally this is (typically) just "Shift" key only, however you might instead have special accessibility needs ;)
 modifierKeyMasksReverseDirection = ShiftMask ControlMask
+
+# The *subset* of navigation keys, for which "modifierKeyMasksReverseDirection" is applied to actually reverse the direction
+# All other nav keys are then ignored, (eg: 'left','right','up','down'). It seems 'wrong' but gives more intuitive keyboard navigation.
+keysReverseDirection = Tab
