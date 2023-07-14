@@ -2,11 +2,12 @@
 #
 # Notes:
 #
+# - File Syntax:
+#   Comments must be on their own seperate lines that start with a #
+#   You cannot append # comment after a settings line or a section header
+#
 # - colors can be anything XAllocNamedColor can handle
 #   (like "black" or "#000000")
-#
-# - distance is a relative number, and is scaled according to the scale
-#   factor applied to windows
 #
 # - fonts are Xft font descriptions
 #
@@ -14,51 +15,95 @@
 #
 # - opacity is an integer in the range of 0-255
 #
-# - brighness is a floating point number (with 0.0 as neutral)
-#
-# - if the update frequency is a negative value, the mini-windows will only
-#   be updated when they're explicitly rendered (like, when they gain or
-#   lose focus).
-#
-# - the 'shadowText' option can be a color or 'none', in which case the
-#   drop-shadow effect is disabled
+# - brightness is a floating point number (with 0.0 as neutral)
 #
 # - Picture specification:
 #   [WIDTHxHEIGHT] [orig|scale|scalek|tile] [left|mid|right] [left|mid|right]
 #   [COLOR|#FFFFFFFF] [PATH]
 #
+# - keysUp, keysDown, keysLeft, keysRight:
+#   selects the window in the direction compared to the current selected window,
+#   without wrapping
+#
+# - keysPrev, keysNext:
+#   selects window previous or next to current one, in up->down, left->right
+#   ordering, wrapping per column and per row
+#   
 #   Examples:
 #   background = 500x400 tile right mid #FF0000 /home/richard/screenshots/256.png
 #   background = orig mid mid #FF000080
 #
-# - Bindings in [bindings] section can bind to "no" (do nothing), "focus"
+# - [bindings] for miwMouse[1,2,3] can bind to "no" (do nothing), "focus"
 #   (focus to window), "iconify", "shade-ewmh" (toggle window shade state),
 #   "close-icccm" (close window with ICCCM method), "close-ewmh" (close
-#   window with EWMH method), or "destroy" (forcefully destroy the window).
+#   window with EWMH method), or "destroy" (forcefully destroy the window),
+#   "keysPrev" to focus on previous window, "keysNext" to focus on next window.
+#
+# - [bindings] key* = is a list of valid XWindows KeySym identifiers, case
+#   sensitive and <space> seperated list. Run the program 'xev' to find them.
+#
+# - [bindings] modifierKeyMasks* = is a list of valid XWindows modifier key
+#   bitmask identifiers, as defined in the /usr/include/X11/X.h header file.
 #
 
 [general]
-distance = 50
-useNetWMFullscreen = true
-ignoreSkipTaskbar = true
-updateFreq = 10.0
-lazyTrans = false
+
+# File path of skippy-xd pipe daemon communication
 pipePath = /tmp/skippy-xd-fifo
-movePointerOnStart = true
-movePointerOnSelect = true
-movePointerOnRaise = true
-switchDesktopOnActivate = false
-useNameWindowPixmap = false
-forceNameWindowPixmap = false
+
+# Depending on your window manager, you may want to choose between
+# XQueryTree, _NET_CLIENT_LIST, _WIN_CLIENT_LIST
+clientList = XQueryTree
+
+# Background picture when skippy-xd is activated
+background =
+
+# Frequency to update pixmaps
+updateFreq = 60.0
+
+# Allow other compositors such as picom handle transparency
+lazyTrans = false
+
+# Move the mouse cursor when skippy is activated
+movePointer = false
+
+# Set = 0 to switch off animations
+# for switch, there is never animation
+animationDuration = 200
+
+# Relative minimal distance between windows
+distance = 50
+
+# Whether to display window frames
 includeFrame = true
+
+# Whether to show the window bigger than its original size
 allowUpscale = true
-showAllDesktops = false
-showUnmapped = true
+
+# Choose whether to show shadow windows:
+# windows that are minimized, shaded, or on other virtual desktops
+showShadow = true
+
+# exposeLayout=xd uses the same layout as switcher, maximizing screen estate
+# exposeLayout=boxy tends to preserve window positions, thus guiding the eye more
+exposeLayout = boxy
+
+# For switch and expose,
+# Whether to limit window select on current virtual desktop
+# Or allow window selection on all virtual desktops
+# Paging always show all desktops
+switchShowAllDesktops = true
+exposeShowAllDesktops = false
+
+# Show window previews with rounded corners,
+# with corner radius in pixels
+cornerRadius = 5
+
+# Icon visual parameters
 preferredIconSize = 48
-clientDisplayModes = thumbnail icon filled none
+showIconsOnThumbnails = true
 iconFillSpec = orig mid mid #00FFFF
 fillSpec = orig mid mid #FFFFFF
-background =
 
 [xinerama]
 showAll = true
@@ -73,12 +118,15 @@ tint = #101020
 tintOpacity = 64
 opacity = 255
 
+[shadow]
+tint = #040404
+tintOpacity = 0
+opacity = 128
+
 [tooltip]
 show = true
-followsMouse = true
-offsetX = 20
-offsetY = 20
-align = left
+offsetX = 0
+offsetY = 5
 border = #ffffff
 background = #404040
 opacity = 128
@@ -90,3 +138,23 @@ font = fixed-11:weight=bold
 miwMouse1 = focus
 miwMouse2 = close-ewmh
 miwMouse3 = iconify
+miwMouse4 = keysNext
+miwMouse5 = keysPrev
+keysUp = Up w
+keysDown = Down s
+keysLeft = Left a
+keysRight = Right d
+keysPrev = p b
+keysNext = Tab n f
+keysExitCancelOnPress = Escape BackSpace x q
+keysExitCancelOnRelease =
+keysExitSelectOnPress = Return space
+keysExitSelectOnRelease = Super_L Super_R Alt_L Alt_R ISO_Level3_Shift
+
+# Put here the modifier keys that (when held) reverses the direction of skippy's navigation keys (prev, next, up, down)
+# Normally this is (typically) just "Shift" key only, however you might instead have special accessibility needs ;)
+modifierKeyMasksReverseDirection = ShiftMask ControlMask
+
+# The *subset* of navigation keys, for which "modifierKeyMasksReverseDirection" is applied to actually reverse the direction
+# All other nav keys are then ignored, (eg: 'left','right','up','down'). It seems 'wrong' but gives more intuitive keyboard navigation.
+keysReverseDirection = Tab

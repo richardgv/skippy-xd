@@ -63,44 +63,17 @@
 
 #include "dlist.h"
 
-#define MAX_MOUSE_BUTTONS 4
+#define MAX_MOUSE_BUTTONS 6
 
-/**
- * @brief Dump raw bytes in HEX format.
- *
- * @param data pointer to raw data
- * @param len length of data
- */
-static inline void
-hexdump(const char *data, int len) {
-  static const int BYTE_PER_LN = 16;
-
-  if (len <= 0)
-    return;
-
-  // Print header
-  printf("%10s:", "Offset");
-  for (int i = 0; i < BYTE_PER_LN; ++i)
-    printf(" %2d", i);
-  putchar('\n');
-
-  // Dump content
-  for (int offset = 0; offset < len; ++offset) {
-    if (!(offset % BYTE_PER_LN))
-      printf("0x%08x:", offset);
-
-    printf(" %02hhx", data[offset]);
-
-    if ((BYTE_PER_LN - 1) == offset % BYTE_PER_LN)
-      putchar('\n');
-  }
-  if (len % BYTE_PER_LN)
-    putchar('\n');
-
-  fflush(stdout);
-}
+extern bool debuglog;
 
 /// @brief Possible return values.
+
+enum {
+	LAYOUT_XD,
+	LAYOUT_BOXY
+};
+
 enum {
 	RET_SUCCESS = 0,
 	RET_UNKNOWN,
@@ -111,10 +84,18 @@ enum {
 
 enum progmode {
 	PROGMODE_NORMAL,
-	PROGMODE_ACTV_PICKER,
-	PROGMODE_DEACTV_PICKER,
-	PROGMODE_TOGGLE_PICKER,
+	PROGMODE_SWITCH,
+	PROGMODE_SWITCH_PREV,
+	PROGMODE_EXPOSE,
+	PROGMODE_PAGING,
+	PROGMODE_RELOAD_CONFIG,
 	PROGMODE_DM_STOP,
+};
+
+enum layoutmode {
+	LAYOUTMODE_SWITCH,
+	LAYOUTMODE_EXPOSE,
+	LAYOUTMODE_PAGING,
 };
 
 enum cliop {
@@ -125,6 +106,8 @@ enum cliop {
 	CLIENTOP_CLOSE_ICCCM,
 	CLIENTOP_CLOSE_EWMH,
 	CLIENTOP_DESTROY,
+	CLIENTOP_PREV,
+	CLIENTOP_NEXT,
 };
 
 enum align {
@@ -188,40 +171,44 @@ typedef struct {
 } keydef_t;
 
 typedef enum {
+	CLIDISP_DESKTOP = -1,
 	CLIDISP_NONE,
 	CLIDISP_FILLED,
 	CLIDISP_ICON,
+	CLIDISP_ZOMBIE,
+	CLIDISP_ZOMBIE_ICON,
 	CLIDISP_THUMBNAIL,
 	CLIDISP_THUMBNAIL_ICON,
 } client_disp_mode_t;
+
+typedef enum {
+	FI_PREV = -1,
+	FI_CURR =  0,
+	FI_NEXT = +1,
+} focus_initial;
 
 /// @brief Option structure.
 typedef struct {
 	char *config_path;
 	enum progmode mode;
 	bool runAsDaemon;
-	bool synchronize;
+	int focus_initial;
 
+	int exposeLayout;
 	int distance;
 	bool useNetWMFullscreen;
-	bool ignoreSkipTaskbar;
-	bool acceptOvRedir;
-	bool acceptWMWin;
+	int clientList;
 	double updateFreq;
+	int animationDuration;;
 	bool lazyTrans;
-	bool useNameWindowPixmap;
-	bool forceNameWindowPixmap;
 	bool includeFrame;
 	char *pipePath;
-	bool movePointerOnStart;
-	bool movePointerOnSelect;
-	bool movePointerOnRaise;
-	bool switchDesktopOnActivate;
+	bool movePointer;
 	bool allowUpscale;
-	bool includeAllScreens;
-	bool avoidThumbnailsFromOtherScreens;
-	bool showAllDesktops;
-	bool showUnmapped;
+	bool switchShowAllDesktops;
+	bool exposeShowAllDesktops;
+	bool showShadow;
+	int cornerRadius;
 	int preferredIconSize;
 	client_disp_mode_t *clientDisplayModes;
 	pictspec_t iconFillSpec;
@@ -240,11 +227,13 @@ typedef struct {
 	int highlight_tintOpacity;
 	int highlight_opacity;
 
+	char *shadow_tint;
+	int shadow_tintOpacity;
+	int shadow_opacity;
+
 	bool tooltip_show;
-	bool tooltip_followsMouse;
 	int tooltip_offsetX;
 	int tooltip_offsetY;
-	enum align tooltip_align;
 	char *tooltip_border;
 	char *tooltip_background;
 	int tooltip_opacity;
@@ -253,38 +242,44 @@ typedef struct {
 	char *tooltip_font;
 
 	enum cliop bindings_miwMouse[MAX_MOUSE_BUTTONS];
+	char *bindings_keysUp;
+	char *bindings_keysDown;
+	char *bindings_keysLeft;
+	char *bindings_keysRight;
+	char *bindings_keysPrev;
+	char *bindings_keysNext;
+	char *bindings_keysExitCancelOnPress;
+	char *bindings_keysExitCancelOnRelease;
+	char *bindings_keysExitSelectOnPress;
+	char *bindings_keysExitSelectOnRelease;
+	char *bindings_keysReverseDirection;
+	char *bindings_modifierKeyMasksReverseDirection;
 } options_t;
 
 #define OPTIONST_INIT { \
 	.config_path = NULL, \
 	.mode = PROGMODE_NORMAL, \
 	.runAsDaemon = false, \
-	.synchronize = false, \
 \
+	.exposeLayout = LAYOUT_BOXY, \
 	.distance = 50, \
 	.useNetWMFullscreen = true, \
-	.ignoreSkipTaskbar = false, \
-	.acceptOvRedir = false, \
-	.acceptWMWin = false, \
-	.updateFreq = 10.0, \
+	.clientList = 0, \
+	.updateFreq = 60.0, \
+	.animationDuration = 200, \
 	.lazyTrans = false, \
-	.useNameWindowPixmap = false, \
-	.forceNameWindowPixmap = false, \
 	.includeFrame = false, \
 	.pipePath = NULL, \
-	.movePointerOnStart = true, \
-	.movePointerOnSelect = true, \
-	.movePointerOnRaise = true, \
-	.switchDesktopOnActivate = false, \
+	.movePointer = false, \
 	.allowUpscale = true, \
-	.includeAllScreens = false, \
-	.avoidThumbnailsFromOtherScreens = true, \
+	.cornerRadius = 0, \
 	.preferredIconSize = 48, \
 	.clientDisplayModes = NULL, \
 	.iconFillSpec = PICTSPECT_INIT, \
 	.fillSpec = PICTSPECT_INIT, \
-	.showAllDesktops = false, \
-	.showUnmapped = true, \
+	.switchShowAllDesktops = true, \
+	.exposeShowAllDesktops = false, \
+	.showShadow = true, \
 	.buttonImgs = { NULL }, \
 	.background = NULL, \
 	.xinerama_showAll = true, \
@@ -294,11 +289,12 @@ typedef struct {
 	.highlight_tint = NULL, \
 	.highlight_tintOpacity = 64, \
 	.highlight_opacity = 255, \
+	.shadow_tint = NULL, \
+	.shadow_tintOpacity = 0, \
+	.shadow_opacity = 128, \
 	.tooltip_show = true, \
-	.tooltip_followsMouse = true, \
-	.tooltip_offsetX = 20, \
+	.tooltip_offsetX = 0, \
 	.tooltip_offsetY = 20, \
-	.tooltip_align = ALIGN_LEFT, \
 	.tooltip_border = NULL, \
 	.tooltip_background = NULL, \
 	.tooltip_opacity = 128, \
@@ -363,21 +359,13 @@ typedef struct {
 	.fd_pipe = -1, \
 }
 
-/// @brief Print out a debug message.
-#define printfd(format, ...) \
-  (fprintf(stdout, format "\n", ## __VA_ARGS__), fflush(stdout))
-
 /// @brief Print out a debug message with function name.
-#define printfdf(format, ...) \
-  (fprintf(stdout, "%s" format "\n", __func__, ## __VA_ARGS__), fflush(stdout))
-
-/// @brief Print out an error message.
-#define printfe(format, ...) \
-  (fprintf(stderr, format "\n", ## __VA_ARGS__), fflush(stderr))
+#define printfdf(alwaysprint, format, ...) \
+  ((alwaysprint) || (debuglog))? fprintf(stdout, "%s" format "\n", __func__, ## __VA_ARGS__):true;
 
 /// @brief Print out an error message with function name.
-#define printfef(format, ...) \
-  printfe("%s" format, __func__, ## __VA_ARGS__)
+#define printfef(alwaysprint, format, ...) \
+  ((alwaysprint) || (debuglog))? fprintf(stderr, "%s" format "\n", __func__, ## __VA_ARGS__):true;
 
 /// @brief Return a value if it's true.
 #define retif(x) do { if (x) return (x); } while (0)
@@ -393,7 +381,7 @@ typedef struct {
 static inline void *
 allocchk_(void *ptr, const char *func_name) {
   if (unlikely(!ptr)) {
-    printfe("%s(): Failed to allocate memory.", func_name);
+    printfef(true, "%s(): Failed to allocate memory.", func_name);
 	exit(RET_BADALLOC);
   }
 
@@ -488,7 +476,7 @@ print_timestamp(session_t *ps) {
 
 	timeval_subtract(&diff, &tm, &ps->time_start);
 
-	printf("[ %5ld.%02ld ] ", diff.tv_sec, diff.tv_usec / 10000);
+	printfef(false, "() [ %5ld.%02ld ] ", diff.tv_sec, diff.tv_usec / 10000);
 }
 
 /**
@@ -598,14 +586,47 @@ str_startswithwordi(const char *haystick, const char *needle) {
 }
 
 /**
+ * @brief Convert a string into an integer.
+ */
+static inline int
+str_to_int(const char *s)
+{
+	 return (int)strtol(s,NULL,0);
+}
+
+/**
+ * @brief Count the number of words in a string.
+ */
+static inline int
+str_count_words(const char *s)
+{
+  if (!s) return 0;
+
+  int count = 0;
+  while (*s != '\0')
+  {
+    while (*s != '\0' && isspace(*s)) // remove all spaces between words
+      s++;
+
+    if(*s != '\0')
+      count++;
+
+    while (*s != '\0' && !isspace(*s)) // loop past the found word
+      s++;
+  }
+  return count;
+}
+
+/**
  * @brief Get first word.
  *
- * @param dest place to store pointer to a copy of the first word
+ * @param dest place to store pointer to a copy of the word
  * @return start of next word
  */
 static inline const char *
 str_get_word(const char *s, char **dest) {
 	*dest = NULL;
+	if (!s) return NULL;
 	int i = 0;
 	while (isspace(s[i])) ++i;
 	int start = i;
@@ -613,6 +634,81 @@ str_get_word(const char *s, char **dest) {
 	if (i - start)
 		*dest = mstrncpy(s + start, i - start);
 	while (isspace(s[i])) ++i;
+	if (!s[i]) return NULL;
+	return &s[i];
+}
+
+/**
+ * @brief Get first alphanumeric word [a-zA-Z0-9] only.
+ * everything else is treated as a word boundary (space)
+ *
+ * @param dest place to store pointer to a copy of the word
+ * @return start of next word
+ */
+static inline const char *
+str_get_word_alnum(const char *s, char **dest) {
+	*dest = NULL;
+	if (!s) return NULL;
+
+	// advance until we hit an alnum
+	int i = 0;
+	while (s[i] && !isalnum(s[i])) ++i;
+
+	// set start of word
+	int start = i;
+
+	// advance until we no longer are alnum
+	while (s[i] && isalnum(s[i])) ++i;
+
+	// if we advanced any chars
+	if (i - start)
+		// then copy into a new null terminated string
+		*dest = mstrncpy(s + start, i - start);
+
+	// keep advancing to the next word, while we are no longer alnum
+	while (s[i] && !isalnum(s[i])) ++i;
+
+	// return NULL if the next char is null
+	if (!s[i]) return NULL;
+
+	// otherwise return the pointer position, for the beginning of the next word
+	return &s[i];
+}
+
+/**
+ * @brief Get first alphanumeric word [a-zA-Z0-9_] including underscores.
+ * everything else is treated as a word boundary (space)
+ * This function INDLUDES _ underscores as being part of the words
+ * i.e. it does not break, when encountering underscores
+ * Otherwise the same as str_get_word_alnum() function (above)
+ *
+ * @param dest place to store pointer to a copy of the word
+ * @return start of next word
+ */
+static inline const char *
+str_get_word_alnum_(const char *s, char **dest) {
+	*dest = NULL;
+	if (!s) return NULL;
+
+	// advance until we hit an alnum
+	int i = 0;
+	while (s[i] && !isalnum(s[i]) && s[i] != '_') ++i;
+
+	// set start of word
+	int start = i;
+
+	// advance until we no longer are alnum
+	while (s[i] && (isalnum(s[i]) || s[i] == '_')) ++i;
+
+	// if we advanced any chars
+	if (i - start)
+		// then copy into a new null terminated string
+		*dest = mstrncpy(s + start, i - start);
+
+	// keep advancing to the next word, while we are no longer alnum
+	while (s[i] && !isalnum(s[i]) && s[i] != '_') ++i;
+
+	// return NULL if the next char is null
 	if (!s[i]) return NULL;
 	return &s[i];
 }
@@ -709,13 +805,484 @@ ev_key_str(XKeyEvent *ev) {
 	return XKeysymToString(XLookupKeysym(ev, 0));
 }
 
+/**
+ * @brief Convert a string into a KeySym.
+ */
+static inline KeySym
+key_str_sym(char *str) {
+	return XStringToKeysym(str);
+}
+
+/**
+ * @brief Print an error message for each word in the string that is not recognized as a valid keysym
+ *
+ * @param str_err_prefix1 filename of the user's config file, where the setting is written
+ * @param str_err_prefix2 [section] of the rc config file where the setting is (ini format)
+ * @param str_syms a list of words, each word is suppsed to represent a valid KeySym
+ */
+static inline void
+check_keysyms(const char *str_err_prefix1, const char *str_err_prefix2, const char *str_syms)
+{
+  if (!str_syms) return;
+  int count = str_count_words(str_syms);
+
+  const char* next = str_syms;
+  for (int i = 0; i < count; i++)
+  {
+		char *word = NULL;
+		next = str_get_word(next, &word);
+
+		if (!word)
+			break;
+
+		KeySym keysym = key_str_sym(word);
+
+		if (!keysym)
+			printfef(true, "(): %s%s \"%s\" was not recognized as a valid KeySym. Run the program 'xev' to find the correct value.", str_err_prefix1, str_err_prefix2, word);
+
+		free(word);
+  }
+}
+
+/**
+ * @brief convert a string of words into an array of KeySyms
+ * if a word in the string is not recognized as a valid KeySym,
+ * then skip over it. Finally write 0x00 to the last array entry (+1)
+ * which denotes the end of the array of KeySyms
+ *
+ * @param s the string of words to parse / split / convert
+ * @param dest place to store pointer to the new array of KeySyms
+ * @return size of the array
+ */
+static inline int
+keys_str_syms(const char *s, KeySym **dest)
+{
+  *dest = NULL;
+  if (!s) return 0;
+
+  int num_words = str_count_words(s);
+  if(num_words == 0) return 0;
+
+  KeySym *arr_keysyms = (KeySym *)malloc(sizeof(KeySym)*(num_words+1));
+  memset(arr_keysyms, 0, sizeof(KeySym)*(num_words+1));
+
+  int count = 0;
+  for (int i = 0; i < num_words; i++)
+  {
+	char *word = NULL;
+
+	s = str_get_word(s, &word);
+	// s = str_get_word_alnum_(s, &word);
+
+	if (!word)
+	  break;
+
+	KeySym keysym = key_str_sym(word);
+
+	// only increment the array counter if the keysym is valid
+	if(keysym)
+	{
+	  arr_keysyms[count] = keysym;
+	  count++;
+	}
+	free(word);
+
+	if (!s)
+	  break;
+  }
+
+  *dest = arr_keysyms;
+  return count;
+}
+
+/**
+ * @brief Count the number of KeySyms, in an array of KeySyms
+ */
+static inline int
+arr_keysyms_size(KeySym *arr_keysyms)
+{
+  if (!arr_keysyms) return 0;
+
+  int count = 0;
+  while(arr_keysyms[count] != 0x00)
+    count++;
+
+  return count;
+}
+
+/**
+ * @brief convert an array of KeySyms into an array of KeyCodes
+ * if a KeySym in the array is not recognized as a valid KeyCode,
+ * then skip over it. Finally write 0x00 to the last array entry (+1)
+ * which denotes the end of the array of KeyCodes
+ *
+ * @param keysyms the input array of KeySyms
+ * @param dest place to store pointer to the new array of KeyCodes
+ * @return size of the new array
+ */
+static inline int
+keysyms_arr_keycodes(Display *display, KeySym *keysyms, KeyCode **dest)
+{
+  // fputs("keysyms_arr_keycodes(Display *display, KeySym *keysyms, KeyCode **dest)\n", stdout); fflush(stdout);
+  *dest = NULL;
+  if (!display) return 0;
+  if (!keysyms) return 0;
+
+  int num_keysyms = arr_keysyms_size(keysyms);
+  if (num_keysyms == 0) return 0;
+
+  KeyCode *arr_keycodes = (KeyCode *)malloc(sizeof(KeyCode)*(num_keysyms+1));
+  memset(arr_keycodes, 0, sizeof(KeyCode)*(num_keysyms+1));
+
+  int count = 0;
+  for (int i = 0; i < num_keysyms; i++)
+  {
+    arr_keycodes[i] = XKeysymToKeycode(display, keysyms[i]);
+    printfdf(false, "(): i=%i, keysym=%lu, keycode=(0x%02i)", i, keysyms[i], arr_keycodes[i]);
+    count++;
+  }
+  // fputs("\n", stdout); fflush(stdout);
+
+  *dest = arr_keycodes;
+  return count;
+}
+
+/**
+ * @brief Count the number of KeyCodes, in an array of KeyCodes
+ */
+static inline int
+arr_keycodes_size(KeyCode *arr_keycodes)
+{
+  int count = 0;
+  if (!arr_keycodes) return 0;
+
+  while (arr_keycodes[count] != 0x00)
+    count++;
+
+  return count;
+}
+
+/**
+ * @brief Check to see if there is a specific KeyCode in an array of KeyCodes
+ */
+static inline bool
+arr_keycodes_includes(KeyCode *arr_keycodes, KeyCode keycode)
+{
+  if (!arr_keycodes) return false;
+  if (!keycode) return false;
+
+  int count = 0;
+  while (arr_keycodes[count] != 0x00)
+  {
+    if (arr_keycodes[count] == keycode)
+      return true;
+    count++;
+  }
+  return false;
+}
+
+/**
+ * @brief take 2 arrays of KeySyms, and generate a new array
+ * containing only the KeySyms that exist in both arrays
+ * Finally write 0x00 to the last array entry (+1)
+ * which denotes the end of the array of KeyCodes
+ *
+ * @param arr1 the 1st input array of KeySyms
+ * @param arr2 the 2nd input array of KeySyms
+ * @param dest place to store pointer to the new array of KeyCodes
+ * @return size of the new array
+ */
+static inline int
+keysyms_arr_intersect(KeySym *arr1, KeySym *arr2, KeySym **dest)
+{
+  *dest = NULL;
+  if (!arr1) return 0;
+  if (!arr2) return 0;
+
+  int arr1_size = arr_keysyms_size(arr1);
+  int arr2_size = arr_keysyms_size(arr2);
+
+  int dest_size = MIN(arr1_size, arr2_size) + 1;
+  if (dest_size == 1) return 0;
+
+  KeySym *intersect = (KeySym *)malloc(sizeof(KeySym)*dest_size);
+  memset(intersect, 0, sizeof(KeySym)*dest_size);
+
+  int count = 0;
+  for (int i = 0; i < arr1_size; i++)
+  {
+    for (int j = 0; j < arr2_size; j++)
+    {
+      if (arr1[i] == arr2[j])
+      {
+        KeySym keysym = arr1[i];
+        intersect[count] = keysym;
+        count++;
+      }
+    }
+  }
+  *dest = intersect;
+  return count;
+}
+
+/**
+ * @brief Print an error message each time the same KeySym is found in 2 different keybindings settings
+ *
+ * @param config_path filename of the user's config file, where the setting is written
+ * @param arr1_str the name of the 1st config setting
+ * @param arr1 the 1st input array of KeySyms
+ * @param arr2 the 2nd input array of KeySyms
+ * @param arr2_str name of the 2nd config setting
+ * @return true if any keybindings conflicts were found
+ */
+static inline bool
+check_keybindings_conflict(const char *config_path, const char *arr1_str, KeySym *arr1, const char *arr2_str, KeySym *arr2)
+{
+  if (!arr1) return false;
+  if (!arr2) return false;
+
+  KeySym *conflicts = NULL;
+  int num_conflicts = keysyms_arr_intersect(arr1, arr2, &conflicts);
+
+  if (num_conflicts)
+  {
+    for (int i = 0; i < num_conflicts; i++)
+    {
+      KeySym keysym = conflicts[i];
+      printfdf(true, "(): %s: [bindings] Conflict detected. Remove the duplicate setting. Keybinding: '%s' found in both '%s' and '%s'.", config_path, XKeysymToString(keysym), arr1_str, arr2_str);
+      printfdf(true, "%s   (0x%02lx)\n", XKeysymToString(keysym), keysym);
+    }
+    free(conflicts);
+    return true;
+  }
+  free(conflicts);
+  return false;
+}
+
+#define report_key(ev) \
+	printfdf(false, "(): Key %u (%s) occured.", (ev)->xkey.keycode, \
+			ev_key_str(&(ev)->xkey))
+
 #define report_key_ignored(ev) \
-	printfef("(): KeyRelease %u (%s) ignored.", (ev)->xkey.keycode, \
+	printfdf(false, "(): KeyRelease %u (%s) ignored.", (ev)->xkey.keycode, \
 			ev_key_str(&(ev)->xkey))
 
 #define report_key_unbinded(ev) \
-	printfef("(): KeyRelease %u (%s) not binded to anything.", \
+	printfdf(false, "(): KeyRelease %u (%s) not binded to anything.", \
 			(ev)->xkey.keycode, ev_key_str(&(ev)->xkey))
+
+
+/**
+ * @brief Checks if a key event matches particular key and modifier combination.
+ */
+static inline bool
+ev_key_modifier(XKeyEvent *ev, int key_modifier)
+{
+	return ev->state & key_modifier;
+}
+
+/**
+ * @brief A static lookup table of enums for X modifier key masks declared in /usr/include/X11/X.h
+ */
+static const int ev_modifier_mask[] = \
+{
+	ShiftMask,
+	LockMask,
+	ControlMask,
+	Mod1Mask,
+	Mod2Mask,
+	Mod3Mask,
+	Mod4Mask,
+	Mod5Mask,
+	Button1Mask,
+	Button2Mask,
+	Button3Mask,
+	Button4Mask,
+	Button5Mask,
+	AnyModifier,
+	0x00
+};
+
+/**
+ * @brief A static lookup table of strings for X modifier key masks declared in /usr/include/X11/X.h
+ */
+static const char *ev_modifier_mask_str[] = \
+{
+	"ShiftMask",
+	"LockMask",
+	"ControlMask",
+	"Mod1Mask",
+	"Mod2Mask",
+	"Mod3Mask",
+	"Mod4Mask",
+	"Mod5Mask",
+	"Button1Mask",
+	"Button2Mask",
+	"Button3Mask",
+	"Button4Mask",
+	"Button5Mask",
+	"AnyModifier",
+	0x00
+};
+
+/**
+ * @brief Convert a modifier key mask (enum / bitmask) into a string representation
+ */
+static inline const char *
+int_key_modifier_str(unsigned int key_modifier)
+{
+    if (!key_modifier) return NULL;
+
+	int i = 0;
+	while (ev_modifier_mask[i])
+	{
+		if (key_modifier == ev_modifier_mask[i])
+			return ev_modifier_mask_str[i];
+		i++;
+	}
+	return NULL;
+}
+
+/**
+ * @brief Convert a string representation of a modifier key mask into an enum / bitmask
+ */
+static inline unsigned int
+str_key_modifier_int(char *str)
+{
+    if (!str) return 0;
+
+	int i = 0;
+	while (ev_modifier_mask_str[i])
+	{
+		if (strcmp(str, ev_modifier_mask_str[i]) == 0)
+			return ev_modifier_mask[i];
+		i++;
+	}
+	return 0x00;
+}
+
+/**
+ * @brief Print an error message if a word in the string is not recognized as a valid X Modifier Key Mask
+ */
+static inline void
+check_modmasks(const char *str_err_prefix1, const char *str_err_prefix2, const char *str_modkeymasks)
+{
+  // fputs("str_check_modkeymasks(const char *str_err_prefix1, const char *str_err_prefix2, const char *str_modkeymasks)\n", stdout);
+  if (!str_modkeymasks) return;
+
+  int count = str_count_words(str_modkeymasks);
+  const char* next = str_modkeymasks;
+
+  for (int i = 0; i < count; i++)
+  {
+		char *word = NULL;
+		next = str_get_word(next, &word);
+
+		if (!word)
+			break;
+
+		int modkeymask = str_key_modifier_int(word);
+		printfdf(false, "(): %s  %i (0x%02i)", word, modkeymask, modkeymask);
+
+		if (!modkeymask)
+			printfef(true, "(): %s%s \"%s\" not recognized as a Modifier Key Mask. See: /usr/include/X11/X.h", str_err_prefix1, str_err_prefix2, word);
+
+		free(word);
+  }
+  // fputs("\n", stdout);
+}
+
+/**
+ * @brief convert a string of words into an array modifier key bitmasks
+ * if a word in the string is not recognized as a valid modifier key bitmask
+ * then skip over it. Finally write 0x00 to the last array entry (+1)
+ * which denotes the end of the array of modifier key bitmasks
+ *
+ * @param s the string of words to parse / split / convert
+ * @param dest place to store pointer to the new array of modifier key bitmasks
+ * @return size of the array
+ */
+static inline int
+modkeymasks_str_enums(const char *s, int** dest)
+{
+  // fputs("modkeymasks_str_enums(char *str, int** dest)\n", stdout);
+  *dest = NULL;
+  if (!s) return 0;
+
+  int num_words = str_count_words(s);
+  if(num_words == 0) return 0;
+
+  int *arr_modkeymasks = (int *)malloc(sizeof(int)*(num_words+1));
+  memset(arr_modkeymasks, 0, sizeof(int)*(num_words+1));
+
+  int count = 0;
+  for (int i = 0; i < num_words; i++)
+  {
+	char *word = NULL;
+
+	s = str_get_word(s, &word);
+	// s = str_get_word_alnum_(s, &word);
+
+	if (!word)
+	  break;
+
+	int modkeymask = str_key_modifier_int(word);
+	printfdf(false, "(): %s  %i (0x%02i)", word, modkeymask, modkeymask);
+
+	// only increment the array counter if the modifier key mask is valid
+	if(modkeymask)
+	{
+	  arr_modkeymasks[count] = modkeymask;
+	  count++;
+	}
+	free(word);
+
+	if (!s)
+	  break;
+  }
+  *dest = arr_modkeymasks;
+  return count;
+}
+
+/**
+ * @brief Check to see if there is a specific modifier key bitmask in an array of modifier key bitmasks
+ */
+static inline bool
+arr_modkeymasks_includes(int *arr_modkeymasks, int modkeymask)
+{
+  // fputs("arr_keycodes_includes(KeyCode *arr_keycodes, KeyCode keycode)\n", stdout);
+  if (!arr_modkeymasks) return false;
+  if (!modkeymask) return false;
+
+  int i = 0;
+  while (arr_modkeymasks[i] != 0x00)
+  {
+    if (arr_modkeymasks[i] & modkeymask)
+      return true;
+    i++;
+  }
+
+  return false;
+}
+
+/**
+ * @brief Print a log message if the keyboard event has a modifier key held down
+ */
+static inline void
+report_key_modifiers(XKeyEvent *evk)
+{
+  // fputs("report_key_modifiers(XKeyEvent *evk)\n", stdout);
+  if (!evk) return;
+
+  int i = 0;
+  while (ev_modifier_mask[i])
+  {
+    if (evk->state & ev_modifier_mask[i])
+      printfdf(false,"(): Key modifier (%s) is held for key (%s).", ev_modifier_mask_str[i], ev_key_str(evk));
+    i++;
+  }
+  // fputs("\n", stdout);
+}
 
 #include "img.h"
 #include "wm.h"
@@ -738,6 +1305,47 @@ ev_key_str(XKeyEvent *ev) {
 #include "img-gif.h"
 #endif
 
+static inline int
+sort_cw_by_row(dlist* dlist1, dlist* dlist2, void* data)
+{
+	ClientWin *cw1 = (ClientWin *) dlist1->data;
+	ClientWin *cw2 = (ClientWin *) dlist2->data;
+	if (cw1->y < cw2->y)
+		return -1;
+	else if (cw1->y > cw2->y)
+		return 1;
+	else if (cw1->x < cw2->x)
+		return -1;
+	else if (cw1->x > cw2->x)
+		return 1;
+	else
+		return 0;
+}
+
+static inline int
+sort_cw_by_column(dlist* dlist1, dlist* dlist2, void* data)
+{
+	ClientWin *cw1 = (ClientWin *) dlist1->data;
+	ClientWin *cw2 = (ClientWin *) dlist2->data;
+
+	if (cw1->x + cw1->src.width / 2
+			< cw2->x + cw2->src.width / 2)
+		return -1;
+	else if (cw1->x + cw1->src.width / 2
+			> cw2->x + cw2->src.width / 2)
+		return 1;
+	else if (cw1->y + cw1->src.height / 2
+			< cw2->y + cw2->src.height / 2)
+		return -1;
+	else if (cw1->y + cw1->src.height / 2
+			> cw2->y + cw2->src.height / 2)
+		return 1;
+	else
+		return 0;
+}
+
 extern session_t *ps_g;
+
+int load_config_file(session_t *ps);
 
 #endif /* SKIPPY_H */

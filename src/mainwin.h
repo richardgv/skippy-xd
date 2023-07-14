@@ -38,41 +38,72 @@ struct _mainwin_t {
 	Window window;
 	Picture background;
 	Pixmap bg_pixmap;
-	int x, y;
-	unsigned int width, height, distance;
+	int x, y, xoff, yoff;
+	int width, height, distance;
+	float multiplier;
+
 	XRenderPictFormat *format;
 	XTransform transform;
 	
-	XRenderColor normalTint, highlightTint;
-	Pixmap normalPixmap, highlightPixmap;
-	Picture normalPicture, highlightPicture;
+	XRenderColor normalTint, highlightTint, shadowTint;
+	Pixmap normalPixmap, highlightPixmap, shadowPixmap;
+	Picture normalPicture, highlightPicture, shadowPicture;
 	
 	ClientWin *pressed, *focus;
-	dlist *cod;
+	dlist *clientondesktop, *focuslist, *desktopwins, *dminis;
 	struct _Tooltip *tooltip;
 	
-	KeyCode key_act, key_up, key_down, key_left, key_right,
-		key_h, key_j, key_k, key_l,
-		key_enter, key_space, key_q, key_escape;
-	
+	KeySym *keysyms_Up;
+	KeySym *keysyms_Down;
+	KeySym *keysyms_Left;
+	KeySym *keysyms_Right;
+	KeySym *keysyms_Prev;
+	KeySym *keysyms_Next;
+	KeySym *keysyms_ExitCancelOnPress;
+	KeySym *keysyms_ExitCancelOnRelease;
+	KeySym *keysyms_ExitSelectOnPress;
+	KeySym *keysyms_ExitSelectOnRelease;
+	KeySym *keysyms_ReverseDirection;
+
+	int *modifierKeyMasks_ReverseDirection;
+
+	KeyCode *keycodes_Up;
+	KeyCode *keycodes_Down;
+	KeyCode *keycodes_Left;
+	KeyCode *keycodes_Right;
+	KeyCode *keycodes_Prev;
+	KeyCode *keycodes_Next;
+	KeyCode *keycodes_ExitCancelOnPress;
+	KeyCode *keycodes_ExitCancelOnRelease;
+	KeyCode *keycodes_ExitSelectOnPress;
+	KeyCode *keycodes_ExitSelectOnRelease;
+	KeyCode *keycodes_ReverseDirection;
+
+	bool mapped;
+
 #ifdef CFG_XINERAMA
 	int xin_screens;
 	XineramaScreenInfo *xin_info, *xin_active;
 #endif /* CFG_XINERAMA */
 
-	/// @brief Window ID to revert focus to when the main window is unmapped.
-	Window revert_focus_win;
 	/// @brief The client window to eventually focus.
 	ClientWin *client_to_focus;
+	/// @brief the originally focused window
+	ClientWin *client_to_focus_on_cancel;
+	bool refocus;
+	// int ignore_next_refocus;
+	ClientWin *cw_tooltip;
 };
 
 MainWin *mainwin_create(session_t *ps);
+MainWin *mainwin_reload(session_t *ps, MainWin *mw);
 void mainwin_destroy(MainWin *);
 void mainwin_map(MainWin *);
 void mainwin_unmap(MainWin *);
 int mainwin_handle(MainWin *, XEvent *);
 void mainwin_update_background(MainWin *mw);
 void mainwin_update(MainWin *mw);
+MainWin *mainwin_create_pixmap(MainWin *mw);
 void mainwin_transform(MainWin *mw, float f);
 
 #endif /* SKIPPY_MAINWIN_H */

@@ -1,0 +1,162 @@
+#!/bin/sh
+#
+# skippy-xd-runner
+#
+# A wrapper script to deal with too many requests / locks up skippy
+# When skippy is bound to a global keybinding, and held keys repeat
+#
+# Functions:
+#   * Restart skippy daemon if stuck / unresponsive (> 1 sec)
+#   * Don't overload skippy with any simultaneous requests
+#   * Auto-start daemon for --activate and --toggle commands
+#
+# Usage:
+#
+#   skippy-xd-runner <args>
+#
+# The available commands are:
+# [no command]        - activate expose once without daemon.
+# --help              - show this message.
+# -S                  - enable debugging logs.
+
+# --config            - read configuration file from path.
+# --config-reload     - reload configuration file from the previous path.
+
+# --start-daemon      - runs as daemon mode.
+# --stop-daemon       - terminates skippy-xd daemon.
+
+# --switch            - connects to daemon and switch to next window.
+# --switch-prev       - connects to daemon and switch to previous window.
+# --expose            - connects to daemon and activate expose.
+# --paging            - connects to daemon and activate paging.
+#
+#
+#
+
+_kill_skippy() {
+
+  killall 'skippy-xd'
+
+  if [ -f '/tmp/skippy-xd-fifo' ]; then
+    rm /tmp/skippy-xd-fifo
+    touch /tmp/skippy-xd-fifo
+  fi
+
+}
+
+  
+_parse_args()
+{
+  while [ "$1" ]; do
+    arg="$1"
+
+    case $arg in
+
+      --help|-h)                                  _help=true ;;
+      -S)                                         _sync=true ;;
+
+      --config)                                   shift && _config="$1" ;;
+      --config-reload)                            _config_reload=true ;;
+
+      --start-daemon|--start)                     _start_daemon=true ;;
+      --stop-daemon|--stop)                       _stop_daemon=true ;;
+
+      --switch)                                   _activate=true; _next=true ;;
+      --switch-prev)                              _activate=true; _prev=true ;;
+
+      --expose)                                   _activate=true; _expose=true ;;
+      --paging)                                   _activate=true; _paging=true ;;
+
+      --toggle)                                   _toggle=true ;;
+      --deactivate)                               _deactivate=true ;;
+
+    esac
+
+    shift
+  done
+
+  unset _first_arg
+  if [ "$_next" ]; then
+    _first_arg="--switch"
+  fi
+
+  if [ "$_prev" ]; then
+    _first_arg="--switch-prev"
+  fi
+
+  if [ "$_expose" ]; then
+    _first_arg="--expose"
+  fi
+
+  if [ "$_paging" ]; then
+    _first_arg="--paging"
+  fi
+
+  if [ "$_first_arg" ]; then
+    unset _start_daemon
+  fi
+}
+
+_main()
+{
+  # if [ "$(command -v xdotool)" ]; then
+  #   if xdotool search -class --onlyvisible skippy-xd > /dev/null; then
+  #     echo "ignored. skippy is already open / active"
+  #     exit 1
+  #   fi
+  # fi
+
+  lastActivationTimeoutSeconds=1
+  psSkippyAltTabOut="`pgrep -f 'skippy-xd --switch'`"
+  psSkippyAltTabOut="$psSkippyAltTabOut `pgrep -f 'skippy-xd --switch-prev'`"
+  psSkippyExposeOut="`pgrep -f 'skippy-xd --expose'`"
+  psSkippyPagingOut="`pgrep -f 'skippy-xd --paging'`"
+
+  _other_clients=0
+  for pid in $psSkippyAltTabOut $psSkippyExposeOut $psSkippyPagingOut; do
+    ptime="$(ps -o etimes= -p "$pid")"
+    if [ "$ptime" -ge "$lastActivationTimeoutSeconds" ]; then
+      _killall=true
+      break
+    fi
+    _other_clients="$(expr $i + 1)"
+  done
+
+
+  if [ "$_other_clients" -gt "1" ]; then
+    _killall=true
+  fi
+
+  # if a process to activate skippy already exists, with a runtime that is too long
+  # (> 1sec). Then assume skippy-xd is stuck, so we must kill its all of its locked processess
+  if [ "$_killall" ]; then
+    _kill_skippy;
+
+  # if the skippy-xd daemon is busy, and servicing only 1 other recent request (< 1 sec old)
+  # then we assume the alt-tab key is being held down. so we must skip / omit our extra
+  # requests such as this one, since too many requests will lock up the skippy daemon
+  elif [ "$_first_arg" ] && [ "$_other_clients" -eq "1" ]; then
+    echo "refused. skippy is still busy servicing the previous client request"
+    exit 1
+  fi
+
+  # if the action requires the skippy-xd daemon, but it is not already running, we should start it
+  if [ "$_first_arg" ] && [ ! "$_deactivate" ] && [ ! "$(pgrep -f 'skippy-xd ')" ]; then
+
+    if [ "$_config" ]; then
+      skippy-xd --start-daemon --config "$_config" &
+
+    else
+      skippy-xd --start-daemon &
+    fi
+  fi
+
+  # pass all arguments onto skippy unmodified. but repeat $first_arg up front, to show up in pgrep -f output
+  skippy-xd $_first_arg "$@"
+  exit $?
+}
+
+(
+  _parse_args "$@";
+  _main "$@"
+)

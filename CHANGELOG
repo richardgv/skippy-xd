@@ -1,5 +1,33 @@
 Skippy-XD changelog
 
+0.7.0 -- "Popsicle" (23 Jun 2023) ~/felixfung
+ - New paging mode
+ - New command line parameters
+ - Named pipe name postfixed with X session ID
+ - Bug fixes particularly polishing around focus logic
+ - Proper z-order management
+ - Support mouse scroll wheel
+ - Tooltip shows on bottom of windows
+
+0.6.0~fung -- "" (10 Mar 2023) ~/felixfung
+ - Thumbnail displays for iconized or otherwise unmapped windows
+ - Animation when activating skippy
+ - Boxy layout / multiple layouts
+ - Config reloading while daemon is kept running
+ - Rounded Corners
+
+0.5.2~pre -- "Puzzlebox" (09 Sept 2018) ~/dreamcat4
+ - Fully customizable keybindings, and documentation for configuring them
+ - Default keybindings settings made consistent with 'Alt-Tab' behaviour
+ - (Alt-Tab) New --prev and --next args for --activate and --toggle modes
+ - Replaced wrapper script skippy-xd-toggle --> skippy-xd-runner
+ - Valgrind - added .valgrind.supressions file
+ - Makefile - prefer clang over gcc, if clang is present on the system
+ - Makefile - a slight improvment to the handling of compiler warnings
+ - Makefile - added 'install-check' build target, informational
+ - Version string - changed format, and now includes the version number
+ - Readme - new section for developers / maintainers / contributors
+
 0.5.1~hg -- "No codename" (23 Dec 2011)
  - Correctly auto-detect 32 or 64-bit system and compile appropriately.
  - Removed X11-based hotkey activation code (skippy now displays once on

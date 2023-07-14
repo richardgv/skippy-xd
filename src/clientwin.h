@@ -44,17 +44,20 @@ struct _clientwin_t {
 	SkippyWindow mini;
 
 	Pixmap pixmap;
-	Picture origin, destination;
+	Picture origin, destination, shadow;
 	Damage damage;
 	float factor;
 
 	bool focused;
 
 	bool damaged;
+
+	bool zombie;
 	/* XserverRegion repair; */
 	
 	/* These are virtual positions set by the layout routine */
 	int x, y;
+    int slots;
 };
 
 #define CLIENTWT_INIT { \
@@ -63,34 +66,8 @@ struct _clientwin_t {
 	.mainwin = NULL \
 }
 
-static inline client_disp_mode_t
-clientwin_get_disp_mode(session_t *ps, ClientWin *cw) {
-	XWindowAttributes wattr = { };
-	XGetWindowAttributes(ps->dpy, cw->src.window, &wattr);
-
-	if (!ps->o.showUnmapped && IsViewable != wattr.map_state)
-		return CLIDISP_NONE;
-
-	for (client_disp_mode_t *p = ps->o.clientDisplayModes; *p; p++) {
-		switch (*p) {
-			case CLIDISP_THUMBNAIL_ICON:
-				if (IsViewable == wattr.map_state && cw->origin && cw->icon_pict)
-					return *p;
-				break;
-			case CLIDISP_THUMBNAIL:
-				if (IsViewable == wattr.map_state && cw->origin) return *p;
-				break;
-			case CLIDISP_ICON:
-				if (cw->icon_pict) return *p;
-				break;
-			case CLIDISP_FILLED:
-			case CLIDISP_NONE:
-				return *p;
-		}
-	}
-
-	return CLIDISP_NONE;
-}
+client_disp_mode_t
+clientwin_get_disp_mode(session_t *ps, ClientWin *cw, bool isViewable);
 
 static inline void
 clientwin_free_res2(session_t *ps, ClientWin *cw) {
@@ -110,7 +87,7 @@ int clientwin_validate_func(dlist *, void *);
 int clientwin_sort_func(dlist *, dlist *, void *);
 ClientWin *clientwin_create(MainWin *, Window);
 void clientwin_destroy(ClientWin *, bool destroyed);
-void clientwin_move(ClientWin *, float, int, int);
+void clientwin_move(ClientWin *, float, int, int, float);
 void clientwin_map(ClientWin *);
 void clientwin_unmap(ClientWin *);
 int clientwin_handle(ClientWin *, XEvent *);
@@ -121,6 +98,7 @@ int clientwin_check_group_leader_func(dlist *l, void *data);
 void clientwin_render(ClientWin *);
 void clientwin_schedule_repair(ClientWin *cw, XRectangle *area);
 void clientwin_repair(ClientWin *cw);
+void clientwin_tooltip(ClientWin *cw, XEvent *ev);
 void childwin_focus(ClientWin *cw);
 
 #endif /* SKIPPY_CLIENT_H */

@@ -343,48 +343,49 @@ static inline dlist *
 wm_get_stack_sub(session_t *ps, Window root) {
 	dlist *l = NULL;
 
-	if (!(ps->o.acceptOvRedir || ps->o.acceptWMWin)) {
+	// does not give info on windows z-order
+	switch (ps->o.clientList) {
 		// EWMH
-		l = wm_get_stack_fromprop(ps, root, _NET_CLIENT_LIST);
-		if (l) {
-			printfdf("(): Retrieved window stack from _NET_CLIENT_LIST.");
-			return l;
-		}
+		case 1:
+			printfdf(false, "(): Retrieved window stack from _NET_CLIENT_LIST.");
+			return wm_get_stack_fromprop(ps, root, _NET_CLIENT_LIST);
 
 		// GNOME WM
-		l = wm_get_stack_fromprop(ps, root, _WIN_CLIENT_LIST);
-		if (l) {
-			printfdf("(): Retrieved window stack from _WIN_CLIENT_LIST.");
-			return l;
-		}
-	}
+		case 2:
+			printfdf(false, "(): Retrieved window stack from _WIN_CLIENT_LIST.");
+			return wm_get_stack_fromprop(ps, root, _WIN_CLIENT_LIST);
 
-	// Stupid method
-	{
-		Window *children = NULL;
-		unsigned nchildren = 0;
-		Window rroot = None, rparent = None;
-		if (XQueryTree(ps->dpy, root, &rroot, &rparent,
-					&children, &nchildren) && nchildren && children) {
-			// Fluxbox sets override-redirect on its frame windows,
-			// so we can't skip override-redirect windows.
-			for (int i = 0; i < nchildren; ++i) {
-				Window wid = children[i];
-				Window client = wm_find_client(ps, wid);
-				if (!client && (ps->o.acceptOvRedir || ps->o.acceptWMWin)) {
-					XWindowAttributes attr = { };
-					if (XGetWindowAttributes(ps->dpy, wid, &attr)
-						&& ((attr.override_redirect && ps->o.acceptOvRedir)
-								|| (!attr.override_redirect && ps->o.acceptWMWin))) {
-						client = wid;
-					}
+		// Stupid method, but this gives windows ordered by z-order
+		default:
+		{
+			Window *children = NULL;
+			unsigned nchildren = 0;
+			Window rroot = None, rparent = None;
+			if (XQueryTree(ps->dpy, root, &rroot, &rparent,
+						&children, &nchildren) && nchildren && children) {
+				// Fluxbox sets override-redirect on its frame windows,
+				// so we can't skip override-redirect windows.
+				for (int i = 0; i < nchildren; ++i) {
+					Window wid = children[i];
+					Window client = wm_find_client(ps, wid);
+					// both obsolete config options
+					// ps->o.acceptOvRedir and ps->o.acceptWMWin were always false
+					// hence this loop never runs
+					/*if (!client && (ps->o.acceptOvRedir || ps->o.acceptWMWin)) {
+						XWindowAttributes attr = { };
+						if (XGetWindowAttributes(ps->dpy, wid, &attr)
+							&& ((attr.override_redirect && ps->o.acceptOvRedir)
+									|| (!attr.override_redirect && ps->o.acceptWMWin))) {
+							client = wid;
+						}
+					}*/
+					if (client)
+						l = dlist_add(l, (void *) client);
 				}
-				if (client)
-					l = dlist_add(l, (void *) client);
 			}
+			sxfree(children);
+			printfdf(false, "(): Retrieved window stack by querying all children.");
 		}
-		sxfree(children);
-		printfdf("(): Retrieved window stack by querying all children.");
 	}
 
 	return l;
@@ -392,7 +393,8 @@ wm_get_stack_sub(session_t *ps, Window root) {
 
 dlist *
 wm_get_stack(session_t *ps) {
-	if (ps->o.includeAllScreens) {
+	if ((!ps->o.switchShowAllDesktops && ps->o.mode == PROGMODE_SWITCH)
+			|| (!ps->o.exposeShowAllDesktops && ps->o.mode == PROGMODE_EXPOSE)) {
 		dlist *l = NULL;
 		for (int i = 0; i < ScreenCount(ps->dpy); ++i)
 			l = dlist_join(l, wm_get_stack_sub(ps, RootWindow(ps->dpy, i)));
@@ -427,6 +429,37 @@ wm_get_root_pmap(Display *dpy)
 	XFree(data);
 	
 	return rootpmap;
+}
+
+unsigned long
+wm_get_desktops(session_t *ps) {
+	Atom real_type;
+	int real_format;
+	unsigned long items_read, items_left;
+	unsigned char *data;
+
+	char num_desktops = -1;
+
+	int status = XGetWindowProperty(ps->dpy, ps->root,
+			_NET_NUMBER_OF_DESKTOPS, 0L, 1L, False, XA_CARDINAL,
+			&real_type, &real_format, &items_read, &items_left, &data);
+
+	if (status == Success && items_read && data && real_format == 32)
+		goto return_status;
+
+	status = XGetWindowProperty(ps->dpy, ps->root,
+			_WIN_WORKSPACE_COUNT, 0L, 1L, False, XA_CARDINAL,
+			&real_type, &real_format, &items_read, &items_left, &data);
+
+	if (status == Success && items_read && data && real_format == 32)
+		goto return_status;
+
+return_status:
+	if (status == Success && items_read && data && real_format == 32)
+		num_desktops = data[0];
+
+	XFree(data);
+	return num_desktops;
 }
 
 long
@@ -470,6 +503,26 @@ wm_get_window_title(session_t *ps, Window wid, int *length_return) {
 	return (FcChar8 *) ret;
 }
 
+void
+printfdfWindowName(session_t *ps, char *prefix_str, Window wid)
+{
+	int win_title_len = 0;
+	FcChar8 *win_title = wm_get_window_title(ps, wid, &win_title_len);
+
+	if (! win_title)
+		return;
+
+	if (prefix_str) {
+		printfdf(false, "(): %s%s", prefix_str, win_title);
+	}
+
+	else {
+		printfdf(false, "(): %s", win_title);
+	}
+
+	free(win_title);
+}
+
 Window
 wm_get_group_leader(Display *dpy, Window window)
 {
@@ -507,7 +560,7 @@ void
 wm_set_fullscreen(session_t *ps, Window window,
 		int x, int y, unsigned width, unsigned height) {
 	Display *dpy = ps->dpy;
-	if (ps->o.useNetWMFullscreen && ps->has_ewmh_fullscreen) {
+	if (ps->has_ewmh_fullscreen) {
 		Atom props[] = {
 			_NET_WM_STATE_FULLSCREEN,
 			_NET_WM_STATE_SKIP_TASKBAR,
@@ -554,10 +607,9 @@ wm_validate_window(session_t *ps, Window wid) {
 		prop = wid_get_prop(ps, wid, _NET_WM_STATE, 8192, XA_ATOM, 32);
 		for (int i = 0; result && i < prop.nitems; i++) {
 			long v = prop.data32[i];
-			if (!ps->o.showUnmapped && _NET_WM_STATE_HIDDEN == v)
+			if (!ps->o.showShadow && _NET_WM_STATE_HIDDEN == v)
 				result = false;
-			else if (ps->o.ignoreSkipTaskbar
-					&& _NET_WM_STATE_SKIP_TASKBAR == v)
+			else if (_NET_WM_STATE_SKIP_TASKBAR == v)
 				result = false;
 			else if (_NET_WM_STATE_SHADED == v)
 				result = false;
@@ -568,12 +620,12 @@ wm_validate_window(session_t *ps, Window wid) {
 	else if (WMPSN_GNOME == ps->wmpsn) {
 		// Check _WIN_STATE
 		prop = wid_get_prop(ps, wid, _WIN_STATE, 1, XA_CARDINAL, 0);
-		if (!ps->o.showUnmapped && winprop_get_int(&prop)
+		if (!ps->o.showShadow && winprop_get_int(&prop)
 				& (WIN_STATE_MINIMIZED | WIN_STATE_SHADED | WIN_STATE_HIDDEN))
 			result = false;
 		free_winprop(&prop);
 
-		if (result && ps->o.ignoreSkipTaskbar) {
+		if (result) {
 			prop = wid_get_prop(ps, wid, _WIN_HINTS, 1, XA_CARDINAL, 0);
 			if (winprop_get_int(&prop) & WIN_HINTS_SKIP_TASKBAR)
 				result = false;
@@ -624,16 +676,15 @@ wm_get_focused(session_t *ps) {
 	{
 		int revert_to = 0;
 		if (!XGetInputFocus(ps->dpy, &focused, &revert_to)) {
-			printfef("(): Failed to get current focused window.");
-			return None;
+			printfdf(false, "(): Currently not focused on any window; returning main window...");
+			return ps->mainwin->window;
 		}
-		// printfdf("(): Focused window is %#010lx.", focused);
 	}
 
 	while (focused) {
 		// Discard insane values
 		if (ps->root == focused || PointerRoot == focused)
-			return None;
+			return ps->mainwin->window;
 
 		// Check for WM_STATE
 		if (wid_has_prop(ps, focused, XA_WM_STATE))
@@ -649,10 +700,10 @@ wm_get_focused(session_t *ps) {
 				XQueryTree(ps->dpy, focused, &rroot, &parent, &children, &nchildren);
 			sxfree(children);
 			if (!status) {
-				printfef("(): Failed to get parent window of %#010lx.", focused);
+				printfef(false, "(): Failed to get parent window of %#010lx.", focused);
 				return None;
 			}
-			// printfdf("(): Parent window of %#010lx is %#010lx.", focused, parent);
+			printfdf(false, "(): Parent window of %#010lx is %#010lx.", focused, parent);
 			focused = parent;
 			assert(ps->root == rroot);
 		}

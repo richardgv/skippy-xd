@@ -67,23 +67,25 @@ static inline bool
 wm_check(session_t *ps) {
 	if (wm_check_netwm(ps)) {
 		ps->wmpsn = WMPSN_EWMH;
-		printfdf("(): Your WM looks EWMH compliant.");
+		printfdf(true, "(): Your WM looks EWMH compliant.");
 		return true;
 	}
 	if (wm_check_gnome(ps)) {
 		ps->wmpsn = WMPSN_GNOME;
-		printfdf("(): Your WM looks GNOME compliant.");
+		printfdf(true, "(): Your WM looks GNOME compliant.");
 		return true;
 	}
-	printfef("(): Your WM is neither EWMH nor GNOME WM compliant. "
+	printfdf(true, "(): Your WM is neither EWMH nor GNOME WM compliant. "
 			"Troubles ahead.");
 	return false;
 }
 
 dlist *wm_get_stack(session_t *ps);
 Pixmap wm_get_root_pmap(Display *dpy);
+unsigned long wm_get_desktops(session_t *ps);
 long wm_get_current_desktop(session_t *ps);
 FcChar8 *wm_get_window_title(session_t *ps, Window wid, int *length_return);
+void printfdfWindowName(session_t *ps, char *prefix_str, Window wid);
 Window wm_get_group_leader(Display *dpy, Window window);
 void wm_set_fullscreen(session_t *ps, Window window,
 		int x, int y, unsigned width, unsigned height);
@@ -155,12 +157,13 @@ wm_set_desktop_ewmh(session_t *ps, long desktop) {
 static inline void
 wm_activate_window(session_t *ps, Window wid) {
 	if (!wid) return;
-
-	if (ps->o.switchDesktopOnActivate) {
+	
+	{
 		long tgt = wm_get_window_desktop(ps, wid);
 		if (tgt >= 0)
 			wm_set_desktop_ewmh(ps, tgt);
 	}
+
 	// Order is important, to avoid "intelligent" WMs fixing our focus stealing
 	wm_activate_window_ewmh(ps, wid);
 	XSetInputFocus(ps->dpy, wid, RevertToParent, CurrentTime);

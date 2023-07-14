@@ -31,7 +31,7 @@ focus_miniw_dir(ClientWin *cw, match_func match, dist_func func) {
 	ClientWin *candidate = NULL;
 	session_t * const ps = cw->mainwin->ps;
 
-	dlist *candidates = dlist_first(dlist_find_all(cw->mainwin->cod, (dlist_match_func) match, &cw->mini));
+	dlist *candidates = dlist_first(dlist_find_all(cw->mainwin->focuslist, (dlist_match_func) match, &cw->mini));
 	if (!candidates) return;
 
 	foreach_dlist (candidates) {
@@ -42,6 +42,10 @@ focus_miniw_dir(ClientWin *cw, match_func match, dist_func func) {
 			diff = distance;
 		}
 	}
+
+	clear_focus_all(cw->mainwin->focuslist);
+	clientwin_render(cw);
+	XFlush(ps->dpy);
 
 	focus_miniw(ps, candidate);
 	dlist_free(candidates);

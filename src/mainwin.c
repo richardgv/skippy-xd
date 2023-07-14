@@ -50,14 +50,6 @@ MainWin *
 mainwin_create(session_t *ps) {
 	Display * const dpy = ps->dpy;
 
-	const char *tmp;
-	double tmp_d;
-	XColor exact_color;
-	XSetWindowAttributes wattr;
-	XWindowAttributes rootattr;
-	XRenderPictureAttributes pa;
-	XRenderColor clear;
-
 	// Get ARGB visual.
 	// FIXME: Move this to skippy.c?
 	if (!ps->argb_visual)
@@ -67,48 +59,45 @@ mainwin_create(session_t *ps) {
 	MainWin *mw = allocchk(calloc(1, sizeof(MainWin)));
 
 	mw->ps = ps;
-	if (ps->o.lazyTrans) {
-		mw->depth  = 32;
-		mw->visual = ps->argb_visual;
-		if (!mw->visual) {
-			printfef("(): Couldn't find ARGB visual, lazy transparency can't work.");
-			goto mainwin_create_err;
-		}
-	}
-	if (!ps->o.lazyTrans) {
-		mw->depth = DefaultDepth(dpy, ps->screen);
-		mw->visual = DefaultVisual(dpy, ps->screen);
-	}
-	mw->colormap = XCreateColormap(dpy, ps->root, mw->visual, AllocNone);
 	mw->bg_pixmap = None;
 	mw->background = None;
-	mw->format = XRenderFindVisualFormat(dpy, mw->visual);
+
 #ifdef CFG_XINERAMA
 	mw->xin_info = mw->xin_active = 0;
 	mw->xin_screens = 0;
 #endif /* CFG_XINERAMA */
 	
-	mw->pressed = mw->focus = 0;
+	// mw->pressed = mw->focus = 0;
+	mw->pressed = mw->client_to_focus = 0;
 	mw->tooltip = 0;
-	mw->cod = 0;
-	mw->key_up = XKeysymToKeycode(dpy, XK_Up);
-	mw->key_down = XKeysymToKeycode(dpy, XK_Down);
-	mw->key_left = XKeysymToKeycode(dpy, XK_Left);
-	mw->key_right = XKeysymToKeycode(dpy, XK_Right);
-	mw->key_h = XKeysymToKeycode(dpy, XK_h);
-	mw->key_j = XKeysymToKeycode(dpy, XK_j);
-	mw->key_k = XKeysymToKeycode(dpy, XK_k);
-	mw->key_l = XKeysymToKeycode(dpy, XK_l);
-	mw->key_enter = XKeysymToKeycode(dpy, XK_Return);
-	mw->key_space = XKeysymToKeycode(dpy, XK_space);
-	mw->key_escape = XKeysymToKeycode(dpy, XK_Escape);
-	mw->key_q = XKeysymToKeycode(dpy, XK_q);
-	
+	mw->clientondesktop = 0;
+	mw->focuslist = 0;
+	mw->refocus = false;
+
+	XWindowAttributes rootattr;
 	XGetWindowAttributes(dpy, ps->root, &rootattr);
 	mw->x = mw->y = 0;
 	mw->width = rootattr.width;
 	mw->height = rootattr.height;
-	
+
+	if (ps->o.lazyTrans) {
+		mw->depth  = 32;
+		mw->visual = ps->argb_visual;
+		if (!mw->visual) {
+			printfef(true, "(): Couldn't find ARGB visual, lazy transparency can't work.");
+			goto mainwin_create_err;
+		}
+	}
+    else {
+		mw->depth = DefaultDepth(dpy, ps->screen);
+		mw->visual = DefaultVisual(dpy, ps->screen);
+	}
+
+	mw = mainwin_reload(ps, mw);
+	if (!mw)
+		goto mainwin_create_err;
+
+	XSetWindowAttributes wattr;
 	wattr.colormap = mw->colormap;
 	wattr.background_pixel = wattr.border_pixel = 0;
 	wattr.override_redirect = True;
@@ -116,35 +105,119 @@ mainwin_create(session_t *ps) {
 	// receive ButtonRelease events in some cases
 	wattr.event_mask = VisibilityChangeMask | ButtonPressMask
 		| ButtonReleaseMask | KeyPressMask | KeyReleaseMask;
-	
+
 	mw->window = XCreateWindow(dpy, ps->root, 0, 0, mw->width, mw->height, 0,
 			mw->depth, InputOutput, mw->visual,
 			CWBackPixel | CWBorderPixel | CWColormap | CWEventMask | CWOverrideRedirect, &wattr);
-	if (!mw->window) {
-		free(mw);
-		return 0;
-	}
+	if (!mw->window)
+		goto mainwin_create_err;
+
 	wm_wid_set_info(ps, mw->window, "main window", None);
+
+	mainwin_create_pixmap(mw);
 
 #ifdef CFG_XINERAMA
 	if (ps->xinfo.xinerama_exist && XineramaIsActive(dpy)) {
 		mw->xin_info = XineramaQueryScreens(ps->dpy, &mw->xin_screens);
 # ifdef DEBUG_XINERAMA
-		printfef("(): Xinerama is enabled (%d screens).", mw->xin_screens);
+		printfdf(false, "(): Xinerama is enabled (%d screens).", mw->xin_screens);
 # endif /* DEBUG_XINERAMA */
 	}
 #endif /* CFG_XINERAMA */
 
 	XCompositeRedirectSubwindows (ps->dpy, ps->root, CompositeRedirectAutomatic);
+
+	return mw;
+
+mainwin_create_err:
+	if (mw)
+		free(mw);
+	return NULL;
+}
+
+MainWin *
+mainwin_reload(session_t *ps, MainWin *mw) {
+	Display * const dpy = ps->dpy;
+
+	// convert the keybindings settings strings into arrays of KeySyms
+	keys_str_syms(ps->o.bindings_keysUp, &mw->keysyms_Up);
+	keys_str_syms(ps->o.bindings_keysDown, &mw->keysyms_Down);
+	keys_str_syms(ps->o.bindings_keysLeft, &mw->keysyms_Left);
+	keys_str_syms(ps->o.bindings_keysRight, &mw->keysyms_Right);
+	keys_str_syms(ps->o.bindings_keysPrev, &mw->keysyms_Prev);
+	keys_str_syms(ps->o.bindings_keysNext, &mw->keysyms_Next);
+	keys_str_syms(ps->o.bindings_keysExitCancelOnPress, &mw->keysyms_ExitCancelOnPress);
+	keys_str_syms(ps->o.bindings_keysExitCancelOnRelease, &mw->keysyms_ExitCancelOnRelease);
+	keys_str_syms(ps->o.bindings_keysExitSelectOnPress, &mw->keysyms_ExitSelectOnPress);
+	keys_str_syms(ps->o.bindings_keysExitSelectOnRelease, &mw->keysyms_ExitSelectOnRelease);
+	keys_str_syms(ps->o.bindings_keysReverseDirection, &mw->keysyms_ReverseDirection);
+
+	// convert the modifier key masks settings strings into arrays of enums
+	modkeymasks_str_enums(ps->o.bindings_modifierKeyMasksReverseDirection, &mw->modifierKeyMasks_ReverseDirection);
+
+	// convert the arrays of KeySyms into arrays of KeyCodes, for this specific Display
+	keysyms_arr_keycodes(dpy, mw->keysyms_Up, &mw->keycodes_Up);
+	keysyms_arr_keycodes(dpy, mw->keysyms_Down, &mw->keycodes_Down);
+	keysyms_arr_keycodes(dpy, mw->keysyms_Left, &mw->keycodes_Left);
+	keysyms_arr_keycodes(dpy, mw->keysyms_Right, &mw->keycodes_Right);
+	keysyms_arr_keycodes(dpy, mw->keysyms_Prev, &mw->keycodes_Prev);
+	keysyms_arr_keycodes(dpy, mw->keysyms_Next, &mw->keycodes_Next);
+	keysyms_arr_keycodes(dpy, mw->keysyms_ExitCancelOnPress, &mw->keycodes_ExitCancelOnPress);
+	keysyms_arr_keycodes(dpy, mw->keysyms_ExitCancelOnRelease, &mw->keycodes_ExitCancelOnRelease);
+	keysyms_arr_keycodes(dpy, mw->keysyms_ExitSelectOnPress, &mw->keycodes_ExitSelectOnPress);
+	keysyms_arr_keycodes(dpy, mw->keysyms_ExitSelectOnRelease, &mw->keycodes_ExitSelectOnRelease);
+	keysyms_arr_keycodes(dpy, mw->keysyms_ReverseDirection, &mw->keycodes_ReverseDirection);
+
+	// we check all possible pairs, one pair at a time. This is in a specific order, to give a more helpful error msg
+	check_keybindings_conflict(ps->o.config_path, "keysUp", mw->keysyms_Up, "keysDown", mw->keysyms_Down);
+	check_keybindings_conflict(ps->o.config_path, "keysUp", mw->keysyms_Up, "keysLeft", mw->keysyms_Left);
+	check_keybindings_conflict(ps->o.config_path, "keysUp", mw->keysyms_Up, "keysRight", mw->keysyms_Right);
+	check_keybindings_conflict(ps->o.config_path, "keysUp", mw->keysyms_Up, "keysExitCancelOnPress", mw->keysyms_ExitCancelOnPress);
+	check_keybindings_conflict(ps->o.config_path, "keysUp", mw->keysyms_Up, "keysExitCancelOnRelease", mw->keysyms_ExitCancelOnRelease);
+	check_keybindings_conflict(ps->o.config_path, "keysUp", mw->keysyms_Up, "keysExitSelectOnPress", mw->keysyms_ExitSelectOnPress);
+	check_keybindings_conflict(ps->o.config_path, "keysUp", mw->keysyms_Up, "keysExitSelectOnRelease", mw->keysyms_ExitSelectOnRelease);
+	check_keybindings_conflict(ps->o.config_path, "keysDown", mw->keysyms_Down, "keysLeft", mw->keysyms_Left);
+	check_keybindings_conflict(ps->o.config_path, "keysDown", mw->keysyms_Down, "keysRight", mw->keysyms_Right);
+	check_keybindings_conflict(ps->o.config_path, "keysDown", mw->keysyms_Down, "keysExitCancelOnPress", mw->keysyms_ExitCancelOnPress);
+	check_keybindings_conflict(ps->o.config_path, "keysDown", mw->keysyms_Down, "keysExitCancelOnRelease", mw->keysyms_ExitCancelOnRelease);
+	check_keybindings_conflict(ps->o.config_path, "keysDown", mw->keysyms_Down, "keysExitSelectOnPress", mw->keysyms_ExitSelectOnPress);
+	check_keybindings_conflict(ps->o.config_path, "keysDown", mw->keysyms_Down, "keysExitSelectOnRelease", mw->keysyms_ExitSelectOnRelease);
+	check_keybindings_conflict(ps->o.config_path, "keysLeft", mw->keysyms_Left, "keysRight", mw->keysyms_Right);
+	check_keybindings_conflict(ps->o.config_path, "keysLeft", mw->keysyms_Left, "keysExitCancelOnPress", mw->keysyms_ExitCancelOnPress);
+	check_keybindings_conflict(ps->o.config_path, "keysLeft", mw->keysyms_Left, "keysExitCancelOnRelease", mw->keysyms_ExitCancelOnRelease);
+	check_keybindings_conflict(ps->o.config_path, "keysLeft", mw->keysyms_Left, "keysExitSelectOnPress", mw->keysyms_ExitSelectOnPress);
+	check_keybindings_conflict(ps->o.config_path, "keysLeft", mw->keysyms_Left, "keysExitSelectOnRelease", mw->keysyms_ExitSelectOnRelease);
+	check_keybindings_conflict(ps->o.config_path, "keysRight", mw->keysyms_Prev, "keysExitCancelOnPress", mw->keysyms_ExitCancelOnPress);
+	check_keybindings_conflict(ps->o.config_path, "keysRight", mw->keysyms_Prev, "keysExitCancelOnRelease", mw->keysyms_ExitCancelOnRelease);
+	check_keybindings_conflict(ps->o.config_path, "keysRight", mw->keysyms_Prev, "keysExitSelectOnPress", mw->keysyms_ExitSelectOnPress);
+	check_keybindings_conflict(ps->o.config_path, "keysRight", mw->keysyms_Prev, "keysExitSelectOnRelease", mw->keysyms_ExitSelectOnRelease);
+	check_keybindings_conflict(ps->o.config_path, "keysPrev", mw->keysyms_Prev, "keysExitCancelOnPress", mw->keysyms_ExitCancelOnPress);
+	check_keybindings_conflict(ps->o.config_path, "keysPrev", mw->keysyms_Prev, "keysExitCancelOnRelease", mw->keysyms_ExitCancelOnRelease);
+	check_keybindings_conflict(ps->o.config_path, "keysPrev", mw->keysyms_Prev, "keysExitSelectOnPress", mw->keysyms_ExitSelectOnPress);
+	check_keybindings_conflict(ps->o.config_path, "keysPrev", mw->keysyms_Prev, "keysExitSelectOnRelease", mw->keysyms_ExitSelectOnRelease);
+	check_keybindings_conflict(ps->o.config_path, "keysNext", mw->keysyms_Next, "keysExitCancelOnPress", mw->keysyms_ExitCancelOnPress);
+	check_keybindings_conflict(ps->o.config_path, "keysNext", mw->keysyms_Next, "keysExitCancelOnRelease", mw->keysyms_ExitCancelOnRelease);
+	check_keybindings_conflict(ps->o.config_path, "keysNext", mw->keysyms_Next, "keysExitSelectOnPress", mw->keysyms_ExitSelectOnPress);
+	check_keybindings_conflict(ps->o.config_path, "keysNext", mw->keysyms_Next, "keysExitSelectOnRelease", mw->keysyms_ExitSelectOnRelease);
+	check_keybindings_conflict(ps->o.config_path, "keysExitCancelOnPress", mw->keysyms_ExitCancelOnPress, "keysExitCancelOnRelease", mw->keysyms_ExitCancelOnRelease);
+	check_keybindings_conflict(ps->o.config_path, "keysExitCancelOnPress", mw->keysyms_ExitCancelOnPress, "keysExitSelectOnPress", mw->keysyms_ExitSelectOnPress);
+	check_keybindings_conflict(ps->o.config_path, "keysExitCancelOnPress", mw->keysyms_ExitCancelOnPress, "keysExitSelectOnRelease", mw->keysyms_ExitSelectOnRelease);
+	check_keybindings_conflict(ps->o.config_path, "keysExitCancelOnRelease", mw->keysyms_ExitCancelOnRelease, "keysExitSelectOnPress", mw->keysyms_ExitSelectOnPress);
+	check_keybindings_conflict(ps->o.config_path, "keysExitCancelOnRelease", mw->keysyms_ExitCancelOnRelease, "keysExitSelectOnRelease", mw->keysyms_ExitSelectOnRelease);
+	check_keybindings_conflict(ps->o.config_path, "keysExitSelectOnPress", mw->keysyms_ExitSelectOnPress, "keysExitSelectOnRelease", mw->keysyms_ExitSelectOnRelease);
 	
-	tmp_d = ps->o.updateFreq;
-	if(tmp_d != 0.0)
-		mw->poll_time = (1.0 / tmp_d) * 1000.0;
+	if (ps->o.updateFreq != 0.0)
+		mw->poll_time = (1.0 / ps->o.updateFreq) * 1000.0;
 	else
-		mw->poll_time = 0;
-	
+		mw->poll_time = (1.0 / 60.0) * 1000.0;
+
+	mw->colormap = XCreateColormap(dpy, ps->root, mw->visual, AllocNone);
+	mw->format = XRenderFindVisualFormat(dpy, mw->visual);
+
+	XColor exact_color;
+
 	if(!XParseColor(ps->dpy, mw->colormap, ps->o.normal_tint, &exact_color)) {
-		printfef("(): Couldn't look up color '%s', reverting to black.", ps->o.normal_tint);
+		printfef(true, "(): Couldn't look up color '%s', reverting to black.", ps->o.normal_tint);
 		mw->normalTint.red = mw->normalTint.green = mw->normalTint.blue = 0;
 	}
 	else
@@ -154,11 +227,10 @@ mainwin_create(session_t *ps) {
 		mw->normalTint.blue = exact_color.blue;
 	}
 	mw->normalTint.alpha = alphaconv(ps->o.normal_tintOpacity);
-	
-	tmp = ps->o.highlight_tint;
-	if(! XParseColor(ps->dpy, mw->colormap, tmp, &exact_color))
+
+	if(! XParseColor(ps->dpy, mw->colormap, ps->o.highlight_tint, &exact_color))
 	{
-		fprintf(stderr, "Couldn't look up color '%s', reverting to #101020", tmp);
+		printfef(true, "(): Couldn't look up color '%s', reverting to #101020", ps->o.highlight_tint);
 		mw->highlightTint.red = mw->highlightTint.green = 0x10;
 		mw->highlightTint.blue = 0x20;
 	}
@@ -169,29 +241,71 @@ mainwin_create(session_t *ps) {
 		mw->highlightTint.blue = exact_color.blue;
 	}
 	mw->highlightTint.alpha = alphaconv(ps->o.highlight_tintOpacity);
-	
-	pa.repeat = True;
-	clear.alpha = alphaconv(ps->o.normal_opacity);
-	mw->normalPixmap = XCreatePixmap(ps->dpy, mw->window, 1, 1, 8);
-	mw->normalPicture = XRenderCreatePicture(ps->dpy, mw->normalPixmap, XRenderFindStandardFormat(ps->dpy, PictStandardA8), CPRepeat, &pa);
-	XRenderFillRectangle(ps->dpy, PictOpSrc, mw->normalPicture, &clear, 0, 0, 1, 1);
-	
-	clear.alpha = alphaconv(ps->o.highlight_opacity);
-	mw->highlightPixmap = XCreatePixmap(ps->dpy, mw->window, 1, 1, 8);
-	mw->highlightPicture = XRenderCreatePicture(ps->dpy, mw->highlightPixmap, XRenderFindStandardFormat(ps->dpy, PictStandardA8), CPRepeat, &pa);
-	XRenderFillRectangle(ps->dpy, PictOpSrc, mw->highlightPicture, &clear, 0, 0, 1, 1);
-	
+
+	;
+	if(! XParseColor(ps->dpy, mw->colormap, ps->o.shadow_tint, &exact_color))
+	{
+		printfef(true, "(): Couldn't look up color '%s', reverting to #040404", ps->o.shadow_tint);
+		mw->shadowTint.red = mw->shadowTint.green =	mw->shadowTint.blue = 0x04;
+	}
+	else
+	{
+		mw->shadowTint.red = exact_color.red;
+		mw->shadowTint.green = exact_color.green;
+		mw->shadowTint.blue = exact_color.blue;
+	}
+	mw->shadowTint.alpha = alphaconv(ps->o.shadow_tintOpacity);
+
 	mw->distance = ps->o.distance;
 	
-	if (ps->o.tooltip_show)
+	if (ps->o.tooltip_show) {
+		if(mw->tooltip)
+			tooltip_destroy(mw->tooltip);
 		mw->tooltip = tooltip_create(mw);
+	}
 	
 	return mw;
+}
 
-mainwin_create_err:
-	if (mw)
-		free(mw);
-	return NULL;
+MainWin *
+mainwin_create_pixmap(MainWin *mw) {
+	session_t *ps = mw->ps;
+
+	XRenderPictureAttributes pa;
+	XRenderColor clear;
+
+	pa.repeat = True;
+	clear.alpha = alphaconv(ps->o.normal_opacity);
+	if(mw->normalPixmap != None)
+		XFreePixmap(ps->dpy, mw->normalPixmap);
+	mw->normalPixmap = XCreatePixmap(ps->dpy, mw->window, 1, 1, 8);
+	if(mw->normalPicture != None)
+		XRenderFreePicture(ps->dpy, mw->normalPicture);
+	mw->normalPicture = XRenderCreatePicture(ps->dpy, mw->normalPixmap,
+			XRenderFindStandardFormat(ps->dpy, PictStandardA8), CPRepeat, &pa);
+	XRenderFillRectangle(ps->dpy, PictOpSrc, mw->normalPicture, &clear, 0, 0, 1, 1);
+
+	clear.alpha = alphaconv(ps->o.highlight_opacity);
+	if(mw->highlightPixmap != None)
+		XFreePixmap(ps->dpy, mw->highlightPixmap);
+	mw->highlightPixmap = XCreatePixmap(ps->dpy, mw->window, 1, 1, 8);
+	if(mw->highlightPicture != None)
+		XRenderFreePicture(ps->dpy, mw->highlightPicture);
+	mw->highlightPicture = XRenderCreatePicture(ps->dpy, mw->highlightPixmap,
+			XRenderFindStandardFormat(ps->dpy, PictStandardA8), CPRepeat, &pa);
+	XRenderFillRectangle(ps->dpy, PictOpSrc, mw->highlightPicture, &clear, 0, 0, 1, 1);
+
+	clear.alpha = alphaconv(ps->o.shadow_opacity);
+	if(mw->shadowPixmap != None)
+		XFreePixmap(ps->dpy, mw->shadowPixmap);
+	mw->shadowPixmap = XCreatePixmap(ps->dpy, mw->window, 1, 1, 8);
+	if(mw->shadowPicture != None)
+		XRenderFreePicture(ps->dpy, mw->shadowPicture);
+	mw->shadowPicture = XRenderCreatePicture(ps->dpy, mw->shadowPixmap,
+			XRenderFindStandardFormat(ps->dpy, PictStandardA8), CPRepeat, &pa);
+	XRenderFillRectangle(ps->dpy, PictOpSrc, mw->shadowPicture, &clear, 0, 0, 1, 1);
+
+	return mw;
 }
 
 void
@@ -246,13 +360,13 @@ mainwin_update(MainWin *mw)
 	}
 	
 # ifdef DEBUG
-	fprintf(stderr, "--> querying pointer... ");
+	printfdf(false, "(): --> querying pointer... ");
 # endif /* DEBUG */
 	XQueryPointer(ps->dpy, ps->root, &dummy_w, &dummy_w, &root_x, &root_y, &dummy_i, &dummy_i, &dummy_u);
 # ifdef DEBUG	
-	fprintf(stderr, "+%i+%i\n", root_x, root_y);
+	printfdf(false, "(): +%i+%i\n", root_x, root_y);
 	
-	fprintf(stderr, "--> figuring out which screen we're on... ");
+	printfdf(false, "(): --> figuring out which screen we're on... ");
 # endif /* DEBUG */
 	iter = mw->xin_info;
 	for(i = 0; i < mw->xin_screens; ++i)
@@ -261,7 +375,7 @@ mainwin_update(MainWin *mw)
 		   root_y >= iter->y_org && root_y < iter->y_org + iter->height)
 		{
 # ifdef DEBUG
-			fprintf(stderr, "screen %i %ix%i+%i+%i\n", iter->screen_number, iter->width, iter->height, iter->x_org, iter->y_org);
+			printfdf(false, "(): screen %i %ix%i+%i+%i\n", iter->screen_number, iter->width, iter->height, iter->x_org, iter->y_org);
 # endif /* DEBUG */
 			break;
 		}
@@ -270,7 +384,7 @@ mainwin_update(MainWin *mw)
 	if(i == mw->xin_screens)
 	{
 # ifdef DEBUG 
-		fprintf(stderr, "unknown\n");
+		printfdf(false, "(): unknown\n");
 # endif /* DEBUG */
 		return;
 	}
@@ -301,8 +415,9 @@ mainwin_map(MainWin *mw) {
 		int ret = XGrabKeyboard(ps->dpy, mw->window, True, GrabModeAsync,
 				GrabModeAsync, CurrentTime);
 		if (Success != ret)
-			printfef("(): Failed to grab keyboard (%d), troubles ahead.", ret);
+			printfef(true, "(): Failed to grab keyboard (%d), troubles ahead.", ret);
 	} */
+	mw->mapped = true;
 }
 
 void
@@ -317,6 +432,7 @@ mainwin_unmap(MainWin *mw)
 	}
 	XUngrabKeyboard(mw->ps->dpy, CurrentTime);
 	XUnmapWindow(mw->ps->dpy, mw->window);
+	mw->mapped = false;
 }
 
 void
@@ -354,6 +470,32 @@ mainwin_destroy(MainWin *mw) {
 		XFree(mw->xin_info);
 #endif /* CFG_XINERAMA */
 	
+	free(mw->keysyms_Up);
+	free(mw->keysyms_Down);
+	free(mw->keysyms_Left);
+	free(mw->keysyms_Right);
+	free(mw->keysyms_Prev);
+	free(mw->keysyms_Next);
+	free(mw->keysyms_ExitCancelOnPress);
+	free(mw->keysyms_ExitCancelOnRelease);
+	free(mw->keysyms_ExitSelectOnPress);
+	free(mw->keysyms_ExitSelectOnRelease);
+	free(mw->keysyms_ReverseDirection);
+
+	free(mw->modifierKeyMasks_ReverseDirection);
+
+	free(mw->keycodes_Up);
+	free(mw->keycodes_Down);
+	free(mw->keycodes_Left);
+	free(mw->keycodes_Right);
+	free(mw->keycodes_Prev);
+	free(mw->keycodes_Next);
+	free(mw->keycodes_ExitCancelOnPress);
+	free(mw->keycodes_ExitCancelOnRelease);
+	free(mw->keycodes_ExitSelectOnPress);
+	free(mw->keycodes_ExitSelectOnRelease);
+	free(mw->keycodes_ReverseDirection);
+
 	free(mw);
 }
 
@@ -373,6 +515,7 @@ mainwin_transform(MainWin *mw, float f)
 
 int
 mainwin_handle(MainWin *mw, XEvent *ev) {
+	printfdf(false, "(): ");
 	session_t *ps = mw->ps;
 
 	switch(ev->type) {
@@ -380,25 +523,46 @@ mainwin_handle(MainWin *mw, XEvent *ev) {
 			XSetInputFocus(ps->dpy, mw->window, RevertToParent, CurrentTime);
 			break;
 		case KeyPress:
-			mw->pressed_key = true;
-			break;
 		case KeyRelease:
-			if (mw->pressed_key)
-				report_key_unbinded(ev);
-			else
-				report_key_ignored(ev);
+			printfdf(false, "(): KeyPress or KeyRelease");
+			// if(mw->client_to_focus)
+			// {
+				// printfdf(false, "(): clientwin_handle(mw->client_to_focus, ev);");
+			if(clientwin_handle(mw->client_to_focus, ev))
+				return 1;
+
+			// }
+			// else
+			// {
+			// 	printfdf(false, "(): mw->client_to_focus == NULL");				
+			// }
 			break;
 		case ButtonPress:
 			mw->pressed_mouse = true;
 			break;
 		case ButtonRelease:
 			if (mw->pressed_mouse) {
-				printfef("(): Detected mouse button release on main window, "
+				const unsigned button = ev->xbutton.button;
+				if (button < MAX_MOUSE_BUTTONS) {
+					enum cliop action = ps->o.bindings_miwMouse[button];
+					if (action == CLIENTOP_PREV) {
+						focus_miniw_prev(ps, mw->client_to_focus);
+						return 0;
+					}
+					else if (action == CLIENTOP_NEXT) {
+						focus_miniw_next(ps, mw->client_to_focus);
+						return 0;
+					}
+					else if (action == CLIENTOP_NO) {
+						return 0;
+					}
+				}
+				printfdf(false, "(): Detected mouse button release on main window, "
 						"exiting.");
 				return 1;
 			}
 			else
-				printfef("(): ButtonRelease %u ignored.", ev->xbutton.button);
+				printfdf(false, "(): ButtonRelease %u ignored.", ev->xbutton.button);
 			break;
 	}
 

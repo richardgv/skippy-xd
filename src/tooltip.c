@@ -88,7 +88,7 @@ tooltip_create(MainWin *mw) {
 	}
 
 	if (!tt->window) {
-		printfef("(): WARNING: Couldn't create tooltip window.");
+		printfef(false, "(): WARNING: Couldn't create tooltip window.");
 		tooltip_destroy(tt);
 		return 0;
 	}
@@ -97,7 +97,7 @@ tooltip_create(MainWin *mw) {
 	tmp = ps->o.tooltip_border;
 	if(! XftColorAllocName(ps->dpy, mw->visual, mw->colormap, tmp, &tt->border))
 	{
-		fprintf(stderr, "WARNING: Invalid color '%s'.\n", tmp);
+		printfef(false, "(): WARNING: Invalid color '%s'.\n", tmp);
 		tooltip_destroy(tt);
 		return 0;
 	}
@@ -105,7 +105,7 @@ tooltip_create(MainWin *mw) {
 	tmp = ps->o.tooltip_background;
 	if(! XftColorAllocName(ps->dpy, mw->visual, mw->colormap, tmp, &tt->background))
 	{
-		fprintf(stderr, "WARNING: Invalid color '%s'.\n", tmp);
+		printfef(false, "(): WARNING: Invalid color '%s'.\n", tmp);
 		tooltip_destroy(tt);
 		return 0;
 	}
@@ -117,7 +117,7 @@ tooltip_create(MainWin *mw) {
 	tmp = ps->o.tooltip_text;
 	if(! XftColorAllocName(ps->dpy, mw->visual, mw->colormap, tmp, &tt->color))
 	{
-		fprintf(stderr, "WARNING: Couldn't allocate color '%s'.\n", tmp);
+		printfef(false, "(): WARNING: Couldn't allocate color '%s'.\n", tmp);
 		tooltip_destroy(tt);
 		return 0;
 	}
@@ -127,7 +127,7 @@ tooltip_create(MainWin *mw) {
 	{
 		if(! XftColorAllocName(ps->dpy, mw->visual, mw->colormap, tmp, &tt->shadow))
 		{
-			fprintf(stderr, "WARNING: Couldn't allocate color '%s'.\n", tmp);
+			printfef(false, "(): WARNING: Couldn't allocate color '%s'.\n", tmp);
 			tooltip_destroy(tt);
 			return 0;
 		}
@@ -136,7 +136,7 @@ tooltip_create(MainWin *mw) {
 	tt->draw = XftDrawCreate(ps->dpy, tt->window, mw->visual, mw->colormap);
 	if(! tt->draw)
 	{
-		fprintf(stderr, "WARNING: Couldn't create Xft draw surface.\n");
+		printfef(false, "(): WARNING: Couldn't create Xft draw surface.\n");
 		tooltip_destroy(tt);
 		return 0;
 	}
@@ -144,7 +144,7 @@ tooltip_create(MainWin *mw) {
 	tt->font = XftFontOpenName(ps->dpy, ps->screen, ps->o.tooltip_font);
 	if(! tt->font)
 	{
-		fprintf(stderr, "WARNING: Couldn't open Xft font.\n");
+		printfef(false, "(): WARNING: Couldn't open Xft font.\n");
 		tooltip_destroy(tt);
 		return 0;
 	}
@@ -163,18 +163,31 @@ tooltip_create(MainWin *mw) {
 }
 
 void
-tooltip_map(Tooltip *tt, int mouse_x, int mouse_y,
-		const FcChar8 *text, int len) {
+tooltip_map(Tooltip *tt, int mouse_x, int mouse_y, ClientWin *cw,
+		FcChar8 *text, int len)
+{
 	session_t * const ps = tt->mainwin->ps;
+	unsigned int max_width = tt->mainwin->width * 0.3;
+	FcChar8 *ptr;
 
 	XUnmapWindow(ps->dpy, tt->window);
 	
 	XftTextExtentsUtf8(ps->dpy, tt->font, text, len, &tt->extents);
 	
+	while (tt->extents.width > max_width) {
+		ptr = text + len - 1;
+		*ptr-- = '\0';
+		*ptr-- = '.';
+		*ptr-- = '.';
+		*ptr-- = '.';
+		len--;
+		XftTextExtentsUtf8(ps->dpy, tt->font, text, len, &tt->extents);
+	}
+
 	tt->width = tt->extents.width + 8;
 	tt->height = tt->font_height + 5 + (tt->shadow.pixel ? 2 : 0);
 	XResizeWindow(ps->dpy, tt->window, tt->width, tt->height);
-	tooltip_move(tt, mouse_x, mouse_y);
+	tooltip_move(tt, mouse_x, mouse_y, cw);
 	
 	if(tt->text)
 		free(tt->text);
@@ -189,22 +202,15 @@ tooltip_map(Tooltip *tt, int mouse_x, int mouse_y,
 }
 
 void
-tooltip_move(Tooltip *tt, int mouse_x, int mouse_y) {
+tooltip_move(Tooltip *tt, int mouse_x, int mouse_y, ClientWin *cw) {
+
 	session_t *ps = tt->mainwin->ps;
-	int x = ps->o.tooltip_offsetX, y = ps->o.tooltip_offsetY;
-	if (ps->o.tooltip_followsMouse) {
-		x += mouse_x;
-		y += mouse_y;
-	}
-	switch (ps->o.tooltip_align) {
-		case ALIGN_LEFT: break;
-		case ALIGN_MID:
-						 x -= tt->width / 2;
-						 break;
-		case ALIGN_RIGHT:
-						 x -= tt->width;
-						 break;
-	}
+	int x = ps->o.tooltip_offsetX,
+		y = ps->o.tooltip_offsetY;
+
+    x += cw->mini.x + cw->mini.width/2 - tt->width / 2;
+    y += cw->mini.y + cw->mini.height;
+
 	x = MIN(MAX(0, x), tt->mainwin->x + tt->mainwin->width - tt->width);
 	y = MIN(MAX(0, y), tt->mainwin->y + tt->mainwin->height - tt->height);
 	
